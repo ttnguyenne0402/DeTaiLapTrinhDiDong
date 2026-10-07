@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 
 
@@ -65,7 +66,16 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
 
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.home,
+                    (route) => false,
+              );
+            }
           },
         ),
         elevation: 0,

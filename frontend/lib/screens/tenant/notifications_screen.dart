@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 import '../../widgets/tenant/notification_item.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -59,7 +60,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.home,
+                    (route) => false,
+              );
+            }
+          },
         ),
         actions: [
 
