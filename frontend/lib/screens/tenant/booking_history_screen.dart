@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 import '../../widgets/common/status_badge.dart';
 
 class booking_history_screen extends StatefulWidget {
@@ -67,13 +68,15 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () {
-
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
 
-              Navigator.pushReplacementNamed(context, '/tenant/contracts');
-
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.home,
+                    (route) => false,
+              );
             }
           },
         ),
