@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 //DỮ LIỆU GIẢ
 class InvoiceMock {
@@ -84,7 +85,18 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.home,
+                    (route) => false,
+              );
+            }
+          },
         ),
       ),
 

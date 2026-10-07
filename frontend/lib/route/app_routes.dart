@@ -30,4 +30,6 @@ abstract class AppRoutes {
   static const String tenantInvoiceDetail = '/tenant/invoices/detail';
   static const String tenantPayment = '/tenant/payment';
   static const String tenantNotifications = '/tenant/notifications';
+  static const String home = '/home';
+  static const String roomDetail = '/room-detail';
 }

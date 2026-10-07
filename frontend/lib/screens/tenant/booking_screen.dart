@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 import '../../widgets/tenant/calendar_widget.dart';
 
 class booking_screen extends StatefulWidget {
@@ -82,7 +83,19 @@ class _BookingScreenState extends State<booking_screen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.roomDetail,
+                    (route) => false,
+              );
+            }
+          }
         ),
         elevation: 0,
       ),

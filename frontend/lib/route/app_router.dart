@@ -29,6 +29,8 @@ import '../screens/tenant/my_invoices_screen.dart' as tenant_invoices;
 import '../screens/tenant/invoice_detail_screen.dart' as tenant_invoice_detail;
 import '../screens/tenant/payment_screen.dart' as tenant_payment;
 import '../screens/tenant/notifications_screen.dart' as tenant_notifications;
+import '../screens/tenant/home_screen.dart' as tv1_home;
+import '../screens/tenant/room_detail_screen.dart' as tv1_room_detail;
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final args = settings.arguments;
@@ -87,7 +89,12 @@ class AppRouter {
       case AppRoutes.tenantPayment:
         return MaterialPageRoute(builder: (_) => const tenant_payment.PaymentScreen());
       case AppRoutes.tenantNotifications:
-        return MaterialPageRoute(builder: (_) => const tenant_notifications.NotificationsScreen());
+        return MaterialPageRoute(builder: (_) => const tenant_notifications.NotificationsScreen());// --- ROUTE CỦA TV1 ---
+      case AppRoutes.home:
+        return MaterialPageRoute(builder: (_) => const tv1_home.HomeScreen());
+      case AppRoutes.roomDetail:
+        final roomData = (args as Map<String, dynamic>?) ?? {};
+        return MaterialPageRoute(builder: (_) => tv1_room_detail.RoomDetailScreen(room: roomData));
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
