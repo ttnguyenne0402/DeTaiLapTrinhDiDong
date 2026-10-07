@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\BaiTapVeNha\\DoAnLapTrinhUngDungDiDong\\DeTaiLapTrinhDiDong\\Backend\\",
+  "WorkspaceRootPath": "C:\\Users\\ADMIN\\Documents\\VisualCodeStudio\\LT_UDDD\\DoAnUngDungDiDong\\Backend\\",
   "Documents": [],
   "DocumentGroupContainers": [
     {
@@ -13,15 +13,7 @@
           "Children": [
             {
               "$type": "Bookmark",
-              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{1c64b9c2-e352-428e-a56d-0ace190b99a6}"
+              "Name": "ST:128:0:{1fc202d4-d401-403c-9834-5b218574bb67}"
             }
           ]
         }
