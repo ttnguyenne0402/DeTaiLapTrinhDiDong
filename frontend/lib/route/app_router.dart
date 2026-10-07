@@ -21,6 +21,14 @@ import '../screens/owner/utility_history.dart';
 import '../screens/owner/maintenance_manage.dart';
 import '../screens/owner/maintenance_detail.dart';
 
+import '../screens/tenant/booking_screen.dart' as tenant_booking;
+import '../screens/tenant/booking_history_screen.dart' as tenant_booking_history;
+import '../screens/tenant/my_contracts_screen.dart' as tenant_contracts;
+import '../screens/tenant/contract_detail_screen.dart' as tenant_contract_detail;
+import '../screens/tenant/my_invoices_screen.dart' as tenant_invoices;
+import '../screens/tenant/invoice_detail_screen.dart' as tenant_invoice_detail;
+import '../screens/tenant/payment_screen.dart' as tenant_payment;
+import '../screens/tenant/notifications_screen.dart' as tenant_notifications;
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final args = settings.arguments;
@@ -63,6 +71,23 @@ class AppRouter {
       case AppRoutes.invoiceDetailOwner:
         return MaterialPageRoute(builder: (_) => InvoiceDetailScreen());// id
 
+      // ROUTE CỦA TV2 (NGƯỜI THUÊ - Dùng bí danh)
+      case AppRoutes.tenantBooking:
+        return MaterialPageRoute(builder: (_) => const tenant_booking.booking_screen());
+      case AppRoutes.tenantBookingHistory:
+        return MaterialPageRoute(builder: (_) => const tenant_booking_history.booking_history_screen());
+      case AppRoutes.tenantContracts:
+        return MaterialPageRoute(builder: (_) => const tenant_contracts.MyContractsScreen());
+      case AppRoutes.tenantContractDetail:
+        return MaterialPageRoute(builder: (_) => const tenant_contract_detail.ContractDetailScreen());
+      case AppRoutes.tenantInvoices:
+        return MaterialPageRoute(builder: (_) => const tenant_invoices.MyInvoicesScreen());
+      case AppRoutes.tenantInvoiceDetail:
+        return MaterialPageRoute(builder: (_) => tenant_invoice_detail.InvoiceDetailScreen());
+      case AppRoutes.tenantPayment:
+        return MaterialPageRoute(builder: (_) => const tenant_payment.PaymentScreen());
+      case AppRoutes.tenantNotifications:
+        return MaterialPageRoute(builder: (_) => const tenant_notifications.NotificationsScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(

@@ -95,6 +95,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         backgroundColor: AppColors.primaryGreen,
         onPressed: () {
           // SANG MÀN HÌNH THANH TOÁN
+          Navigator.pushNamed(context, '/tenant/payment');
         },
         icon: const Icon(Icons.payment, color: Colors.white),
         label: const Text(
@@ -176,6 +177,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           // CHUYỂN SANG MÀN HÌNH CHI TIẾT HÓA ĐƠN
+          Navigator.pushNamed(context, '/tenant/invoices/detail');
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
