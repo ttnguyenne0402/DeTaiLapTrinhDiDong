@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 //DỮ LIỆU GIẢ
 
@@ -246,7 +247,8 @@ class InvoiceDetailScreen extends StatelessWidget {
                           ),
                         ),
                         onPressed: () {
-                          // CHUYỂN SANG MÀN  payment_screen.dart
+                          // CHUYỂN SANG MÀN HÌNH THANH TOÁN
+                          Navigator.pushNamed(context, AppRoutes.tenantPayment);
                         },
                         child: const Text(
                           'THANH TOÁN NGAY',

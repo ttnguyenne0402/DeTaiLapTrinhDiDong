@@ -130,6 +130,7 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
                       // CHUYỂN SANG CHI TIẾT HỢP ĐỒNG
+                      Navigator.pushNamed(context, '/tenant/contracts/detail');
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),

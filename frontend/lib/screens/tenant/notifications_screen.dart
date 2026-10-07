@@ -101,6 +101,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 });
               }
 
+
+              switch (notif['type']) {
+                case 'invoice':
+                  Navigator.pushNamed(context, '/tenant/invoices/detail');
+                  break;
+                case 'viewing_appointment':
+                  Navigator.pushNamed(context, '/tenant/booking-history');
+                  break;
+                case 'contract':
+                  Navigator.pushNamed(context, '/tenant/contracts/detail');
+                  break;
+
+              // MAINTENANCE SẼ DO TV4 LÀM NÊN TẠM THỜI CHƯA CÓ ROUTE CỤ THỂ CỦA TENANT
+              }
+
               // TUẦN 7 VIẾT LỆNH ĐIỀU HƯỚNG
 
             },
