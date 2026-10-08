@@ -8,7 +8,7 @@ class AppColors {
   static const Color lightGreen = Color(0xFFE6F0EB);
 
   // Màu nền màn hình
-  static const Color background = Color(0xFFF9F9F6);
+  static const Color background = Color(0xFFFFFDF5);
 
   // Màu trắng Card/Thẻ
   static const Color cardSurface = Color(0xFFFFFFFF);

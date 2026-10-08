@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/invoices_manage_w.dart';
 import '../../route/app_routes.dart';
-
+import '../../widgets/owner/owner_drawer.dart';
 class Invoice_mana extends StatefulWidget {
   const Invoice_mana({super.key});
 
@@ -17,28 +17,29 @@ class _InvoiceManaState extends State<Invoice_mana> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
+      drawer:OwnerDrawer(
+        currentRoute: 'invoices',
+      ) ,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
-        leading: IconButton(
-          onPressed: () {},
-          icon: const Icon(Icons.home_outlined, color: Colors.white, size: 22),
-        ),
         title: const Text('Hóa Đơn Thu Tiền', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.tune, color: Colors.white, size: 20),
-          ),
-          IconButton(
-            onPressed: () {},
             icon: const Icon(Icons.notifications_none, color: Colors.white, size: 22),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.person_outline, color: Colors.white, size: 22),
+
+          const SizedBox(width: 8),
+
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(Icons.person, color: Colors.white, size: 20),
           ),
+
+          const SizedBox(width: 16),
         ],
       ),
       body: Container(

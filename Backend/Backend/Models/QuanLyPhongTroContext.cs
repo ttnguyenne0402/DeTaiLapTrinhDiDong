@@ -69,11 +69,12 @@ public partial class QuanLyPhongTroContext : DbContext
     {
         modelBuilder.Entity<Amenity>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__amenitie__3213E83F85201038");
+
+            entity.HasKey(e => e.Id).HasName("PK__amenitie__3213E83F4C6B86BC");
 
             entity.ToTable("amenities");
 
-            entity.HasIndex(e => e.Name, "UQ__amenitie__72E12F1B40057EC4").IsUnique();
+            entity.HasIndex(e => e.Name, "UQ__amenitie__72E12F1B1783B84B").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasMaxLength(50)
@@ -95,8 +96,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<BankAccount>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__bank_acc__3213E83F2ABB9E3B");
 
+            entity.HasKey(e => e.Id).HasName("PK__bank_acc__3213E83F86F7E36D");
             entity.ToTable("bank_accounts");
 
             entity.Property(e => e.Id)
@@ -136,11 +137,12 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Contract>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83FF803B7CF");
+
+            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83F4BD26F9C");
 
             entity.ToTable("contracts");
 
-            entity.HasIndex(e => e.ContractCode, "UQ__contract__68CFBDBAFDFFCBE5").IsUnique();
+            entity.HasIndex(e => e.ContractCode, "UQ__contract__68CFBDBADEC6EE03").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasMaxLength(50)
@@ -212,8 +214,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<ContractMember>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83FD19CD238");
 
+            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83FE2441066");
             entity.ToTable("contract_members");
 
             entity.Property(e => e.Id)
@@ -249,8 +251,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<ContractService>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83F9F4FEE70");
 
+            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83FB5C7C523");
             entity.ToTable("contract_services");
 
             entity.Property(e => e.Id)
@@ -292,7 +294,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<ContractTermination>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83F8868A1F0");
+
+            entity.HasKey(e => e.Id).HasName("PK__contract__3213E83F1AE4A456");
 
             entity.ToTable("contract_terminations");
 
@@ -324,7 +327,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Favorite>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__favorite__3213E83FEB8CD865");
+
+            entity.HasKey(e => e.Id).HasName("PK__favorite__3213E83F6E095339");
 
             entity.ToTable("favorites");
 
@@ -357,12 +361,12 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Invoice>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__invoices__3213E83F8296A1A4");
+
+            entity.HasKey(e => e.Id).HasName("PK__invoices__3213E83FC1C2A34A");
 
             entity.ToTable("invoices");
 
-            entity.HasIndex(e => e.InvoiceCode, "UQ__invoices__5ED70A3517DF05F6").IsUnique();
-
+            entity.HasIndex(e => e.InvoiceCode, "UQ__invoices__5ED70A358421FE6C").IsUnique();
             entity.Property(e => e.Id)
                 .HasMaxLength(50)
                 .HasColumnName("id");
@@ -410,8 +414,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<InvoiceItem>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__invoice___3213E83F55F30A73");
 
+            entity.HasKey(e => e.Id).HasName("PK__invoice___3213E83F08727040");
             entity.ToTable("invoice_items");
 
             entity.Property(e => e.Id)
@@ -458,7 +462,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<MaintenanceRequest>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__maintena__3213E83F7E8317F9");
+
+            entity.HasKey(e => e.Id).HasName("PK__maintena__3213E83F16645F4F");
 
             entity.ToTable("maintenance_requests");
 
@@ -506,7 +511,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Notification>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__notifica__3213E83F6DBA477B");
+
+            entity.HasKey(e => e.Id).HasName("PK__notifica__3213E83FA29A72A9");
 
             entity.ToTable("notifications");
 
@@ -545,11 +551,12 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Payment>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__payments__3213E83F4B093E61");
+
+            entity.HasKey(e => e.Id).HasName("PK__payments__3213E83F45CFE2B2");
 
             entity.ToTable("payments");
 
-            entity.HasIndex(e => e.PaymentCode, "UQ__payments__7234C6E3DB927A26").IsUnique();
+            entity.HasIndex(e => e.PaymentCode, "UQ__payments__7234C6E3651C60C7").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasMaxLength(50)
@@ -596,7 +603,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Property>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__properti__3213E83FA2B3631B");
+
+            entity.HasKey(e => e.Id).HasName("PK__properti__3213E83F78387B89");
 
             entity.ToTable("properties");
 
@@ -646,7 +654,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<PropertyService>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__property__3213E83F5D07EB91");
+
+            entity.HasKey(e => e.Id).HasName("PK__property__3213E83FF09827AA");
 
             entity.ToTable("property_services");
 
@@ -685,7 +694,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<RentalPost>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__rental_p__3213E83FA1BF58AF");
+
+            entity.HasKey(e => e.Id).HasName("PK__rental_p__3213E83F8C31F744");
 
             entity.ToTable("rental_posts");
 
@@ -720,7 +730,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<RentalPostImage>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__rental_p__3213E83F0897CD3D");
+
+            entity.HasKey(e => e.Id).HasName("PK__rental_p__3213E83F213A5E42");
 
             entity.ToTable("rental_post_images");
 
@@ -754,8 +765,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Review>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__reviews__3213E83F350D0BAF");
 
+            entity.HasKey(e => e.Id).HasName("PK__reviews__3213E83F65249D0C");
             entity.ToTable("reviews");
 
             entity.Property(e => e.Id)
@@ -792,7 +803,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Room>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__rooms__3213E83FFCF25C40");
+
+            entity.HasKey(e => e.Id).HasName("PK__rooms__3213E83FBC717729");
 
             entity.ToTable("rooms");
 
@@ -837,8 +849,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<RoomAmenity>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__room_ame__3213E83F3843B1CF");
 
+            entity.HasKey(e => e.Id).HasName("PK__room_ame__3213E83FA91D7067");
             entity.ToTable("room_amenities");
 
             entity.Property(e => e.Id)
@@ -870,7 +882,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<Service>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__services__3213E83FF29ADA37");
+
+            entity.HasKey(e => e.Id).HasName("PK__services__3213E83FD0AA465B");
 
             entity.ToTable("services");
 
@@ -904,11 +917,12 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__users__3213E83FC21DE11F");
+
+            entity.HasKey(e => e.Id).HasName("PK__users__3213E83F0199C970");
 
             entity.ToTable("users");
 
-            entity.HasIndex(e => e.Email, "UQ__users__AB6E61641DC58E5B").IsUnique();
+            entity.HasIndex(e => e.Email, "UQ__users__AB6E616490A93DA4").IsUnique();
 
             entity.Property(e => e.Id)
                 .HasMaxLength(50)
@@ -945,7 +959,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<UtilityReading>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__utility___3213E83F54D08D77");
+
+            entity.HasKey(e => e.Id).HasName("PK__utility___3213E83F642FB0CB");
 
             entity.ToTable("utility_readings");
 
@@ -989,7 +1004,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
         modelBuilder.Entity<ViewingAppointment>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__viewing___3213E83F97580B0F");
+
+            entity.HasKey(e => e.Id).HasName("PK__viewing___3213E83FAF3A20D6");
 
             entity.ToTable("viewing_appointments");
 

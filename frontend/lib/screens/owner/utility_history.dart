@@ -18,28 +18,30 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
-        centerTitle: false,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
           onPressed: () => Navigator.maybePop(context),
         ),
+
         title: const Text(
           'Quản Lí Điện Nước',
           style: TextStyle(
             color: AppColors.cardSurface,
             fontWeight: FontWeight.bold,
+            fontSize: 18
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.cardSurface),
+            icon: const Icon(Icons.notifications, color: AppColors.cardSurface),
             onPressed: () {},
           ),
           Container(
             margin: const EdgeInsets.only(right: 16, left: 4),
             padding: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
-              color: AppColors.cardSurface,
+              color: AppColors.lightGreen,
               shape: BoxShape.circle,
             ),
             child: const Icon(
