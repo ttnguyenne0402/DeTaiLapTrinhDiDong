@@ -4,14 +4,12 @@ import '../../core/constants/app_colors.dart';
 import '../../widgets/tenant/image_slider.dart';
 import 'favorites_screen.dart';
 import 'reviews_screen.dart';
+import 'booking_screen.dart';
 
 class RoomDetailScreen extends StatefulWidget {
   final Map<String, dynamic> room;
 
-  const RoomDetailScreen({
-    super.key,
-    required this.room,
-  });
+  const RoomDetailScreen({super.key, required this.room});
 
   @override
   State<RoomDetailScreen> createState() => _RoomDetailScreenState();
@@ -27,8 +25,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
 
   Map<String, dynamic> get room => widget.room;
 
-  String get roomTitle =>
-      room['title']?.toString() ?? 'Phòng trọ chưa có tên';
+  String get roomTitle => room['title']?.toString() ?? 'Phòng trọ chưa có tên';
 
   String get propertyName =>
       room['propertyName']?.toString() ?? 'Khu trọ Trọ Ơi';
@@ -95,15 +92,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       curve: Curves.easeOut,
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.04),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _animationController.forward();
   }
@@ -187,9 +182,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
         duration: const Duration(milliseconds: 1300),
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Row(
           children: [
             Icon(
@@ -200,12 +193,8 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             ),
             const SizedBox(width: 10),
             Text(
-              _isFavorite
-                  ? 'Đã thêm vào yêu thích'
-                  : 'Đã bỏ khỏi yêu thích',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-              ),
+              _isFavorite ? 'Đã thêm vào yêu thích' : 'Đã bỏ khỏi yêu thích',
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -216,11 +205,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   void _openReviews() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ReviewsScreen(
-          room: room,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => ReviewsScreen(room: room)),
     );
   }
 
@@ -231,14 +216,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: Text(
           message,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -261,12 +242,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                   child: SlideTransition(
                     position: _slideAnimation,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        20,
-                        22,
-                        20,
-                        120,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 120),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -356,9 +332,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             icon: _isFavorite
                 ? Icons.favorite_rounded
                 : Icons.favorite_border_rounded,
-            iconColor: _isFavorite
-                ? AppColors.accentYellow
-                : Colors.white,
+            iconColor: _isFavorite ? AppColors.accentYellow : Colors.white,
             onTap: _toggleFavorite,
           ),
         ),
@@ -507,9 +481,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryGreen.withOpacity(0.07),
@@ -550,21 +522,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   }
 
   Widget _verticalDivider() {
-    return Container(
-      width: 1,
-      height: 48,
-      color: const Color(0xFFE5E7EB),
-    );
+    return Container(width: 1, height: 48, color: const Color(0xFFE5E7EB));
   }
 
   // ============================================================
   // SECTION TITLE
   // ============================================================
 
-  Widget _buildSectionTitle({
-    required IconData icon,
-    required String title,
-  }) {
+  Widget _buildSectionTitle({required IconData icon, required String title}) {
     return Row(
       children: [
         Container(
@@ -574,11 +539,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             color: AppColors.lightGreen,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: AppColors.primaryGreen,
-            size: 20,
-          ),
+          child: Icon(icon, color: AppColors.primaryGreen, size: 20),
         ),
         const SizedBox(width: 11),
         Text(
@@ -622,9 +583,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           _InfoRow(
             icon: Icons.account_balance_wallet_outlined,
             title: 'Tiền cọc',
-            value: _formatPrice(
-              (room['deposit'] as num?)?.toInt() ?? price,
-            ),
+            value: _formatPrice((room['deposit'] as num?)?.toInt() ?? price),
           ),
         ],
       ),
@@ -640,10 +599,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       return _HoverCard(
         child: const Row(
           children: [
-            Icon(
-              Icons.info_outline_rounded,
-              color: AppColors.primaryGreen,
-            ),
+            Icon(Icons.info_outline_rounded, color: AppColors.primaryGreen),
             SizedBox(width: 10),
             Text(
               'Chưa có thông tin tiện nghi',
@@ -661,10 +617,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       spacing: 10,
       runSpacing: 10,
       children: amenities.map((amenity) {
-        return _AmenityChip(
-          label: amenity,
-          icon: _amenityIcon(amenity),
-        );
+        return _AmenityChip(label: amenity, icon: _amenityIcon(amenity));
       }).toList(),
     );
   }
@@ -676,8 +629,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   Widget _buildDescription() {
     final rawDescription = room['description']?.toString().trim();
 
-    final description =
-        rawDescription != null && rawDescription.isNotEmpty
+    final description = rawDescription != null && rawDescription.isNotEmpty
         ? rawDescription
         : 'Phòng được thiết kế phù hợp cho sinh viên và người đi làm, '
               'không gian thoải mái, tiện nghi và thuận tiện cho sinh hoạt '
@@ -752,10 +704,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           const SizedBox(height: 16),
 
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 13,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
               color: AppColors.lightGreen.withOpacity(.55),
               borderRadius: BorderRadius.circular(15),
@@ -818,23 +767,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.rate_review_outlined,
-                    size: 18,
-                  ),
+                  Icon(Icons.rate_review_outlined, size: 18),
                   SizedBox(width: 8),
                   Text(
                     'Xem tất cả đánh giá',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
                   ),
                   SizedBox(width: 5),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 17,
-                  ),
+                  Icon(Icons.arrow_forward_rounded, size: 17),
                 ],
               ),
             ),
@@ -875,19 +815,12 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
-              child: _FakeMap(
-                address: address,
-              ),
+              child: _FakeMap(address: address),
             ),
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              17,
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -935,12 +868,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              16,
-              0,
-              16,
-              17,
-            ),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 17),
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
@@ -992,128 +920,124 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   // ============================================================
 
   // ============================================================
-// BOTTOM ACTION
-// ============================================================
+  // BOTTOM ACTION
+  // ============================================================
 
-Widget _buildBottomAction() {
-  return Positioned(
-    left: 0,
-    right: 0,
-    bottom: 0,
-    child: SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(
-          20,
-          12,
-          20,
-          12,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.cardSurface.withOpacity(0.96),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.10),
-              blurRadius: 25,
-              offset: const Offset(0, -8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // =================================================
-            // XEM DANH SÁCH YÊU THÍCH
-            // =================================================
-            SizedBox(
-              width: 150,
-              height: 54,
-              child: OutlinedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const FavoritesScreen(),
+  Widget _buildBottomAction() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          decoration: BoxDecoration(
+            color: AppColors.cardSurface.withOpacity(0.96),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 25,
+                offset: const Offset(0, -8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // =================================================
+              // XEM DANH SÁCH YÊU THÍCH
+              // =================================================
+              SizedBox(
+                width: 150,
+                height: 54,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const FavoritesScreen(),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryGreen,
+                    backgroundColor: AppColors.lightGreen,
+                    side: BorderSide(
+                      color: AppColors.primaryGreen.withOpacity(0.18),
+                      width: 1.2,
                     ),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primaryGreen,
-                  backgroundColor: AppColors.lightGreen,
-                  side: BorderSide(
-                    color: AppColors.primaryGreen.withOpacity(0.18),
-                    width: 1.2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(17),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(17),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.favorite_rounded,
+                        size: 20,
+                        color: AppColors.primaryGreen,
+                      ),
+                      SizedBox(width: 7),
+                      Flexible(
+                        child: Text(
+                          'Xem yêu thích',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.primaryGreen,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.favorite_rounded,
-                      size: 20,
-                      color: AppColors.primaryGreen,
-                    ),
-                    SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        'Xem yêu thích',
-                        overflow: TextOverflow.ellipsis,
+              ),
+
+              const SizedBox(width: 12),
+
+              // =================================================
+              // ĐẶT LỊCH XEM PHÒNG
+              // =================================================
+              Expanded(
+                child: _PrimaryHoverButton(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const booking_screen(),
+                      ),
+                    );
+                  },
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.calendar_month_rounded,
+                        color: Colors.white,
+                        size: 21,
+                      ),
+                      SizedBox(width: 9),
+                      Text(
+                        'Đặt lịch xem phòng',
                         style: TextStyle(
-                          color: AppColors.primaryGreen,
-                          fontSize: 13,
+                          color: Colors.white,
+                          fontSize: 15,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // =================================================
-            // ĐẶT LỊCH XEM PHÒNG
-            // =================================================
-            Expanded(
-              child: _PrimaryHoverButton(
-                onTap: () {
-                  _showComingSoon(
-                    'Chức năng đặt lịch xem phòng sẽ được bổ sung sau.',
-                  );
-                },
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.calendar_month_rounded,
-                      color: Colors.white,
-                      size: 21,
-                    ),
-                    SizedBox(width: 9),
-                    Text(
-                      'Đặt lịch xem phòng',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // ============================================================
@@ -1132,12 +1056,10 @@ class _CircleActionButton extends StatefulWidget {
   });
 
   @override
-  State<_CircleActionButton> createState() =>
-      _CircleActionButtonState();
+  State<_CircleActionButton> createState() => _CircleActionButtonState();
 }
 
-class _CircleActionButtonState
-    extends State<_CircleActionButton> {
+class _CircleActionButtonState extends State<_CircleActionButton> {
   bool _hovered = false;
 
   @override
@@ -1165,18 +1087,12 @@ class _CircleActionButtonState
                 ? Colors.white.withOpacity(0.30)
                 : Colors.black.withOpacity(0.25),
             shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withOpacity(0.25),
-            ),
+            border: Border.all(color: Colors.white.withOpacity(0.25)),
           ),
           child: AnimatedScale(
             scale: _hovered ? 1.12 : 1,
             duration: const Duration(milliseconds: 180),
-            child: Icon(
-              widget.icon,
-              color: widget.iconColor,
-              size: 21,
-            ),
+            child: Icon(widget.icon, color: widget.iconColor, size: 21),
           ),
         ),
       ),
@@ -1205,11 +1121,7 @@ class _QuickInfoItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(
-          icon,
-          size: 21,
-          color: AppColors.primaryGreen,
-        ),
+        Icon(icon, size: 21, color: AppColors.primaryGreen),
         const SizedBox(height: 7),
         Text(
           label,
@@ -1224,9 +1136,7 @@ class _QuickInfoItem extends StatelessWidget {
           value,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: highlight
-                ? AppColors.primaryGreen
-                : AppColors.textPrimary,
+            color: highlight ? AppColors.primaryGreen : AppColors.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w900,
           ),
@@ -1262,11 +1172,7 @@ class _InfoRow extends StatelessWidget {
             color: AppColors.lightGreen,
             borderRadius: BorderRadius.circular(11),
           ),
-          child: Icon(
-            icon,
-            color: AppColors.primaryGreen,
-            size: 19,
-          ),
+          child: Icon(icon, color: AppColors.primaryGreen, size: 19),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -1302,9 +1208,7 @@ class _InfoRow extends StatelessWidget {
 class _FakeMap extends StatefulWidget {
   final String address;
 
-  const _FakeMap({
-    required this.address,
-  });
+  const _FakeMap({required this.address});
 
   @override
   State<_FakeMap> createState() => _FakeMapState();
@@ -1333,82 +1237,54 @@ class _FakeMapState extends State<_FakeMap> {
         curve: Curves.easeOut,
         child: Stack(
           children: [
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _FakeMapPainter(),
-              ),
-            ),
+            Positioned.fill(child: CustomPaint(painter: _FakeMapPainter())),
 
             const Positioned(
               left: 24,
               top: 30,
-              child: _MapStreetLabel(
-                text: 'NGUYỄN VĂN QUÁ',
-                angle: -0.04,
-              ),
+              child: _MapStreetLabel(text: 'NGUYỄN VĂN QUÁ', angle: -0.04),
             ),
 
             const Positioned(
               right: 30,
               top: 78,
-              child: _MapStreetLabel(
-                text: 'QUANG TRUNG',
-                angle: 1.52,
-              ),
+              child: _MapStreetLabel(text: 'QUANG TRUNG', angle: 1.52),
             ),
 
             const Positioned(
               left: 100,
               bottom: 34,
-              child: _MapStreetLabel(
-                text: 'TÂN SƠN NHÌ',
-                angle: -0.02,
-              ),
+              child: _MapStreetLabel(text: 'TÂN SƠN NHÌ', angle: -0.02),
             ),
 
             const Positioned(
               right: 22,
               bottom: 28,
-              child: _MapStreetLabel(
-                text: 'LÊ VĂN KHƯƠNG',
-                angle: 0.02,
-              ),
+              child: _MapStreetLabel(text: 'LÊ VĂN KHƯƠNG', angle: 0.02),
             ),
 
             Positioned(
               left: 22,
               top: 72,
-              child: _MapBuilding(
-                width: 65,
-                height: 43,
-              ),
+              child: _MapBuilding(width: 65, height: 43),
             ),
 
             Positioned(
               right: 34,
               top: 22,
-              child: _MapBuilding(
-                width: 70,
-                height: 45,
-              ),
+              child: _MapBuilding(width: 70, height: 45),
             ),
 
             Positioned(
               left: 36,
               bottom: 28,
-              child: _MapBuilding(
-                width: 58,
-                height: 42,
-              ),
+              child: _MapBuilding(width: 58, height: 42),
             ),
 
             Positioned(
               right: 25,
               bottom: 62,
-              child: _MapBuilding(
-                width: 75,
-                height: 46,
-              ),
+              child: _MapBuilding(width: 75, height: 46),
             ),
 
             Positioned(
@@ -1420,9 +1296,7 @@ class _FakeMapState extends State<_FakeMap> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFCFE5C7),
                   borderRadius: BorderRadius.circular(13),
-                  border: Border.all(
-                    color: const Color(0xFFB9D5AF),
-                  ),
+                  border: Border.all(color: const Color(0xFFB9D5AF)),
                 ),
                 child: const Center(
                   child: Icon(
@@ -1436,18 +1310,12 @@ class _FakeMapState extends State<_FakeMap> {
 
             Center(
               child: TweenAnimationBuilder<double>(
-                tween: Tween(
-                  begin: 0,
-                  end: 1,
-                ),
+                tween: Tween(begin: 0, end: 1),
                 duration: const Duration(milliseconds: 850),
                 curve: Curves.elasticOut,
                 builder: (context, value, child) {
                   return Transform.translate(
-                    offset: Offset(
-                      0,
-                      -18 * (1 - value),
-                    ),
+                    offset: Offset(0, -18 * (1 - value)),
                     child: child,
                   );
                 },
@@ -1497,15 +1365,10 @@ class _FakeMapState extends State<_FakeMap> {
                       decoration: BoxDecoration(
                         color: AppColors.primaryGreen,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 4,
-                        ),
+                        border: Border.all(color: Colors.white, width: 4),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryGreen.withOpacity(
-                              0.35,
-                            ),
+                            color: AppColors.primaryGreen.withOpacity(0.35),
                             blurRadius: 18,
                             spreadRadius: 4,
                           ),
@@ -1527,15 +1390,9 @@ class _FakeMapState extends State<_FakeMap> {
               top: 12,
               child: Column(
                 children: [
-                  _MapControlButton(
-                    icon: Icons.add_rounded,
-                    onTap: () {},
-                  ),
+                  _MapControlButton(icon: Icons.add_rounded, onTap: () {}),
                   const SizedBox(height: 6),
-                  _MapControlButton(
-                    icon: Icons.remove_rounded,
-                    onTap: () {},
-                  ),
+                  _MapControlButton(icon: Icons.remove_rounded, onTap: () {}),
                 ],
               ),
             ),
@@ -1553,10 +1410,7 @@ class _FakeMapState extends State<_FakeMap> {
               left: 12,
               bottom: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.94),
                   borderRadius: BorderRadius.circular(9),
@@ -1592,10 +1446,7 @@ class _MapStreetLabel extends StatelessWidget {
   final String text;
   final double angle;
 
-  const _MapStreetLabel({
-    required this.text,
-    required this.angle,
-  });
+  const _MapStreetLabel({required this.text, required this.angle});
 
   @override
   Widget build(BuildContext context) {
@@ -1622,10 +1473,7 @@ class _MapBuilding extends StatelessWidget {
   final double width;
   final double height;
 
-  const _MapBuilding({
-    required this.width,
-    required this.height,
-  });
+  const _MapBuilding({required this.width, required this.height});
 
   @override
   Widget build(BuildContext context) {
@@ -1635,9 +1483,7 @@ class _MapBuilding extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFE5E1D7),
         borderRadius: BorderRadius.circular(7),
-        border: Border.all(
-          color: const Color(0xFFD2CDC0),
-        ),
+        border: Border.all(color: const Color(0xFFD2CDC0)),
       ),
       child: Center(
         child: Wrap(
@@ -1668,18 +1514,13 @@ class _MapControlButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _MapControlButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _MapControlButton({required this.icon, required this.onTap});
 
   @override
-  State<_MapControlButton> createState() =>
-      _MapControlButtonState();
+  State<_MapControlButton> createState() => _MapControlButtonState();
 }
 
-class _MapControlButtonState
-    extends State<_MapControlButton> {
+class _MapControlButtonState extends State<_MapControlButton> {
   bool _hovered = false;
 
   @override
@@ -1718,9 +1559,7 @@ class _MapControlButtonState
           child: Icon(
             widget.icon,
             size: 19,
-            color: _hovered
-                ? Colors.white
-                : AppColors.textPrimary,
+            color: _hovered ? Colors.white : AppColors.textPrimary,
           ),
         ),
       ),
@@ -1735,25 +1574,15 @@ class _MapControlButtonState
 class _FakeMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final backgroundPaint = Paint()
-      ..color = const Color(0xFFF1F0E8);
+    final backgroundPaint = Paint()..color = const Color(0xFFF1F0E8);
 
-    canvas.drawRect(
-      Offset.zero & size,
-      backgroundPaint,
-    );
+    canvas.drawRect(Offset.zero & size, backgroundPaint);
 
-    final greenPaint = Paint()
-      ..color = const Color(0xFFDDEBD5);
+    final greenPaint = Paint()..color = const Color(0xFFDDEBD5);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          -20,
-          size.height * 0.58,
-          115,
-          85,
-        ),
+        Rect.fromLTWH(-20, size.height * 0.58, 115, 85),
         const Radius.circular(22),
       ),
       greenPaint,
@@ -1761,12 +1590,7 @@ class _FakeMapPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width - 105,
-          size.height * 0.30,
-          130,
-          95,
-        ),
+        Rect.fromLTWH(size.width - 105, size.height * 0.30, 130, 95),
         const Radius.circular(22),
       ),
       greenPaint,
@@ -1789,16 +1613,10 @@ class _FakeMapPainter extends CustomPainter {
         size.height * 0.44,
       );
 
-    canvas.drawPath(
-      road1,
-      smallRoad,
-    );
+    canvas.drawPath(road1, smallRoad);
 
     final road2 = Path()
-      ..moveTo(
-        size.width * 0.72,
-        -20,
-      )
+      ..moveTo(size.width * 0.72, -20)
       ..cubicTo(
         size.width * 0.67,
         size.height * 0.25,
@@ -1808,10 +1626,7 @@ class _FakeMapPainter extends CustomPainter {
         size.height + 20,
       );
 
-    canvas.drawPath(
-      road2,
-      smallRoad,
-    );
+    canvas.drawPath(road2, smallRoad);
 
     final mainRoad = Paint()
       ..color = Colors.white
@@ -1820,10 +1635,7 @@ class _FakeMapPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final mainRoadPath = Path()
-      ..moveTo(
-        -20,
-        size.height * 0.78,
-      )
+      ..moveTo(-20, size.height * 0.78)
       ..cubicTo(
         size.width * 0.20,
         size.height * 0.69,
@@ -1833,41 +1645,25 @@ class _FakeMapPainter extends CustomPainter {
         size.height * 0.68,
       );
 
-    canvas.drawPath(
-      mainRoadPath,
-      mainRoad,
-    );
+    canvas.drawPath(mainRoadPath, mainRoad);
 
     final edgePaint = Paint()
       ..color = const Color(0xFFE0DED4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
-    canvas.drawPath(
-      road1,
-      edgePaint,
-    );
+    canvas.drawPath(road1, edgePaint);
 
-    canvas.drawPath(
-      road2,
-      edgePaint,
-    );
+    canvas.drawPath(road2, edgePaint);
 
-    canvas.drawPath(
-      mainRoadPath,
-      edgePaint,
-    );
+    canvas.drawPath(mainRoadPath, edgePaint);
 
     final centerPaint = Paint()
       ..color = const Color(0xFFD8D3A8)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
-    _drawDashedPath(
-      canvas,
-      mainRoadPath,
-      centerPaint,
-    );
+    _drawDashedPath(canvas, mainRoadPath, centerPaint);
 
     final thinRoad = Paint()
       ..color = Colors.white
@@ -1876,58 +1672,27 @@ class _FakeMapPainter extends CustomPainter {
 
     final paths = [
       Path()
-        ..moveTo(
-          -10,
-          size.height * 0.17,
-        )
-        ..lineTo(
-          size.width + 10,
-          size.height * 0.25,
-        ),
+        ..moveTo(-10, size.height * 0.17)
+        ..lineTo(size.width + 10, size.height * 0.25),
       Path()
-        ..moveTo(
-          -10,
-          size.height * 0.61,
-        )
-        ..lineTo(
-          size.width + 10,
-          size.height * 0.56,
-        ),
+        ..moveTo(-10, size.height * 0.61)
+        ..lineTo(size.width + 10, size.height * 0.56),
       Path()
-        ..moveTo(
-          size.width * 0.15,
-          -10,
-        )
-        ..lineTo(
-          size.width * 0.22,
-          size.height + 10,
-        ),
+        ..moveTo(size.width * 0.15, -10)
+        ..lineTo(size.width * 0.22, size.height + 10),
       Path()
-        ..moveTo(
-          size.width * 0.88,
-          -10,
-        )
-        ..lineTo(
-          size.width * 0.77,
-          size.height + 10,
-        ),
+        ..moveTo(size.width * 0.88, -10)
+        ..lineTo(size.width * 0.77, size.height + 10),
     ];
 
     for (final path in paths) {
-      canvas.drawPath(
-        path,
-        thinRoad,
-      );
+      canvas.drawPath(path, thinRoad);
     }
 
-    final waterPaint = Paint()
-      ..color = const Color(0xFFD6E9EA);
+    final waterPaint = Paint()..color = const Color(0xFFD6E9EA);
 
     final waterPath = Path()
-      ..moveTo(
-        size.width * 0.72,
-        size.height,
-      )
+      ..moveTo(size.width * 0.72, size.height)
       ..cubicTo(
         size.width * 0.78,
         size.height * 0.82,
@@ -1936,23 +1701,13 @@ class _FakeMapPainter extends CustomPainter {
         size.width,
         size.height * 0.80,
       )
-      ..lineTo(
-        size.width,
-        size.height,
-      )
+      ..lineTo(size.width, size.height)
       ..close();
 
-    canvas.drawPath(
-      waterPath,
-      waterPaint,
-    );
+    canvas.drawPath(waterPath, waterPaint);
   }
 
-  void _drawDashedPath(
-    Canvas canvas,
-    Path path,
-    Paint paint,
-  ) {
+  void _drawDashedPath(Canvas canvas, Path path, Paint paint) {
     final metrics = path.computeMetrics();
 
     for (final metric in metrics) {
@@ -1963,16 +1718,10 @@ class _FakeMapPainter extends CustomPainter {
 
         final segment = metric.extractPath(
           distance,
-          next.clamp(
-            0,
-            metric.length,
-          ),
+          next.clamp(0, metric.length),
         );
 
-        canvas.drawPath(
-          segment,
-          paint,
-        );
+        canvas.drawPath(segment, paint);
 
         distance += 18;
       }
@@ -1980,9 +1729,7 @@ class _FakeMapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(
-    covariant CustomPainter oldDelegate,
-  ) {
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return false;
   }
 }
@@ -2024,11 +1771,7 @@ class _HoverCardState extends State<_HoverCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
-        transform: Matrix4.translationValues(
-          0,
-          _hovered ? -4 : 0,
-          0,
-        ),
+        transform: Matrix4.translationValues(0, _hovered ? -4 : 0, 0),
         padding: widget.padding,
         decoration: BoxDecoration(
           color: AppColors.cardSurface,
@@ -2040,14 +1783,9 @@ class _HoverCardState extends State<_HoverCard> {
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryGreen.withOpacity(
-                _hovered ? 0.12 : 0.05,
-              ),
+              color: AppColors.primaryGreen.withOpacity(_hovered ? 0.12 : 0.05),
               blurRadius: _hovered ? 28 : 16,
-              offset: Offset(
-                0,
-                _hovered ? 12 : 6,
-              ),
+              offset: Offset(0, _hovered ? 12 : 6),
             ),
           ],
         ),
@@ -2065,10 +1803,7 @@ class _AmenityChip extends StatefulWidget {
   final String label;
   final IconData icon;
 
-  const _AmenityChip({
-    required this.label,
-    required this.icon,
-  });
+  const _AmenityChip({required this.label, required this.icon});
 
   @override
   State<_AmenityChip> createState() => _AmenityChipState();
@@ -2093,14 +1828,9 @@ class _AmenityChipState extends State<_AmenityChip> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 13,
-          vertical: 10,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
         decoration: BoxDecoration(
-          color: _hovered
-              ? AppColors.primaryGreen
-              : AppColors.lightGreen,
+          color: _hovered ? AppColors.primaryGreen : AppColors.lightGreen,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: _hovered
@@ -2123,17 +1853,13 @@ class _AmenityChipState extends State<_AmenityChip> {
             Icon(
               widget.icon,
               size: 17,
-              color: _hovered
-                  ? Colors.white
-                  : AppColors.primaryGreen,
+              color: _hovered ? Colors.white : AppColors.primaryGreen,
             ),
             const SizedBox(width: 7),
             Text(
               widget.label,
               style: TextStyle(
-                color: _hovered
-                    ? Colors.white
-                    : AppColors.primaryGreen,
+                color: _hovered ? Colors.white : AppColors.primaryGreen,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -2153,18 +1879,13 @@ class _PrimaryHoverButton extends StatefulWidget {
   final VoidCallback onTap;
   final Widget child;
 
-  const _PrimaryHoverButton({
-    required this.onTap,
-    required this.child,
-  });
+  const _PrimaryHoverButton({required this.onTap, required this.child});
 
   @override
-  State<_PrimaryHoverButton> createState() =>
-      _PrimaryHoverButtonState();
+  State<_PrimaryHoverButton> createState() => _PrimaryHoverButtonState();
 }
 
-class _PrimaryHoverButtonState
-    extends State<_PrimaryHoverButton> {
+class _PrimaryHoverButtonState extends State<_PrimaryHoverButton> {
   bool _hovered = false;
   bool _pressed = false;
 
