@@ -9,6 +9,13 @@
       <excludeFolder url="file://$MODULE_DIR$/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/build" />
+      <excludeFolder url="file://$MODULE_DIR$/Backend/Backend/bin" />
+      <excludeFolder url="file://$MODULE_DIR$/Backend/Backend/obj/Debug/net8.0/ref" />
+      <excludeFolder url="file://$MODULE_DIR$/Backend/Backend/obj/Debug/net8.0/refint" />
+      <excludeFolder url="file://$MODULE_DIR$/Backend/Backend/obj/Debug/net8.0/staticwebassets" />
+      <excludeFolder url="file://$MODULE_DIR$/android/.gradle" />
+      <excludeFolder url="file://$MODULE_DIR$/ios/Flutter/ephemeral" />
+      <excludeFolder url="file://$MODULE_DIR$/macos/Flutter/ephemeral" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../widgets/owner/owner_drawer.dart';
 
 class MaintenanceManageScreen extends StatefulWidget {
   const MaintenanceManageScreen({super.key});
@@ -166,15 +167,15 @@ class _MaintenanceManageScreenState extends State<MaintenanceManageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
+      drawer:OwnerDrawer(
+        currentRoute: 'maintenance',
+      ),
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () {},
-        ),
+        centerTitle: true,
         title: const Text(
-          'Quản Lý Sửa Chữa & Sự Cố',
+          'Quản lý sửa chữa',
           style: TextStyle(
             color: Colors.white,
             fontSize: 18,
@@ -186,10 +187,15 @@ class _MaintenanceManageScreenState extends State<MaintenanceManageScreen> {
             icon: const Icon(Icons.notifications_none, color: Colors.white),
             onPressed: () {},
           ),
-          IconButton(
-            icon: const Icon(Icons.person_outline, color: Colors.white),
-            onPressed: () {},
+
+          SizedBox(width: 10,),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(Icons.person, color: Colors.white, size: 20),
           ),
+
+          SizedBox(width: 10,)
         ],
       ),
       body: Column(

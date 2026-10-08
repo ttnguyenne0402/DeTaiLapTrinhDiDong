@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       // initialRoute: AppRoutes.invoicesManage,
-      // onGenerateRoute: AppRouter.generateRoute,
+      onGenerateRoute: AppRouter.generateRoute,
       theme: ThemeData(
         // This is the theme of your application.
         //
