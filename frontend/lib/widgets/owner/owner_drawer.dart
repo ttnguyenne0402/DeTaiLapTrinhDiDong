@@ -5,7 +5,9 @@ import '../../screens/owner/contracts_manage.dart';
 import '../../screens/owner/invoices_manage..dart';
 import '../../screens/owner/maintenance_manage.dart';
 import '../../screens/owner/posts_manage.dart';
-import '../../screens/owner/utility_history.dart';
+import '../../screens/owner/utility_readings.dart';
+import '../../screens/owner/properties_manage.dart';
+
 
 class OwnerDrawer extends StatelessWidget {
   /// Mã định danh màn hình hiện tại để làm nổi bật (nếu có):
@@ -88,7 +90,7 @@ class OwnerDrawer extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const LandlordUtilityScreen(),
+                          builder: (context) => const PropertiesManageScreen(),
                         ),
                       );
                     }

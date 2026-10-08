@@ -3,6 +3,8 @@ import '../../widgets/owner/owner_drawer.dart';
 import 'owner_dashboard.dart';
 import 'property_form.dart';
 import 'rooms_manage.dart';
+import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 class PropertiesManageScreen extends StatelessWidget {
   const PropertiesManageScreen({super.key});
@@ -14,30 +16,38 @@ class PropertiesManageScreen extends StatelessWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF9F9FB),
-        drawer: const OwnerDrawer(),
+        backgroundColor: AppColors.primaryGreen,
+        drawer: const OwnerDrawer(
+          currentRoute: 'utilities',
+        ),
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.primaryGreen,
           elevation: 0,
           leading: Builder(
             builder: (context) => IconButton(
-              icon: const Icon(Icons.menu, color: Colors.black),
+              icon: const Icon(Icons.menu, color: Colors.white),
               tooltip: 'Mở danh mục',
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
           actions: [
-            if (Navigator.canPop(context))
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black),
-                tooltip: 'Quay lại',
-                onPressed: () => Navigator.pop(context),
-              ),
+            IconButton(
+              icon: const Icon(Icons.notifications_none, color: Colors.white),
+              onPressed: () {},
+            ),
+
+            const SizedBox(width: 10,),
+            const CircleAvatar(
+              backgroundColor: Colors.white24,
+              radius: 16,
+              child: Icon(Icons.person, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 16),
           ],
           title: const Text(
             'Quản lý Bất động sản',
             style: TextStyle(
-              color: Colors.black,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
@@ -46,10 +56,10 @@ class PropertiesManageScreen extends StatelessWidget {
 
           // THANH TAB BAR LỌC TÒA NHÀ
           bottom: TabBar(
-            labelColor: primaryColor,
-            unselectedLabelColor: Colors.grey,
+            labelColor: AppColors.lightGreen,
+            unselectedLabelColor: AppColors.lightGreen,
             indicatorColor: primaryColor,
-            indicatorWeight: 2.5,
+            indicatorWeight: 1,
             indicatorSize: TabBarIndicatorSize.label,
             labelStyle: const TextStyle(
               fontWeight: FontWeight.bold,
@@ -67,13 +77,28 @@ class PropertiesManageScreen extends StatelessWidget {
           ),
         ),
 
-        // DANH SÁCH BẤT ĐỘNG SẢN LỌC THEO TAB
-        body: TabBarView(
-          children: [
-            _buildPropertyList('all'), // Tất cả tòa nhà
-            _buildPropertyList('active'), // Đang hoạt động
-            _buildPropertyList('maintenance'), // Đang bảo trì
-          ],
+        //body bo góc trên và trái
+        body: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+            child: TabBarView(
+              children: [
+                _buildPropertyList('all'),
+                _buildPropertyList('active'),
+                _buildPropertyList('maintenance'),
+              ],
+            ),
+          ),
         ),
 
         // NÚT THÊM BẤT ĐỘNG SẢN MỚI
@@ -204,7 +229,7 @@ class PropertiesManageScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Khung chứa Ảnh Bất động sản + Status Badge (Đã fix lỗi tràn layout)
+          // Khung chứa Ảnh Bất động sản + Status Badge
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: SizedBox(
@@ -212,7 +237,6 @@ class PropertiesManageScreen extends StatelessWidget {
               width: double.infinity,
               child: Stack(
                 children: [
-                  // Lớp ảnh full chiều rộng
                   Positioned.fill(
                     child: Image.asset(
                       item['image'] as String,
@@ -236,7 +260,6 @@ class PropertiesManageScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  // Badge trạng thái nằm cố định ở góc trên bên phải
                   Positioned(
                     top: 12,
                     right: 12,
@@ -253,7 +276,6 @@ class PropertiesManageScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tên tòa nhà
                 Text(
                   item['name'] as String,
                   style: const TextStyle(
@@ -263,8 +285,6 @@ class PropertiesManageScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-
-                // Địa chỉ
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -287,8 +307,6 @@ class PropertiesManageScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Divider(height: 1, color: Color(0xFFEEEEEE)),
                 const SizedBox(height: 12),
-
-                // Thống kê phòng
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -305,8 +323,54 @@ class PropertiesManageScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
+
+                //2 nút ghi điện nước và xem tiêu thụ
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pushNamed(context, AppRoutes.utilityReadings);
+                        },
+                        icon: const Icon(Icons.bolt, size: 16, color: Colors.amber),
+                        label: const Text(
+                          'Ghi điện nước',
+                          style: TextStyle(fontSize: 12, color: Colors.black87),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pushNamed(context, AppRoutes.utilityHistory);
+                        },
+                        icon: const Icon(Icons.bar_chart, size: 16, color: Colors.blue),
+                        label: const Text(
+                          'Xem tiêu thụ',
+                          style: TextStyle(fontSize: 12, color: Colors.black87),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // ----------------------------------------------------
 
                 // Nút chuyển sang màn hình Quản lý Phòng
                 SizedBox(
@@ -349,7 +413,6 @@ class PropertiesManageScreen extends StatelessWidget {
     );
   }
 
-  // Widget hiển thị số liệu nhỏ
   Widget _buildStatItem(String label, String value, {Color? color}) {
     return Column(
       children: [
@@ -367,7 +430,6 @@ class PropertiesManageScreen extends StatelessWidget {
     );
   }
 
-  // Badge màu trạng thái Tòa nhà
   Widget _buildStatusBadge(String status) {
     Color bgColor = status == 'Đang hoạt động'
         ? const Color(0xFFE8F5E9)
@@ -394,11 +456,11 @@ class PropertiesManageScreen extends StatelessWidget {
   }
 
   Widget _buildNavItem(
-    IconData icon,
-    String label,
-    bool isActive,
-    VoidCallback onTap,
-  ) {
+      IconData icon,
+      String label,
+      bool isActive,
+      VoidCallback onTap,
+      ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
