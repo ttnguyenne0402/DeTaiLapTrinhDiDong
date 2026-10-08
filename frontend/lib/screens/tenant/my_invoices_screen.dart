@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 //DỮ LIỆU GIẢ
 class InvoiceMock {
@@ -84,7 +85,18 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.home,
+                    (route) => false,
+              );
+            }
+          },
         ),
       ),
 
@@ -95,6 +107,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         backgroundColor: AppColors.primaryGreen,
         onPressed: () {
           // SANG MÀN HÌNH THANH TOÁN
+          Navigator.pushNamed(context, '/tenant/payment');
         },
         icon: const Icon(Icons.payment, color: Colors.white),
         label: const Text(
@@ -176,6 +189,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           // CHUYỂN SANG MÀN HÌNH CHI TIẾT HÓA ĐƠN
+          Navigator.pushNamed(context, '/tenant/invoices/detail');
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
