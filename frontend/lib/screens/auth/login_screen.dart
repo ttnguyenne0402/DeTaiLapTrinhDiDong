@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../tenant/home_screen.dart';
+import '../owner/owner_dashboard.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -235,12 +237,57 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    final String email = _emailController.text.trim().toLowerCase();
+    final String password = _passwordController.text;
+
+    // ==========================================================
+    // TÀI KHOẢN TEST
+    // ==========================================================
+
+    const String tenantEmail = 'tenant@gmail.com';
+    const String ownerEmail = 'owner@gmail.com';
+    const String testPassword = '123456';
+
+    // ==========================================================
+    // TENANT - NGƯỜI THUÊ
+    // ==========================================================
+
+    if (email == tenantEmail && password == testPassword) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (BuildContext context) => const HomeScreen(),
+        ),
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // OWNER - CHỦ TRỌ
+    // ==========================================================
+
+    if (email == ownerEmail && password == testPassword) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (BuildContext context) => const OwnerDashboard(),
+        ),
+      );
+
+      return;
+    }
+
+    // ==========================================================
+    // SAI TÀI KHOẢN / MẬT KHẨU
+    // ==========================================================
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
-          'Thông tin hợp lệ. Sẵn sàng kết nối API.',
+          'Email hoặc mật khẩu không chính xác.',
         ),
-        backgroundColor: AppColors.primaryGreen,
+        backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
@@ -692,10 +739,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     _paintLightVignette(canvas, w, h);
   }
 
-  // ============================================================
-  // SKY + CITY
-  // ============================================================
-
   void _paintSkyAndCity(
     Canvas canvas,
     double w,
@@ -724,10 +767,7 @@ class CozyRoomHeroPainter extends CustomPainter {
         ],
       ).createShader(skyRect);
 
-    canvas.drawRect(
-      skyRect,
-      skyPaint,
-    );
+    canvas.drawRect(skyRect, skyPaint);
 
     final Offset sunCenter = Offset(
       w * 0.56,
@@ -832,10 +872,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       ..lineTo(0, h * 0.86)
       ..close();
 
-    canvas.drawPath(
-      treePath,
-      treeLinePaint,
-    );
+    canvas.drawPath(treePath, treeLinePaint);
   }
 
   void _cloud(
@@ -878,10 +915,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     );
   }
 
-  // ============================================================
-  // BUILDINGS
-  // ============================================================
-
   void _buildingRow(
     Canvas canvas,
     double w,
@@ -893,8 +926,7 @@ class CozyRoomHeroPainter extends CustomPainter {
   }) {
     final math.Random rnd = math.Random(seed);
 
-    final Paint buildingPaint = Paint()
-      ..color = color;
+    final Paint buildingPaint = Paint()..color = color;
 
     final Paint litPaint = Paint()
       ..color = windowLit.withOpacity(0.85);
@@ -914,10 +946,7 @@ class CozyRoomHeroPainter extends CustomPainter {
         bh + (h - baseY),
       );
 
-      canvas.drawRect(
-        rect,
-        buildingPaint,
-      );
+      canvas.drawRect(rect, buildingPaint);
 
       final int cols = math.max(
         1,
@@ -954,10 +983,6 @@ class CozyRoomHeroPainter extends CustomPainter {
       x += bw + 6 + rnd.nextDouble() * 8;
     }
   }
-
-  // ============================================================
-  // CURTAIN
-  // ============================================================
 
   void _paintRightCurtain(
     Canvas canvas,
@@ -998,10 +1023,7 @@ class CozyRoomHeroPainter extends CustomPainter {
         ],
       ).createShader(rect);
 
-    canvas.drawPath(
-      path,
-      curtainPaint,
-    );
+    canvas.drawPath(path, curtainPaint);
 
     final Paint foldPaint = Paint()
       ..color = Colors.white.withOpacity(0.35)
@@ -1018,10 +1040,6 @@ class CozyRoomHeroPainter extends CustomPainter {
       );
     }
   }
-
-  // ============================================================
-  // WALL
-  // ============================================================
 
   void _paintRightWall(
     Canvas canvas,
@@ -1119,17 +1137,9 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.save();
 
-    canvas.translate(
-      center.dx,
-      center.dy,
-    );
-
+    canvas.translate(center.dx, center.dy);
     canvas.rotate(tilt);
-
-    canvas.translate(
-      -center.dx,
-      -center.dy,
-    );
+    canvas.translate(-center.dx, -center.dy);
 
     canvas.drawRect(
       rect,
@@ -1150,10 +1160,6 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.restore();
   }
-
-  // ============================================================
-  // BED
-  // ============================================================
 
   void _paintBedCorner(
     Canvas canvas,
@@ -1228,10 +1234,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     }
   }
 
-  // ============================================================
-  // SHELF + PLANT
-  // ============================================================
-
   void _paintShelfAndPlant(
     Canvas canvas,
     double w,
@@ -1300,10 +1302,7 @@ class CozyRoomHeroPainter extends CustomPainter {
     );
 
     final Path vinePath = Path()
-      ..moveTo(
-        vineStart.dx,
-        vineStart.dy,
-      )
+      ..moveTo(vineStart.dx, vineStart.dy)
       ..quadraticBezierTo(
         control.dx,
         control.dy,
@@ -1311,13 +1310,9 @@ class CozyRoomHeroPainter extends CustomPainter {
         end.dy,
       );
 
-    canvas.drawPath(
-      vinePath,
-      vinePaint,
-    );
+    canvas.drawPath(vinePath, vinePaint);
 
-    final Paint leafPaint = Paint()
-      ..color = leafLight;
+    final Paint leafPaint = Paint()..color = leafLight;
 
     final math.Random rnd = math.Random(5);
 
@@ -1371,11 +1366,7 @@ class CozyRoomHeroPainter extends CustomPainter {
   ) {
     canvas.save();
 
-    canvas.translate(
-      pos.dx,
-      pos.dy,
-    );
-
+    canvas.translate(pos.dx, pos.dy);
     canvas.rotate(rotate);
 
     canvas.drawOval(
@@ -1389,10 +1380,6 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.restore();
   }
-
-  // ============================================================
-  // PINBOARD
-  // ============================================================
 
   void _paintPinboard(
     Canvas canvas,
@@ -1494,10 +1481,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       )
       ..close();
 
-    canvas.drawPath(
-      heartPath,
-      heartPaint,
-    );
+    canvas.drawPath(heartPath, heartPaint);
   }
 
   void _pinnedNote(
@@ -1557,10 +1541,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     );
   }
 
-  // ============================================================
-  // DESK
-  // ============================================================
-
   void _paintDeskForeground(
     Canvas canvas,
     double w,
@@ -1583,10 +1563,7 @@ class CozyRoomHeroPainter extends CustomPainter {
         ],
       ).createShader(deskRect);
 
-    canvas.drawRect(
-      deskRect,
-      deskPaint,
-    );
+    canvas.drawRect(deskRect, deskPaint);
 
     final Paint grainPaint = Paint()
       ..color = Colors.black.withOpacity(0.06)
@@ -1743,10 +1720,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     );
   }
 
-  // ============================================================
-  // LIGHT
-  // ============================================================
-
   void _paintLightVignette(
     Canvas canvas,
     double w,
@@ -1769,10 +1742,7 @@ class CozyRoomHeroPainter extends CustomPainter {
         ],
       ).createShader(fullRect);
 
-    canvas.drawRect(
-      fullRect,
-      glow,
-    );
+    canvas.drawRect(fullRect, glow);
 
     final Rect topRect = Rect.fromLTWH(
       0,
@@ -1791,10 +1761,7 @@ class CozyRoomHeroPainter extends CustomPainter {
         ],
       ).createShader(topRect);
 
-    canvas.drawRect(
-      topRect,
-      edge,
-    );
+    canvas.drawRect(topRect, edge);
   }
 
   @override
@@ -1802,4 +1769,3 @@ class CozyRoomHeroPainter extends CustomPainter {
     return false;
   }
 }
-
