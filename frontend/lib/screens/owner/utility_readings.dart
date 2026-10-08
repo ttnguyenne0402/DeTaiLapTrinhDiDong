@@ -1,17 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/owner/utility_card_w.dart';
-
-class AppColors {
-  static const Color primaryDarkGreen = Color(0xFF0F3E2E);
-  static const Color accentGreen = Color(0xFF1B5E20);
-  static const Color backgroundLight = Color(0xFFF4F8F5);
-  static const Color orangeWarning = Color(0xFFFFA726);
-  static const Color redAlert = Color(0xFFE53935);
-  static const Color redLightBg = Color(0xFFFFEBEE);
-  static const Color greenLightBg = Color(0xFFE8F5E9);
-  static const Color textPrimary = Color(0xFF1A1A1A);
-  static const Color textSecondary = Color(0xFF666666);
-}
+import '../../core/constants/app_colors.dart';
+import '../../widgets/owner/owner_drawer.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   const InvoiceCreateScreen({Key? key}) : super(key: key);
@@ -26,7 +16,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primaryDarkGreen, //nền xanh đậm cho header phía trên
+      backgroundColor: AppColors.primaryGreen, //nền xanh đậm cho header phía trên
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -39,7 +29,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
               child: Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
-                  color: AppColors.backgroundLight,
+                  color: AppColors.background,
                   borderRadius: BorderRadius.vertical(
                     top: Radius.circular(24), //bo tròn góc chuẩn theo hình
                   ),
@@ -150,12 +140,22 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Builder(
+            builder: (context) {
+              return IconButton(
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              );
+            },
+          ),
+          
           Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {},
-              ),
               const Text(
                 'Ghi số điện nước',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
@@ -185,7 +185,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.primaryDarkGreen,
+        color: AppColors.primaryGreen,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -231,7 +231,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             children: [
               Row(
                 children: const [
-                  Icon(Icons.corporate_fare, color: AppColors.orangeWarning, size: 20),
+                  Icon(Icons.corporate_fare, color: AppColors.warningOrange, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'Khu Trọ Xanh - Bình Thạ...',
@@ -307,8 +307,8 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             borderRadius: BorderRadius.circular(4),
             child: const LinearProgressIndicator(
               value: 0.67,
-              backgroundColor: AppColors.backgroundLight,
-              color: AppColors.orangeWarning,
+              backgroundColor: AppColors.primaryGreen,
+              color: AppColors.warningOrange,
               minHeight: 6,
             ),
           ),
@@ -330,7 +330,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: const Color(0xFFDCEDC8), borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.crop_free, color: AppColors.primaryDarkGreen, size: 20),
+            child: const Icon(Icons.crop_free, color: AppColors.primaryGreen, size: 20),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -343,7 +343,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(color: AppColors.orangeWarning.withOpacity(0.3), borderRadius: BorderRadius.circular(6)),
+                      decoration: BoxDecoration(color: AppColors.warningOrange.withOpacity(0.3), borderRadius: BorderRadius.circular(6)),
                       child: const Text('Mới', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
                   ],
@@ -380,12 +380,12 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
               showCheckmark: false,
               label: Row(
                 children: [
-                  if (isAlert) const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.redAlert),
+                  if (isAlert) const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.redAccent),
                   if (isAlert) const SizedBox(width: 4),
                   Text(
                     filters[index]['title']!,
                     style: TextStyle(
-                      color: isAlert ? AppColors.redAlert : (isSelected ? Colors.white : AppColors.textPrimary),
+                      color: isAlert ? Colors.red : (isSelected ? Colors.white : AppColors.textPrimary),
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -409,8 +409,8 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                   ],
                 ],
               ),
-              selectedColor: isAlert ? AppColors.redLightBg : AppColors.primaryDarkGreen,
-              backgroundColor: isAlert ? AppColors.redLightBg : Colors.white,
+              selectedColor: isAlert ? Colors.redAccent : AppColors.primaryGreen,
+              backgroundColor: isAlert ? Colors.redAccent : Colors.white,
               onSelected: (val) {
                 setState(() => _selectedFilterIndex = index);
               },
@@ -425,7 +425,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   Widget _buildTipBox() {
     return Column(
       children: const [
-        Icon(Icons.lightbulb_outline, color: AppColors.primaryDarkGreen, size: 28),
+        Icon(Icons.lightbulb_outline, color: AppColors.primaryGreen, size: 28),
         SizedBox(height: 4),
         Text('Mẹo ghi nhanh chỉ số', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         SizedBox(height: 4),
@@ -441,7 +441,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   //khung footer cố định bên dưới
   Widget _buildBottomFooter() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(24),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
@@ -462,14 +462,14 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.greenLightBg,
+                  color: AppColors.lightGreen,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: const [
-                    Icon(Icons.water_drop_outlined, size: 12, color: AppColors.accentGreen),
+                    Icon(Icons.water_drop_outlined, size: 12, color: AppColors.primaryGreen),
                     SizedBox(width: 4),
-                    Text('Giá bậc thang', style: TextStyle(fontSize: 11, color: AppColors.accentGreen, fontWeight: FontWeight.bold)),
+                    Text('Giá bậc thang', style: TextStyle(fontSize: 11, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
                   ],
                 ),
               )
@@ -497,7 +497,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                   icon: const Icon(Icons.receipt_long, size: 18, color: Colors.black87),
                   label: const Text('Chốt số & Tạo hóa đơn', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.orangeWarning,
+                    backgroundColor: AppColors.warningOrange,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),

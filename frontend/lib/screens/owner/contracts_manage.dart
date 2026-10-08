@@ -3,7 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/contract_card.dart';
 import '../../route/app_routes.dart';
 import 'properties_manage.dart';
-
+import '../../widgets/owner/owner_drawer.dart';
 
 class Contracts_manager extends StatefulWidget
 {
@@ -22,15 +22,22 @@ class HienThiQuanLyHopDong extends State<Contracts_manager>{
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
+      drawer:OwnerDrawer(
+        currentRoute: 'contracts',
+      ) ,
       appBar: AppBar(
         backgroundColor:AppColors.primaryGreen,
-        leading: IconButton(onPressed: (){}, icon: Icon(Icons.arrow_back,size: 26,color: Colors.white,)),
         title: const Text('Quản lý hợp đồng', style: TextStyle(color: Colors.white)),
         centerTitle: true,
         actions: [
           IconButton(
             onPressed: () {},
             icon: const Icon(Icons.notifications, color: Colors.white),
+          ),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(Icons.person, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 16),
         ],
@@ -80,23 +87,26 @@ class HienThiQuanLyHopDong extends State<Contracts_manager>{
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: EdgeInsets.symmetric(vertical: 0),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(4),
-                        borderSide: BorderSide.none
-                      )
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.primaryGreen, width: 1.5),
+                      ),
+
                     ),
 
                   )),
 
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.tune, color: Colors.black54),
-                  ),
+
                 ],
 
               ),
@@ -110,7 +120,12 @@ class HienThiQuanLyHopDong extends State<Contracts_manager>{
                     padding: EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color:AppColors.primaryGreen,
-                      borderRadius: BorderRadius.circular(14)
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 1.5
+
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,6 +153,10 @@ class HienThiQuanLyHopDong extends State<Contracts_manager>{
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 1.5
+                        )
                       ),
                       child: const Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
