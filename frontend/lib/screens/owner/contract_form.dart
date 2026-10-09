@@ -45,7 +45,7 @@ class HopDongMoi extends State<Contract_form> {
     if (widget.contract?['status'] == 'Sắp hết hạn') {
       return 'Gia hạn hợp đồng';
     }
-    return 'Tạo Hợp Đồng Mới';
+    return 'Tạo hợp đồng mới';
   }
 
   @override
@@ -196,12 +196,22 @@ class HopDongMoi extends State<Contract_form> {
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.more_vert, color: Colors.white),
+            icon: const Icon(
+              Icons.notifications,
+              color: Colors.white,
+            ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.person_outline, color: Colors.white),
+          const SizedBox(width: 16),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Container(

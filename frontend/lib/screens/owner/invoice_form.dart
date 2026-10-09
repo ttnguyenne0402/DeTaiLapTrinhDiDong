@@ -532,9 +532,12 @@ class _InvoiceFormState extends State<Invoice_form> {
                       ),
                     ),
                   ),
+
                 ],
               ),
             ),
+
+            const SizedBox(height: 10,)
           ],
         ),
       ),
