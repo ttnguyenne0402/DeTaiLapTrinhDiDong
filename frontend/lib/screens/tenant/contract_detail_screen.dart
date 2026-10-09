@@ -137,56 +137,6 @@ class ContractDetailScreen extends StatelessWidget {
             ),
             const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
 
-            //  NGƯỜI Ở CÙNG
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('NGƯỜI Ở CÙNG (${members.length}/3)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
-
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ...members.map((member) => Card(
-                    color: AppColors.cardSurface,
-                    elevation: 1,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const CircleAvatar(backgroundColor: AppColors.lightGreen, child: Icon(Icons.person, color: AppColors.primaryGreen)),
-                      title: Text(member['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                      subtitle: Text('${member['phone']} • ${member['role']}', style: const TextStyle(color: AppColors.textSecondary)),
-                    ),
-                  )),
-                  const SizedBox(height: 12),
-
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primaryGreen, width: 2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.group_add, color: AppColors.primaryGreen),
-                      label: const Text(
-                        'KHAI BÁO NGƯỜI Ở CÙNG',
-                        style: TextStyle(color: AppColors.primaryGreen, fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () {
-                        // CHUYỂN SANG MÀN HÌNH KHAI BÁO TẠM TRÚ
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
-
             // LIÊN HỆ
             Padding(
               padding: const EdgeInsets.all(16.0),

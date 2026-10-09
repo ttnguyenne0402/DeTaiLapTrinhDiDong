@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../widgets/owner/dashboard_card.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'properties_manage.dart';
+import '../tenant/profile_screen.dart';
+import 'tenant_list_screen.dart';
+import '../../core/constants/app_colors.dart';
 
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key});
@@ -16,7 +19,7 @@ class OwnerDashboard extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: primaryColor,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Chủ trọ', style: TextStyle(color: Colors.white)),
+        title: const Text('Trang chủ', style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
             onPressed: () {},
@@ -30,7 +33,7 @@ class OwnerDashboard extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: AppColors.background,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
@@ -209,8 +212,31 @@ class OwnerDashboard extends StatelessWidget {
               );
             }),
             const SizedBox(width: 40),
-            _buildNavItem(Icons.people_outline, 'Người thuê', false, () {}),
-            _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
+            _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TenantListScreen(),
+                ),
+              );
+            }),
+
+            _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProfileScreen(
+                    user: {
+                      'Name': 'Nguyễn Văn A',
+                      'Email': '',
+                      'Phone': '',
+                      'Avatar': '',
+                      'Role': 'owner',
+                    },
+                  ),
+                ),
+              );
+            }),
           ],
         ),
       ),

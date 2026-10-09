@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "C:\\BaiTapVeNha\\DoAnLapTrinhUngDungDiDong\\DeTaiLapTrinhDiDong\\Backend\\Backend\\Backend.csproj": {}
+    "D:\\BaiTapVeNha\\doanlaptrinhdidong\\Backend\\Backend\\Backend.csproj": {}
   },
   "projects": {
-    "C:\\BaiTapVeNha\\DoAnLapTrinhUngDungDiDong\\DeTaiLapTrinhDiDong\\Backend\\Backend\\Backend.csproj": {
+    "D:\\BaiTapVeNha\\doanlaptrinhdidong\\Backend\\Backend\\Backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\BaiTapVeNha\\DoAnLapTrinhUngDungDiDong\\DeTaiLapTrinhDiDong\\Backend\\Backend\\Backend.csproj",
+        "projectUniqueName": "D:\\BaiTapVeNha\\doanlaptrinhdidong\\Backend\\Backend\\Backend.csproj",
         "projectName": "Backend",
-        "projectPath": "C:\\BaiTapVeNha\\DoAnLapTrinhUngDungDiDong\\DeTaiLapTrinhDiDong\\Backend\\Backend\\Backend.csproj",
-        "packagesPath": "C:\\Users\\ADMIN\\.nuget\\packages\\",
-        "outputPath": "C:\\BaiTapVeNha\\DoAnLapTrinhUngDungDiDong\\DeTaiLapTrinhDiDong\\Backend\\Backend\\obj\\",
+        "projectPath": "D:\\BaiTapVeNha\\doanlaptrinhdidong\\Backend\\Backend\\Backend.csproj",
+        "packagesPath": "C:\\Users\\LOQ\\.nuget\\packages\\",
+        "outputPath": "D:\\BaiTapVeNha\\doanlaptrinhdidong\\Backend\\Backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\ADMIN\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\LOQ\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -25,7 +25,6 @@
           "net8.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -80,6 +79,24 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.31, 8.0.31]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.win-x64",
+              "version": "[8.0.31, 8.0.31]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.31, 8.0.31]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.31, 8.0.31]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -88,7 +105,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.315/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.318/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

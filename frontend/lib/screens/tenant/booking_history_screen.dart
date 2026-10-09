@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 import '../../widgets/common/status_badge.dart';
 
 class booking_history_screen extends StatefulWidget {
@@ -64,10 +65,7 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+
         elevation: 0,
       ),
       body: ListView.builder(

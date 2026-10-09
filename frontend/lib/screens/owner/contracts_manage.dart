@@ -5,6 +5,7 @@ import '../../route/app_routes.dart';
 import 'properties_manage.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'contract_form.dart';
+import 'tenant_list_screen.dart';
 
 class Contracts_manager extends StatefulWidget {
   const Contracts_manager({super.key});
@@ -431,7 +432,13 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
               Icons.people_outline,
               'Người thuê',
               false,
-                  () {},
+                  () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TenantListScreen(),
+                        ),);
+                  },
             ),
             _buildNavItem(
               Icons.person_outline,

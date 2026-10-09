@@ -21,4 +21,15 @@ abstract class AppRoutes {
   static const String contractMembers = '/owner/contracts/members';
   static const String invoiceDetailOwner = '/owner/invoices/detail';
 
+  // --- TV2: NGƯỜI THUÊ (TENANT) ---
+  static const String tenantBooking = '/tenant/booking';
+  static const String tenantBookingHistory = '/tenant/booking-history';
+  static const String tenantContracts = '/tenant/contracts';
+  static const String tenantContractDetail = '/tenant/contracts/detail';
+  static const String tenantInvoices = '/tenant/invoices';
+  static const String tenantInvoiceDetail = '/tenant/invoices/detail';
+  static const String tenantPayment = '/tenant/payment';
+  static const String tenantNotifications = '/tenant/notifications';
+  static const String home = '/home';
+  static const String roomDetail = '/room-detail';
 }

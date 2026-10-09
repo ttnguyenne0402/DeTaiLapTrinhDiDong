@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
+import '../tenant/profile_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -28,7 +29,10 @@ class AdminDashboard extends StatelessWidget {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -50,15 +54,33 @@ class AdminDashboard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const CircleAvatar(
-                          backgroundColor: Colors.white24,
-                          radius: 16,
-                          child: Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                        GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProfileScreen(
+          user: {
+            'Name': 'Quản trị viên',
+            'Email': '',
+            'Phone': '',
+            'Avatar': '',
+            'Role': 'admin',
+          },
+        ),
+      ),
+    );
+  },
+  child: const CircleAvatar(
+    backgroundColor: Colors.white24,
+    radius: 16,
+    child: Icon(
+      Icons.person,
+      color: Colors.white,
+      size: 20,
+    ),
+  ),
+),
                         const SizedBox(width: 16),
                       ],
                     ),
@@ -86,17 +108,29 @@ class AdminDashboard extends StatelessWidget {
                           children: [
                             const Text(
                               'Dashboard',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Row(
                               children: [
-                                const Text('Tháng này', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                                const Text(
+                                  'Tháng này',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 13,
+                                  ),
+                                ),
                                 IconButton(
                                   onPressed: () {},
-                                  icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                                  icon: const Icon(
+                                    Icons.arrow_drop_down,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                               ],
-                            )
+                            ),
                           ],
                         ),
 
@@ -143,7 +177,11 @@ class AdminDashboard extends StatelessWidget {
                           padding: EdgeInsets.all(4),
                           child: Text(
                             "Thống kê",
-                            style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -160,7 +198,10 @@ class AdminDashboard extends StatelessWidget {
                             children: [
                               const Text(
                                 "Lượt tương tác theo tuần",
-                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
                               ),
                               const SizedBox(height: 10),
                               SizedBox(
@@ -178,29 +219,40 @@ class AdminDashboard extends StatelessWidget {
                                   ),
                                   primaryYAxis: const NumericAxis( // trục dọc - số liệu
                                     axisLine: AxisLine(width: 0),
-                                    majorTickLines: MajorTickLines(color: Colors.transparent),
+                                    majorTickLines: MajorTickLines(
+                                      color: Colors.transparent,
+                                    ),
                                   ),
                                   series: <CartesianSeries<_ChartData, String>>[
                                     //đường 1: lượt truy cập
                                     LineSeries<_ChartData, String>(
                                       name: 'Lượt truy cập',
                                       dataSource: chartData,
-                                      xValueMapper: (_ChartData data, _) => data.day,
-                                      yValueMapper: (_ChartData data, _) => data.views,
+                                      xValueMapper: (_ChartData data, _) =>
+                                          data.day,
+                                      yValueMapper: (_ChartData data, _) =>
+                                          data.views,
                                       color: AppColors.primaryGreen,
                                       width: 3,
                                       markerSettings: const MarkerSettings(isVisible: true), // hiển thị các dấu chấm tròn
+
+                                      ),
+
                                     ),
 
                                     //đường 2:lượt tìm phòng
                                     LineSeries<_ChartData, String>(
                                       name: 'Lượt tìm phòng',
                                       dataSource: chartData,
-                                      xValueMapper: (_ChartData data, _) => data.day,
-                                      yValueMapper: (_ChartData data, _) => data.searches,
+                                      xValueMapper: (_ChartData data, _) =>
+                                          data.day,
+                                      yValueMapper: (_ChartData data, _) =>
+                                          data.searches,
                                       color: Colors.amber,
                                       width: 3,
-                                      markerSettings: const MarkerSettings(isVisible: true),
+                                      markerSettings: const MarkerSettings(
+                                        isVisible: true,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -226,7 +278,7 @@ class AdminDashboard extends StatelessWidget {
           selectedFontSize: 12,
           unselectedFontSize: 12,
           onTap: (index) {
-            switch(index){
+            switch (index) {
               case 0:
                 Navigator.pushNamed(context, AppRoutes.adminDashboard);
                 break;
@@ -239,10 +291,22 @@ class AdminDashboard extends StatelessWidget {
             }
           },
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: "Dashboard"),
-            BottomNavigationBarItem(icon: Icon(Icons.article_outlined), label: 'Quản lý'),
-            BottomNavigationBarItem(icon: Icon(Icons.show_chart_rounded), label: 'Thống kê'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: 'Tài khoản'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.grid_view_rounded),
+              label: "Dashboard",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.article_outlined),
+              label: 'Quản lý',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.show_chart_rounded),
+              label: 'Thống kê',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              label: 'Tài khoản',
+            ),
           ],
         ),
       ),
@@ -300,10 +364,7 @@ class StarCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(color: Colors.grey, fontSize: 12),
-          ),
+          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
     );

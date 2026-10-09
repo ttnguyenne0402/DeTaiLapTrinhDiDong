@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 
 
@@ -58,16 +59,12 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
+        centerTitle: true,
         title: const Text(
           'Hợp đồng của tôi',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
 
-          },
-        ),
         elevation: 0,
       ),
       body: Column(
@@ -130,6 +127,7 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
                       // CHUYỂN SANG CHI TIẾT HỢP ĐỒNG
+                      Navigator.pushNamed(context, '/tenant/contracts/detail');
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),

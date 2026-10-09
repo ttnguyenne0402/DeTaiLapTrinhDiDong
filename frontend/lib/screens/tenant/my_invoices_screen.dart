@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 //DỮ LIỆU GIẢ
 class InvoiceMock {
@@ -78,31 +79,13 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
+        centerTitle: true,
         title: const Text(
           'Hóa đơn & Thanh toán',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
 
-      // NÚT THANH TOÁN (KHI CHƯA THANH TOÁN)
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: totalDebt > 0
-          ? FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryGreen,
-        onPressed: () {
-          // SANG MÀN HÌNH THANH TOÁN
-        },
-        icon: const Icon(Icons.payment, color: Colors.white),
-        label: const Text(
-          'THANH TOÁN NGAY',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      )
-          : null,
+      ),
 
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,7 +132,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 80),
+              padding: const EdgeInsets.only(bottom: 20),
               itemCount: dummyInvoices.length,
               itemBuilder: (context, index) {
                 final invoice = dummyInvoices[index];
@@ -176,6 +159,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           // CHUYỂN SANG MÀN HÌNH CHI TIẾT HÓA ĐƠN
+          Navigator.pushNamed(context, '/tenant/invoices/detail');
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
