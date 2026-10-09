@@ -13,7 +13,7 @@ import '../../screens/owner/services_manage.dart';
 import '../../screens/owner/utility_readings.dart';
 
 class OwnerDrawer extends StatelessWidget {
-  /// Mã định danh màn hình hiện tại để làm nổi bật (nếu có):
+  /// Mã định danh màn hình hiện tại để làm nổi bật :
   /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'services'
   final String? currentRoute;
 

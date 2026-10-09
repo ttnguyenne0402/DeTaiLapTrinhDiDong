@@ -5,6 +5,8 @@ import 'property_form.dart';
 import 'rooms_manage.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
+import 'utility_history.dart';
+import 'utility_readings.dart';
 
 class PropertiesManageScreen extends StatelessWidget {
   const PropertiesManageScreen({super.key});
@@ -55,7 +57,7 @@ class PropertiesManageScreen extends StatelessWidget {
           // THANH TAB BAR LỌC TÒA NHÀ
           bottom: TabBar(
             labelColor: AppColors.lightGreen,
-            unselectedLabelColor: AppColors.lightGreen,
+            unselectedLabelColor: AppColors.lightGreen, //màu của tab ch dc chọn
             indicatorColor: Colors.orange,
             indicatorWeight: 1,
             indicatorSize: TabBarIndicatorSize.label,
@@ -218,7 +220,7 @@ class PropertiesManageScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -329,9 +331,11 @@ class PropertiesManageScreen extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          Navigator.pushNamed(
+                          Navigator.push(
                             context,
-                            AppRoutes.utilityReadings,
+                            MaterialPageRoute(
+                              builder: (context) => const InvoiceCreateScreen(),
+                            ),
                           );
                         },
                         icon: const Icon(
@@ -356,9 +360,12 @@ class PropertiesManageScreen extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          Navigator.pushNamed(
+                          Navigator.push(
                             context,
-                            AppRoutes.utilityHistory,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const LandlordUtilityScreen(),
+                            ),
                           );
                         },
                         icon: const Icon(

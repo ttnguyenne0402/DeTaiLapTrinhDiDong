@@ -112,10 +112,10 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryGreen.withOpacity(0.08),
+                  color: AppColors.primaryGreen.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.primaryGreen.withOpacity(0.2),
+                    color: AppColors.primaryGreen.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Row(
@@ -209,14 +209,12 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color:
-                    (service['iconColor'] as Color? ?? AppColors.primaryGreen)
-                        .withOpacity(0.12),
+                color: AppColors.primaryGreen.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 service['icon'] as IconData? ?? Icons.miscellaneous_services,
-                color: service['iconColor'] as Color? ?? AppColors.primaryGreen,
+                color: AppColors.primaryGreen,
                 size: 26,
               ),
             ),
@@ -294,7 +292,7 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
               children: [
                 Switch(
                   value: isActive,
-                  activeColor: AppColors.primaryGreen,
+                  activeThumbColor: AppColors.primaryGreen,
                   onChanged: (val) {
                     setState(() {
                       service['status'] = val;

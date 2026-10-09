@@ -245,7 +245,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: SwitchListTile(
-                          activeColor: AppColors.primaryGreen,
+                          activeTrackColor: AppColors.primaryGreen,
                           title: const Text(
                             'Bắt buộc đối với tất cả các phòng',
                             style: TextStyle(
