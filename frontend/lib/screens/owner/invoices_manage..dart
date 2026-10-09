@@ -210,13 +210,13 @@ class _InvoiceManaState extends State<Invoice_mana> {
           break;
         case 2:
           matchesFilter =
-              invoice.status == InvoiceStatus.pendingConfirmation;
+              invoice.status == InvoiceStatus.pendingConfirmation;// chờ xác nhận
           break;
         case 3:
-          matchesFilter = invoice.status == InvoiceStatus.paid;
+          matchesFilter = invoice.status == InvoiceStatus.paid; // đã thanh toán
           break;
         case 4:
-          matchesFilter = invoice.status == InvoiceStatus.draft;
+          matchesFilter = invoice.status == InvoiceStatus.draft; // bản nháp
         default:
           matchesFilter = true;
       }
@@ -925,7 +925,7 @@ class _InvoiceManaState extends State<Invoice_mana> {
                           const SizedBox(height: 7),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
+                            child: LinearProgressIndicator( // thanh tiến trình
                               value: progress.clamp(0.0, 1.0),
                               minHeight: 6,
                               backgroundColor: Colors.red.shade100,

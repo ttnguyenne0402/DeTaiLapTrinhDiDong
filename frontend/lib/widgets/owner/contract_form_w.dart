@@ -3,7 +3,7 @@ import '../../core/constants/app_colors.dart';
 
 class ContractFormWidgets {
 
-  // 1. Widget khung Card chuẩn cho từng bước
+  // 1. Widget khung
   static Widget buildSectionCard({
     required String step,
     required String title,
@@ -49,7 +49,7 @@ class ContractFormWidgets {
     );
   }
 
-  // 2. Widget TextField chuẩn bám sát hình
+  // 2. Widget TextField
   static Widget buildTextField(
       String label,
       String initialValue,
@@ -61,7 +61,7 @@ class ContractFormWidgets {
       controller: TextEditingController(text: initialValue),
       style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
       decoration: InputDecoration(
-        labelText: label,
+        labelText: label,// là nếu kh rỗng thì nó được đưa lên trên
         fillColor: isTrue ? AppColors.lightGreen : Colors.white,
         filled: true,
         labelStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),

@@ -136,10 +136,11 @@ class AdminDashboard extends StatelessWidget {
 
                         const SizedBox(height: 10),
 
+                        // chia làm 2 dòng
                         GridView.count(
                           crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
+                          shrinkWrap: true, // thu nhỏ lại không
+                          physics: const NeverScrollableScrollPhysics(),// khóa cuộn
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                           childAspectRatio: 1.3,
@@ -157,7 +158,7 @@ class AdminDashboard extends StatelessWidget {
                               iconColor: Colors.amber,
                             ),
                             StarCard(
-                              title: 'Hợp đồng duyệt',
+                              title: 'Tin đã duyệt',
                               value: '1.890',
                               icon: Icons.description_outlined,
                               iconColor: Colors.blue,
@@ -205,18 +206,18 @@ class AdminDashboard extends StatelessWidget {
                               const SizedBox(height: 10),
                               SizedBox(
                                 height: 200, // chiều cao phù hợp cho Dashboard
-                                child: SfCartesianChart(
+                                child: SfCartesianChart(  // biểu đồ đường
                                   margin: EdgeInsets.zero,
-                                  plotAreaBorderWidth: 0,
+                                  plotAreaBorderWidth: 0,// ẩn viền bao quanh
                                   legend: const Legend(
-                                    isVisible: true,
+                                    isVisible: true,// hiển thị bảng chú thích
                                     position: LegendPosition.top,
-                                    overflowMode: LegendItemOverflowMode.wrap,
+                                    overflowMode: LegendItemOverflowMode.wrap, // tự động xuống dòng
                                   ),
-                                  primaryXAxis: const CategoryAxis(
+                                  primaryXAxis: const CategoryAxis(  // trục ngang danh mục
                                     majorGridLines: MajorGridLines(width: 0),
                                   ),
-                                  primaryYAxis: const NumericAxis(
+                                  primaryYAxis: const NumericAxis( // trục dọc - số liệu
                                     axisLine: AxisLine(width: 0),
                                     majorTickLines: MajorTickLines(
                                       color: Colors.transparent,
@@ -233,9 +234,10 @@ class AdminDashboard extends StatelessWidget {
                                           data.views,
                                       color: AppColors.primaryGreen,
                                       width: 3,
-                                      markerSettings: const MarkerSettings(
-                                        isVisible: true,
+                                      markerSettings: const MarkerSettings(isVisible: true), // hiển thị các dấu chấm tròn
+
                                       ),
+
                                     ),
 
                                     //đường 2:lượt tìm phòng
@@ -342,6 +344,10 @@ class StarCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade300,
+          width: 1.5
+        )
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

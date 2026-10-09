@@ -305,7 +305,7 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
             scrollDirection: Axis.horizontal,
             child: SizedBox(
               width: 12 * 50.0, // Đặt chiều rộng đủ lớn cho 12 tháng (mỗi tháng 50px)
-              height: 180,
+              height: 280,
               child: BarChart(
                 BarChartData(
                   maxY: 20,
