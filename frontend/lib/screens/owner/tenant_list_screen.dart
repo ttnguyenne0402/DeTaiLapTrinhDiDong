@@ -174,7 +174,7 @@ class _TenantListScreenState extends State<TenantListScreen> {
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.black,
+          color: Colors.grey.shade300,
           width: 1.0
         )
       ),
