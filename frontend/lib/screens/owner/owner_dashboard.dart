@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/owner/dashboard_card.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'properties_manage.dart';
+import 'owner_profile_screen.dart';
 
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key});
@@ -210,7 +211,14 @@ class OwnerDashboard extends StatelessWidget {
             }),
             const SizedBox(width: 40),
             _buildNavItem(Icons.people_outline, 'Người thuê', false, () {}),
-            _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
+            _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OwnerProfileScreen(),
+                ),
+              );
+            }),
           ],
         ),
       ),

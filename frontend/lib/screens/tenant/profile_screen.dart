@@ -3,19 +3,15 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../widgets/tenant/profile_info_card.dart';
-import '../../widgets/tenant/bank_account_card.dart';
 import '../auth/login_screen.dart';
 import 'edit_profile_dialog.dart';
-import 'bank_account_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic>? user;
-  final List<Map<String, dynamic>> bankAccounts;
 
   const ProfileScreen({
     super.key,
     this.user,
-    this.bankAccounts = const [],
   });
 
   @override
@@ -24,7 +20,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late Map<String, dynamic> _userData;
-  late List<Map<String, dynamic>> _bankAccounts;
 
   @override
   void initState() {
@@ -40,28 +35,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'Role': 'tenant',
           },
     );
-
-    _bankAccounts = widget.bankAccounts
-        .map((account) => Map<String, dynamic>.from(account))
-        .toList();
-
-    if (_bankAccounts.isNotEmpty &&
-        !_bankAccounts.any(
-          (account) => account['IsDefault'] == true,
-        )) {
-      _bankAccounts.first['IsDefault'] = true;
-    }
   }
 
   // =========================
-  // SỬA THÔNG TIN CÁ NHÂN
+  // CHỈNH SỬA THÔNG TIN
   // =========================
 
   Future<void> _editProfile() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (_) => EditProfileDialog(
-        initialData: _userData,
+        initialData: Map<String, dynamic>.from(_userData),
       ),
     );
 
@@ -75,125 +59,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // =========================
-  // THÊM TÀI KHOẢN NGÂN HÀNG
-  // =========================
-
-  Future<void> _addBankAccount() async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => const BankAccountDialog(),
-    );
-
-    if (result == null || !mounted) return;
-
-    setState(() {
-      result['Id'] ??=
-          'LOCAL_${DateTime.now().microsecondsSinceEpoch}';
-
-      if (result['IsDefault'] == true ||
-          _bankAccounts.isEmpty) {
-        for (final account in _bankAccounts) {
-          account['IsDefault'] = false;
-        }
-
-        result['IsDefault'] = true;
-      }
-
-      _bankAccounts.add(result);
-    });
-
-    _showMessage('Đã thêm tài khoản ngân hàng.');
-  }
-
-  // =========================
-  // SỬA TÀI KHOẢN NGÂN HÀNG
-  // =========================
-
-  Future<void> _editBankAccount(int index) async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => BankAccountDialog(
-        account: Map<String, dynamic>.from(
-          _bankAccounts[index],
-        ),
-      ),
-    );
-
-    if (result == null || !mounted) return;
-
-    setState(() {
-      if (result['IsDefault'] == true) {
-        for (final account in _bankAccounts) {
-          account['IsDefault'] = false;
-        }
-      }
-
-      _bankAccounts[index] = result;
-    });
-
-    _showMessage('Đã cập nhật tài khoản ngân hàng.');
-  }
-
-  // =========================
-  // ĐẶT TÀI KHOẢN MẶC ĐỊNH
-  // =========================
-
-  void _setDefaultBankAccount(int index) {
-    setState(() {
-      for (int i = 0; i < _bankAccounts.length; i++) {
-        _bankAccounts[i]['IsDefault'] = i == index;
-      }
-    });
-
-    _showMessage('Đã đổi tài khoản mặc định.');
-  }
-
-  // =========================
-  // XÓA TÀI KHOẢN NGÂN HÀNG
-  // =========================
-
-  Future<void> _deleteBankAccount(int index) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Xóa tài khoản'),
-        content: const Text(
-          'Em có chắc muốn xóa tài khoản ngân hàng này không?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, false);
-            },
-            child: const Text('Hủy'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, true);
-            },
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true || !mounted) return;
-
-    setState(() {
-      final wasDefault =
-          _bankAccounts[index]['IsDefault'] == true;
-
-      _bankAccounts.removeAt(index);
-
-      if (wasDefault && _bankAccounts.isNotEmpty) {
-        _bankAccounts.first['IsDefault'] = true;
-      }
-    });
-
-    _showMessage('Đã xóa tài khoản ngân hàng.');
-  }
-
-  // =========================
   // ĐĂNG XUẤT
   // =========================
 
@@ -201,21 +66,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Đăng xuất'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text(
+          'Đăng xuất',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
         content: const Text(
-          'Em có chắc muốn đăng xuất không?',
+          'Em có chắc muốn đăng xuất khỏi tài khoản không?',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, false);
-            },
-            child: const Text('Hủy'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext, true);
-            },
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: const Text('Đăng xuất'),
           ),
         ],
@@ -238,7 +125,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.primaryGreen,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
     );
   }
 
@@ -248,142 +143,365 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-
-      appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: 'Quay lại',
-          onPressed: () {
-            Navigator.of(context).maybePop();
-          },
-        ),
-        title: const Text(
-          'Cá nhân',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // THÔNG TIN CÁ NHÂN
-          ProfileInfoCard(
-            user: _userData,
-            onEdit: _editProfile,
+    return SafeArea(
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // TIÊU ĐỀ
+          SliverToBoxAdapter(
+            child: _buildHeader(),
           ),
 
-          const SizedBox(height: 24),
-
-          // TÀI KHOẢN NGÂN HÀNG
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Tài khoản ngân hàng',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-
-              FilledButton.icon(
-                onPressed: _addBankAccount,
-                icon: const Icon(
-                  Icons.add,
-                  size: 18,
-                ),
-                label: const Text('Thêm'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryGreen,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // DANH SÁCH TÀI KHOẢN NGÂN HÀNG
-          if (_bankAccounts.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.cardSurface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Column(
+          // THÔNG TIN NGƯỜI THUÊ
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.account_balance_outlined,
-                    size: 42,
-                    color: AppColors.textSecondary,
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Chưa có tài khoản ngân hàng',
+                  const Text(
+                    'Thông tin của bạn',
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Thêm tài khoản để quản lý thông tin nhận tiền.',
-                    textAlign: TextAlign.center,
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Quản lý thông tin cá nhân của bạn tại đây.',
                     style: TextStyle(
                       color: AppColors.textSecondary,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Thẻ thông tin cá nhân hiện có
+                  ProfileInfoCard(
+                    user: _userData,
+                    onEdit: _editProfile,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // THẺ LƯU Ý
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+            sliver: SliverToBoxAdapter(
+              child: _buildPrivacyCard(),
+            ),
+          ),
+
+          // NÚT ĐĂNG XUẤT
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
+            sliver: SliverToBoxAdapter(
+              child: _buildLogoutButton(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================
+  // HEADER
+  // =========================
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 28),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF005D4B),
+            Color(0xFF157762),
+            Color(0xFF2D8D73),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(34),
+          bottomRight: Radius.circular(34),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -25,
+            top: -35,
+            child: Container(
+              width: 125,
+              height: 125,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.07),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 40,
+            bottom: -55,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.accentYellow.withOpacity(0.10),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.home_work_rounded,
+                    color: Colors.white,
+                    size: 27,
+                  ),
+                  SizedBox(width: 9),
+                  Text(
+                    'TRỌ ƠI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.6,
                     ),
                   ),
                 ],
               ),
-            )
-          else
-            ...List.generate(
-              _bankAccounts.length,
-              (index) => BankAccountCard(
-                account: _bankAccounts[index],
-                onEdit: () => _editBankAccount(index),
-                onSetDefault: () {
-                  _setDefaultBankAccount(index);
-                },
-                onDelete: () {
-                  _deleteBankAccount(index);
-                },
+              const SizedBox(height: 27),
+              Row(
+                children: [
+                  Container(
+                    width: 66,
+                    height: 66,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.45),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: _buildAvatar(),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Xin chào 👋',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _displayName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.13),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.18),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_user_outlined,
+                                color: AppColors.accentYellow,
+                                size: 14,
+                              ),
+                              SizedBox(width: 5),
+                              Text(
+                                'Người thuê',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar() {
+    final avatar = _userData['Avatar']?.toString().trim() ?? '';
+
+    if (avatar.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Image.network(
+          avatar,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _defaultAvatar(),
+        ),
+      );
+    }
+
+    return _defaultAvatar();
+  }
+
+  Widget _defaultAvatar() {
+    return const Icon(
+      Icons.person_rounded,
+      color: Colors.white,
+      size: 38,
+    );
+  }
+
+  String get _displayName {
+    final name = _userData['Name']?.toString().trim() ?? '';
+    return name.isEmpty ? 'Người dùng' : name;
+  }
+
+  // =========================
+  // THẺ GỢI Ý
+  // =========================
+
+  Widget _buildPrivacyCard() {
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: AppColors.lightGreen,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppColors.primaryGreen.withOpacity(0.10),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(14),
             ),
-
-          const SizedBox(height: 28),
-
-          // NÚT ĐĂNG XUẤT
-          OutlinedButton.icon(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Đăng xuất'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.red,
-              side: const BorderSide(
-                color: Colors.red,
-              ),
-              minimumSize: const Size(
-                double.infinity,
-                48,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+            child: const Icon(
+              Icons.shield_outlined,
+              color: AppColors.primaryGreen,
+              size: 23,
             ),
           ),
-
-          const SizedBox(height: 20),
+          const SizedBox(width: 13),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Thông tin cá nhân',
+                  style: TextStyle(
+                    color: AppColors.primaryGreen,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 5),
+                Text(
+                  'Hãy đảm bảo email và số điện thoại của bạn luôn chính xác để thuận tiện khi liên hệ về phòng trọ.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  // =========================
+  // NÚT ĐĂNG XUẤT
+  // =========================
+
+  Widget _buildLogoutButton() {
+    return Material(
+      color: AppColors.cardSurface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: _logout,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 17,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFFF0DADA),
+            ),
+          ),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.logout_rounded,
+                color: Color(0xFFC62828),
+                size: 22,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Đăng xuất tài khoản',
+                  style: TextStyle(
+                    color: Color(0xFFC62828),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Color(0xFFC62828),
+                size: 15,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
