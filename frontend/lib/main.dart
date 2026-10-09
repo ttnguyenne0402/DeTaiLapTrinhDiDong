@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/admin/content_moderation.dart';
+import 'screens/owner/appointments_manage.dart';
 import 'screens/owner/invoice_detail_owner.dart';
 import 'screens/admin/admin_dashboard.dart';
 import 'route/app_routes.dart';
@@ -8,6 +9,7 @@ import 'screens/owner/contracts_manage.dart';
 import 'screens/owner/invoices_manage..dart';
 import 'screens/owner/posts_manage.dart';
 import 'screens/owner/properties_manage.dart';
+import 'screens/owner/services_manage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -41,7 +43,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: .fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: PostsManageScreen(),
+      home: ServicesManageScreen(),
     );
   }
 }

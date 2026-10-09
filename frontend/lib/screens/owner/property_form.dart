@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
+
 class PropertyFormScreen extends StatefulWidget {
   const PropertyFormScreen({super.key});
 
@@ -17,18 +19,18 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.primaryGreen,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Thêm Bất động sản mới',
           style: TextStyle(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
@@ -36,142 +38,155 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         centerTitle: true,
       ),
 
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Tải ảnh đại diện tòa nhà
-                    _buildSectionTitle('Hình ảnh Tòa nhà / Bất động sản'),
-                    const SizedBox(height: 8),
-                    _buildImagePickerSection(),
-                    const SizedBox(height: 20),
-
-                    // Thông tin cơ bản
-                    _buildSectionTitle('Thông tin cơ bản'),
-                    const SizedBox(height: 8),
-                    _buildCardGroup(
+      body: Container(
+        color: AppColors.primaryGreen,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF9F9FB),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildTextField(
-                          label: 'Tên Tòa nhà / Dãy trọ',
-                          hint: 'VD: Chung cư Mini Q7',
-                          icon: Icons.apartment_outlined,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          label: 'Địa chỉ chi tiết',
-                          hint:
-                              'VD: 123 Nguyễn Thị Thập, P. Tân Quy, Q. 7, TP.HCM',
-                          icon: Icons.location_on_outlined,
-                          maxLines: 2,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
+                        // Tải ảnh đại diện tòa nhà
+                        _buildSectionTitle('Hình ảnh Tòa nhà / Bất động sản'),
+                        const SizedBox(height: 8),
+                        _buildImagePickerSection(),
+                        const SizedBox(height: 20),
 
-                    // Quy mô tòa nhà
-                    _buildSectionTitle('Quy mô bất động sản'),
-                    const SizedBox(height: 8),
-                    _buildCardGroup(
-                      children: [
-                        Row(
+                        // Thông tin cơ bản
+                        _buildSectionTitle('Thông tin cơ bản'),
+                        const SizedBox(height: 8),
+                        _buildCardGroup(
                           children: [
-                            Expanded(
-                              child: _buildTextField(
-                                label: 'Tổng số tầng',
-                                hint: '4',
-                                keyboardType: TextInputType.number,
-                                icon: Icons.layers_outlined,
-                              ),
+                            _buildTextField(
+                              label: 'Tên Tòa nhà / Dãy trọ',
+                              hint: 'VD: Chung cư Mini Q7',
+                              icon: Icons.apartment_outlined,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildTextField(
-                                label: 'Số lượng phòng',
-                                hint: '20',
-                                keyboardType: TextInputType.number,
-                                icon: Icons.meeting_room_outlined,
-                              ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              label: 'Địa chỉ chi tiết',
+                              hint:
+                                  'VD: 123 Nguyễn Thị Thập, P. Tân Quy, Q. 7, TP.HCM',
+                              icon: Icons.location_on_outlined,
+                              maxLines: 2,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Quy mô tòa nhà
+                        _buildSectionTitle('Quy mô bất động sản'),
+                        const SizedBox(height: 8),
+                        _buildCardGroup(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    label: 'Tổng số tầng',
+                                    hint: '4',
+                                    keyboardType: TextInputType.number,
+                                    icon: Icons.layers_outlined,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildTextField(
+                                    label: 'Số lượng phòng',
+                                    hint: '20',
+                                    keyboardType: TextInputType.number,
+                                    icon: Icons.meeting_room_outlined,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Trạng thái hoạt động
+                        _buildSectionTitle('Trạng thái hoạt động'),
+                        const SizedBox(height: 8),
+                        _buildStatusSelector(),
+                        const SizedBox(height: 20),
+
+                        // Mô tả tiện ích
+                        _buildSectionTitle('Mô tả & Tiện ích chung'),
+                        const SizedBox(height: 8),
+                        _buildCardGroup(
+                          children: [
+                            _buildTextField(
+                              label: 'Mô tả tiện ích hoặc quy định',
+                              hint:
+                                  'VD: Có thang máy, ra vào cổng vân tay, giờ giấc tự do, bảo vệ 24/7...',
+                              maxLines: 3,
+                              icon: Icons.description_outlined,
                             ),
                           ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                  ),
+                ),
 
-                    // Trạng thái hoạt động
-                    _buildSectionTitle('Trạng thái hoạt động'),
-                    const SizedBox(height: 8),
-                    _buildStatusSelector(),
-                    const SizedBox(height: 20),
-
-                    // Mô tả tiện ích
-                    _buildSectionTitle('Mô tả & Tiện ích chung'),
-                    const SizedBox(height: 8),
-                    _buildCardGroup(
-                      children: [
-                        _buildTextField(
-                          label: 'Mô tả tiện ích hoặc quy định',
-                          hint:
-                              'VD: Có thang máy, ra vào cổng vân tay, giờ giấc tự do, bảo vệ 24/7...',
-                          maxLines: 3,
-                          icon: Icons.description_outlined,
+                // Nút Thêm Bất động sản
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (_formKey.currentState!.validate()) {
+                            Navigator.pop(context);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Nút Thêm Bất động sản
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Thêm bất động sản',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        child: const Text(
+                          'Thêm bất động sản',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

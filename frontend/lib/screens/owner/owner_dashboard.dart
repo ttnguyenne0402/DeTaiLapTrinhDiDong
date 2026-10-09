@@ -16,7 +16,7 @@ class OwnerDashboard extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: primaryColor,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text('Chủ trọ', style: TextStyle(color: Colors.white)),
+        title: const Text('Trang chủ', style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
             onPressed: () {},

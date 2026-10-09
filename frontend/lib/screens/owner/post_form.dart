@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 
 class PostFormScreen extends StatefulWidget {
   const PostFormScreen({super.key});
@@ -8,7 +9,6 @@ class PostFormScreen extends StatefulWidget {
 }
 
 class _PostFormScreenState extends State<PostFormScreen> {
-  final Color primaryColor = const Color(0xFF1B5E55);
   final List<String> amenities = [
     'Wifi',
     'Điều hòa',
@@ -23,126 +23,142 @@ class _PostFormScreenState extends State<PostFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.primaryGreen,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
+          icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Đăng tin cho thuê',
           style: TextStyle(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Áp dụng cho phòng nào
-            _buildSectionTitle('Thông tin cơ bản'),
-            _buildDropdownField('Chọn tòa nhà', [
-              'Chung cư Mini Q7',
-              'Dãy trọ Lê Văn Sỹ',
-            ]),
-            const SizedBox(height: 12),
-            _buildDropdownField('Chọn phòng trống', ['Phòng 101', 'Phòng 102']),
+      body: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFF9F9FB),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Áp dụng cho phòng nào
+              _buildSectionTitle('Thông tin cơ bản'),
+              _buildDropdownField('Chọn tòa nhà', [
+                'Chung cư Mini Q7',
+                'Dãy trọ Lê Văn Sỹ',
+              ]),
+              const SizedBox(height: 12),
+              _buildDropdownField('Chọn phòng trống', [
+                'Phòng 101',
+                'Phòng 102',
+              ]),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Hình ảnh
-            _buildSectionTitle('Hình ảnh thực tế (Tối đa 6 ảnh)'),
-            _buildImagePickerUI(),
+              // Hình ảnh
+              _buildSectionTitle('Hình ảnh thực tế (Tối đa 6 ảnh)'),
+              _buildImagePickerUI(),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Nội dung tin đăng
-            _buildSectionTitle('Nội dung chi tiết'),
-            _buildTextField(
-              'Tiêu đề tin đăng',
-              'VD: Cho thuê phòng trọ có gác xép mới xây...',
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            _buildTextField(
-              'Mô tả chi tiết',
-              'Mô tả về không gian, tiện ích xung quanh, yêu cầu người thuê...',
-              maxLines: 5,
-            ),
+              // Nội dung tin đăng
+              _buildSectionTitle('Nội dung chi tiết'),
+              _buildTextField(
+                'Tiêu đề tin đăng',
+                'VD: Cho thuê phòng trọ có gác xép mới xây...',
+                maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              _buildTextField(
+                'Mô tả chi tiết',
+                'Mô tả về không gian, tiện ích xung quanh, yêu cầu người thuê...',
+                maxLines: 5,
+              ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Giá cả
-            _buildSectionTitle('Chi phí thuê'),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildTextField(
-                    'Giá thuê (VNĐ/tháng)',
-                    'VD: 3.500.000',
-                    isNumber: true,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildTextField(
-                    'Tiền cọc (VNĐ)',
-                    'VD: 3.500.000',
-                    isNumber: true,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Tiện ích nổi bật
-            _buildSectionTitle('Tiện ích có sẵn'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: amenities.map((item) {
-                final isSelected = selectedAmenities.contains(item);
-                return FilterChip(
-                  label: Text(item),
-                  selected: isSelected,
-                  selectedColor: primaryColor.withOpacity(0.1),
-                  checkmarkColor: primaryColor,
-                  labelStyle: TextStyle(
-                    color: isSelected ? primaryColor : Colors.grey[700],
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: isSelected ? primaryColor : Colors.grey[300]!,
+              // Giá cả
+              _buildSectionTitle('Chi phí thuê'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      'Giá thuê (VNĐ/tháng)',
+                      'VD: 3.500.000',
+                      isNumber: true,
                     ),
                   ),
-                  onSelected: (bool selected) {
-                    setState(() {
-                      if (selected) {
-                        selectedAmenities.add(item);
-                      } else {
-                        selectedAmenities.remove(item);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildTextField(
+                      'Tiền cọc (VNĐ)',
+                      'VD: 3.500.000',
+                      isNumber: true,
+                    ),
+                  ),
+                ],
+              ),
 
-            const SizedBox(height: 40),
-          ],
+              const SizedBox(height: 24),
+
+              // Tiện ích nổi bật
+              _buildSectionTitle('Tiện ích có sẵn'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: amenities.map((item) {
+                  final isSelected = selectedAmenities.contains(item);
+                  return FilterChip(
+                    label: Text(item),
+                    selected: isSelected,
+                    selectedColor: AppColors.primaryGreen.withOpacity(0.1),
+                    checkmarkColor: AppColors.primaryGreen,
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? AppColors.primaryGreen
+                          : Colors.grey[700],
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSelected
+                            ? AppColors.primaryGreen
+                            : Colors.grey[300]!,
+                      ),
+                    ),
+                    onSelected: (bool selected) {
+                      setState(() {
+                        if (selected) {
+                          selectedAmenities.add(item);
+                        } else {
+                          selectedAmenities.remove(item);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: Container(
@@ -162,7 +178,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
             Expanded(
               child: OutlinedButton(
                 onPressed: () {
-                  // Lưu bài viết ở trạng thái Bản nháp
                   Navigator.pop(context, {
                     'title': 'Cho thuê phòng mới full tiện nghi',
                     'room': 'Phòng 102 - Chung cư Mini Q7',
@@ -175,7 +190,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
                   });
                 },
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: primaryColor),
+                  side: BorderSide(color: AppColors.primaryGreen),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -186,7 +201,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: primaryColor,
+                    color: AppColors.primaryGreen,
                   ),
                 ),
               ),
@@ -196,7 +211,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
               flex: 2,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // Lưu và gửi duyệt cho Admin
                   Navigator.pop(context, {
                     'title': 'Cho thuê phòng mới full tiện nghi',
                     'room': 'Phòng 102 - Chung cư Mini Q7',
@@ -205,11 +219,16 @@ class _PostFormScreenState extends State<PostFormScreen> {
                     'likes': 0,
                     'date': 'Vừa gửi',
                     'status': 'pending',
-                    'submitNote': 'Đang chờ Quản trị viên duyệt (tiêu chuẩn PCCC & giá)',
+                    'submitNote':
+                        'Đang chờ Quản trị viên duyệt (tiêu chuẩn PCCC & giá)',
                     'image': 'frontend/assets/images/anhPhongDemo.jpg',
                   });
                 },
-                icon: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
+                icon: const Icon(
+                  Icons.send_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
                 label: const Text(
                   'GỬI ADMIN DUYỆT',
                   style: TextStyle(
@@ -219,7 +238,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
+                  backgroundColor: AppColors.primaryGreen,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -232,7 +251,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
       ),
     );
   }
-
 
   Widget _buildSectionTitle(String title) {
     return Padding(
@@ -277,7 +295,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primaryColor),
+          borderSide: BorderSide(color: AppColors.primaryGreen),
         ),
       ),
     );
@@ -312,7 +330,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
   Widget _buildImagePickerUI() {
     return Row(
       children: [
-        // Nút thêm ảnh
         Container(
           width: 100,
           height: 100,
@@ -320,7 +337,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: primaryColor,
+              color: AppColors.primaryGreen,
               style: BorderStyle.solid,
               width: 1.5,
             ),
@@ -328,12 +345,12 @@ class _PostFormScreenState extends State<PostFormScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add_a_photo, color: primaryColor, size: 28),
+              Icon(Icons.add_a_photo, color: AppColors.primaryGreen, size: 28),
               const SizedBox(height: 8),
               Text(
                 'Thêm ảnh',
                 style: TextStyle(
-                  color: primaryColor,
+                  color: AppColors.primaryGreen,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
@@ -342,7 +359,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
           ),
         ),
         const SizedBox(width: 12),
-        // Demo 1 ảnh đã chọn
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Container(
@@ -358,7 +374,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
                   errorBuilder: (context, error, stackTrace) =>
                       const Icon(Icons.image, color: Colors.grey),
                 ),
-                Positioned(
+                const Positioned(
                   top: 4,
                   right: 4,
                   child: CircleAvatar(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/owner/contracts_manage.dart';
 import '../../screens/owner/invoices_manage..dart';
@@ -7,17 +8,16 @@ import '../../screens/owner/maintenance_manage.dart';
 import '../../screens/owner/posts_manage.dart';
 import '../../screens/owner/utility_readings.dart';
 import '../../screens/owner/properties_manage.dart';
-
+import '../../screens/owner/appointments_manage.dart';
+import '../../screens/owner/services_manage.dart';
+import '../../screens/owner/utility_readings.dart';
 
 class OwnerDrawer extends StatelessWidget {
   /// Mã định danh màn hình hiện tại để làm nổi bật (nếu có):
-  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts'
+  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'services'
   final String? currentRoute;
 
-  const OwnerDrawer({
-    super.key,
-    this.currentRoute,
-  });
+  const OwnerDrawer({super.key, this.currentRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +90,7 @@ class OwnerDrawer extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const PropertiesManageScreen(),
+                          builder: (context) => const InvoiceCreateScreen(),
                         ),
                       );
                     }
@@ -137,9 +137,54 @@ class OwnerDrawer extends StatelessWidget {
                   },
                 ),
 
+                // 6. Quản lý Lịch hẹn xem phòng (MỚI THÊM)
+                _buildDrawerItem(
+                  context: context,
+                  icon: Icons.calendar_today_outlined,
+                  title: 'Lịch hẹn xem phòng',
+                  subtitle: 'Quản lý, xác nhận lịch xem phòng',
+                  isActive: currentRoute == 'appointments',
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (currentRoute != 'appointments') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const AppointmentsManageScreen(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+
+                // 7. Quản lý Dịch vụ & Bảng giá (MỚI THÊM)
+                _buildDrawerItem(
+                  context: context,
+                  icon: Icons.room_service_outlined,
+                  title: 'Dịch vụ & Bảng giá',
+                  subtitle: 'Cấu hình đơn giá điện, nước, wifi...',
+                  isActive: currentRoute == 'services',
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (currentRoute != 'services') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ServicesManageScreen(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFEEEEEE),
+                  ),
                 ),
 
                 _buildSectionTitle('HỆ THỐNG'),
@@ -199,7 +244,11 @@ class OwnerDrawer extends StatelessWidget {
                         color: Colors.red.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                      child: const Icon(
+                        Icons.logout_rounded,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -216,10 +265,7 @@ class OwnerDrawer extends StatelessWidget {
                           ),
                           Text(
                             'Thoát tài khoản quản lý',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 11,
-                            ),
+                            style: TextStyle(color: Colors.grey, fontSize: 11),
                           ),
                         ],
                       ),
@@ -249,10 +295,7 @@ class OwnerDrawer extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            primaryColor,
-            AppColors.primaryGreen,
-          ],
+          colors: [primaryColor, AppColors.primaryGreen],
         ),
       ),
       child: Column(
@@ -268,7 +311,9 @@ class OwnerDrawer extends StatelessWidget {
                 child: const CircleAvatar(
                   radius: 28,
                   backgroundColor: Color(0xFF2C7D73),
-                  backgroundImage: AssetImage('frontend/assets/images/avatarDemo.jpg'),
+                  backgroundImage: AssetImage(
+                    'frontend/assets/images/avatarDemo.jpg',
+                  ),
                   child: Icon(Icons.person, color: Colors.white, size: 28),
                 ),
               ),
@@ -291,7 +336,10 @@ class OwnerDrawer extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.orange.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(4),
@@ -306,7 +354,11 @@ class OwnerDrawer extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(Icons.verified, color: Colors.lightGreenAccent, size: 14),
+                        const Icon(
+                          Icons.verified,
+                          color: Colors.lightGreenAccent,
+                          size: 14,
+                        ),
                       ],
                     ),
                   ],
@@ -402,7 +454,9 @@ class OwnerDrawer extends StatelessWidget {
         subtitle: Text(
           subtitle,
           style: TextStyle(
-            color: isActive ? primaryColor.withOpacity(0.8) : const Color(0xFF78909C),
+            color: isActive
+                ? primaryColor.withOpacity(0.8)
+                : const Color(0xFF78909C),
             fontSize: 11,
           ),
           maxLines: 1,
@@ -455,7 +509,10 @@ class OwnerDrawer extends StatelessWidget {
                 (route) => false,
               );
             },
-            child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Đăng xuất',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -485,7 +542,10 @@ class OwnerDrawer extends StatelessWidget {
               children: [
                 Icon(Icons.phone_in_talk, color: Colors.green, size: 18),
                 SizedBox(width: 8),
-                Text('1900 6868 (8:00 - 21:00)', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  '1900 6868 (8:00 - 21:00)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             SizedBox(height: 8),
@@ -493,7 +553,10 @@ class OwnerDrawer extends StatelessWidget {
               children: [
                 Icon(Icons.email_outlined, color: Colors.blue, size: 18),
                 SizedBox(width: 8),
-                Text('hotro@trotot.vn', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  'hotro@trotot.vn',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           ],
@@ -501,7 +564,10 @@ class OwnerDrawer extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Đóng', style: TextStyle(color: Color(0xFF1B5E55))),
+            child: const Text(
+              'Đóng',
+              style: TextStyle(color: Color(0xFF1B5E55)),
+            ),
           ),
         ],
       ),

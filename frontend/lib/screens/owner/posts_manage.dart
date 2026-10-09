@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'post_form.dart';
 
@@ -11,7 +12,6 @@ class PostsManageScreen extends StatefulWidget {
 
 class _PostsManageScreenState extends State<PostsManageScreen>
     with SingleTickerProviderStateMixin {
-  final Color primaryColor = const Color(0xFF1B5E55);
   late TabController _tabController;
 
   // Danh sách bài đăng quản lý
@@ -59,7 +59,8 @@ class _PostsManageScreenState extends State<PostsManageScreen>
       'likes': 1,
       'date': '02/10/2026',
       'status': 'rejected', // rejected: admin từ chối duyệt
-      'rejectReason': 'Ảnh chụp phòng mờ, chưa đính kèm biên bản cam kết an toàn PCCC.',
+      'rejectReason':
+          'Ảnh chụp phòng mờ, chưa đính kèm biên bản cam kết an toàn PCCC.',
       'image': 'frontend/assets/images/anhPhongDemo.jpg',
     },
     {
@@ -91,40 +92,36 @@ class _PostsManageScreenState extends State<PostsManageScreen>
   Widget build(BuildContext context) {
     // Đếm số lượng theo trạng thái
     final int activeCount = _posts.where((p) => p['status'] == 'active').length;
-    final int pendingCount =
-        _posts.where((p) => p['status'] == 'pending').length;
+    final int pendingCount = _posts
+        .where((p) => p['status'] == 'pending')
+        .length;
     final int hiddenOrDraftCount = _posts
-        .where((p) =>
-            p['status'] == 'draft' ||
-            p['status'] == 'hidden' ||
-            p['status'] == 'rejected')
+        .where(
+          (p) =>
+              p['status'] == 'draft' ||
+              p['status'] == 'hidden' ||
+              p['status'] == 'rejected',
+        )
         .length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: AppColors.primaryGreen,
       drawer: const OwnerDrawer(currentRoute: 'posts'),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: AppColors.primaryGreen,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.black),
+            icon: const Icon(Icons.menu, color: Colors.white),
             tooltip: 'Menu',
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        actions: [
-          if (Navigator.canPop(context))
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
-              tooltip: 'Quay lại',
-              onPressed: () => Navigator.pop(context),
-            ),
-        ],
         title: const Text(
           'Quản lý tin đăng',
           style: TextStyle(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
@@ -132,9 +129,9 @@ class _PostsManageScreenState extends State<PostsManageScreen>
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: primaryColor,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: primaryColor,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          indicatorColor: Colors.orange,
           indicatorWeight: 3,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.bold,
@@ -147,13 +144,26 @@ class _PostsManageScreenState extends State<PostsManageScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildPostList('active'),
-          _buildPostList('pending'),
-          _buildPostList('hidden_draft'),
-        ],
+      body: Container(
+        color: AppColors.primaryGreen,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: const BoxDecoration(
+            color: Color(0xFFF9F9FB),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildPostList('active'),
+              _buildPostList('pending'),
+              _buildPostList('hidden_draft'),
+            ],
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -168,9 +178,11 @@ class _PostsManageScreenState extends State<PostsManageScreen>
             if (newPost['status'] == 'pending') {
               _tabController.animateTo(1);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã gửi bài đăng mới cho Admin duyệt thành công!'),
-                  backgroundColor: Color(0xFF1B5E55),
+                SnackBar(
+                  content: const Text(
+                    'Đã gửi bài đăng mới cho Admin duyệt thành công!',
+                  ),
+                  backgroundColor: AppColors.primaryGreen,
                 ),
               );
             }
@@ -195,10 +207,12 @@ class _PostsManageScreenState extends State<PostsManageScreen>
       filtered = _posts.where((p) => p['status'] == 'pending').toList();
     } else {
       filtered = _posts
-          .where((p) =>
-              p['status'] == 'draft' ||
-              p['status'] == 'hidden' ||
-              p['status'] == 'rejected')
+          .where(
+            (p) =>
+                p['status'] == 'draft' ||
+                p['status'] == 'hidden' ||
+                p['status'] == 'rejected',
+          )
           .toList();
     }
 
@@ -206,10 +220,12 @@ class _PostsManageScreenState extends State<PostsManageScreen>
       String emptyMessage;
       IconData emptyIcon;
       if (tabKey == 'pending') {
-        emptyMessage = 'Hiện không có bài nào đang chờ duyệt.\nHãy bấm "Gửi duyệt" ở mục Bản nháp để gửi cho Admin.';
+        emptyMessage =
+            'Hiện không có bài nào đang chờ duyệt.\nHãy bấm "Gửi duyệt" ở mục Bản nháp để gửi cho Admin.';
         emptyIcon = Icons.hourglass_empty_rounded;
       } else if (tabKey == 'active') {
-        emptyMessage = 'Chưa có bài đăng nào đang hiển thị.\nHãy tạo tin mới hoặc gửi duyệt bài đăng.';
+        emptyMessage =
+            'Chưa có bài đăng nào đang hiển thị.\nHãy tạo tin mới hoặc gửi duyệt bài đăng.';
         emptyIcon = Icons.article_outlined;
       } else {
         emptyMessage = 'Không có bài đăng nháp hoặc bị ẩn.';
@@ -310,7 +326,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                         post['room'] ?? '',
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: primaryColor,
+                          color: AppColors.primaryGreen,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -333,7 +349,10 @@ class _PostsManageScreenState extends State<PostsManageScreen>
             if (status == 'pending') ...[
               const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.amber.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -341,8 +360,11 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.hourglass_top_rounded,
-                        size: 16, color: Colors.amber.shade800),
+                    Icon(
+                      Icons.hourglass_top_rounded,
+                      size: 16,
+                      color: Colors.amber.shade800,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -363,7 +385,10 @@ class _PostsManageScreenState extends State<PostsManageScreen>
             if (status == 'rejected') ...[
               const SizedBox(height: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -371,7 +396,11 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.cancel_outlined, size: 16, color: Colors.red),
+                    const Icon(
+                      Icons.cancel_outlined,
+                      size: 16,
+                      color: Colors.red,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -393,23 +422,29 @@ class _PostsManageScreenState extends State<PostsManageScreen>
               child: Divider(height: 1),
             ),
 
-            // Dòng dưới cùng: Thống kê & NÚT HÀNH ĐỘNG (GỬI DUYỆT ADMIN)
+            // Dòng dưới cùng: Thống kê & NÚT HÀNH ĐỘNG
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Số lượt xem & thích
                 Row(
                   children: [
-                    Icon(Icons.remove_red_eye_outlined,
-                        size: 15, color: Colors.grey[600]),
+                    Icon(
+                      Icons.remove_red_eye_outlined,
+                      size: 15,
+                      color: Colors.grey[600],
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '${post['views'] ?? 0}',
                       style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                     const SizedBox(width: 12),
-                    Icon(Icons.favorite_border,
-                        size: 15, color: Colors.grey[600]),
+                    Icon(
+                      Icons.favorite_border,
+                      size: 15,
+                      color: Colors.grey[600],
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '${post['likes'] ?? 0}',
@@ -421,18 +456,24 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                 // Các nút hành động chính
                 Row(
                   children: [
-                    // Trường hợp 1: Chờ duyệt -> Nút Thu hồi yêu cầu
                     if (status == 'pending') ...[
                       OutlinedButton.icon(
                         onPressed: () => _confirmCancelApproval(post),
-                        icon: const Icon(Icons.undo, size: 15, color: Colors.orange),
+                        icon: const Icon(
+                          Icons.undo,
+                          size: 15,
+                          color: Colors.orange,
+                        ),
                         label: const Text(
                           'Thu hồi',
                           style: TextStyle(fontSize: 12, color: Colors.orange),
                         ),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.orange),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           visualDensity: VisualDensity.compact,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -441,16 +482,20 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                       ),
                     ],
 
-                    // Trường hợp 2: Bản nháp / Ẩn / Bị từ chối -> NÚT GỬI ADMIN DUYỆT NỔI BẬT!
                     if (status == 'draft' ||
                         status == 'hidden' ||
                         status == 'rejected') ...[
                       ElevatedButton.icon(
                         onPressed: () => _showSubmitApprovalBottomSheet(post),
-                        icon: const Icon(Icons.send_rounded,
-                            size: 15, color: Colors.white),
+                        icon: const Icon(
+                          Icons.send_rounded,
+                          size: 15,
+                          color: Colors.white,
+                        ),
                         label: Text(
-                          status == 'rejected' ? 'Gửi duyệt lại' : 'Gửi Admin duyệt',
+                          status == 'rejected'
+                              ? 'Gửi duyệt lại'
+                              : 'Gửi Admin duyệt',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -458,9 +503,11 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
+                          backgroundColor: AppColors.primaryGreen,
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           visualDensity: VisualDensity.compact,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -470,7 +517,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                       const SizedBox(width: 6),
                     ],
 
-                    // Trường hợp 3: Đang hiển thị -> Nút Ẩn tin
                     if (status == 'active') ...[
                       TextButton.icon(
                         onPressed: () {
@@ -479,15 +525,22 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                           });
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Đã ẩn tin đăng khỏi danh sách công khai.'),
+                              content: Text(
+                                'Đã ẩn tin đăng khỏi danh sách công khai.',
+                              ),
                               duration: Duration(seconds: 2),
                             ),
                           );
                         },
-                        icon: const Icon(Icons.visibility_off,
-                            size: 16, color: Colors.orange),
-                        label: const Text('Ẩn tin',
-                            style: TextStyle(color: Colors.orange, fontSize: 12)),
+                        icon: const Icon(
+                          Icons.visibility_off,
+                          size: 16,
+                          color: Colors.orange,
+                        ),
+                        label: const Text(
+                          'Ẩn tin',
+                          style: TextStyle(color: Colors.orange, fontSize: 12),
+                        ),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 6),
                           visualDensity: VisualDensity.compact,
@@ -495,20 +548,24 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                       ),
                     ],
 
-                    // Nút Sửa
                     TextButton.icon(
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => const PostFormScreen()),
+                            builder: (context) => const PostFormScreen(),
+                          ),
                         );
                       },
-                      icon: Icon(Icons.edit_outlined,
-                          size: 16, color: Colors.blue[700]),
-                      label: Text('Sửa',
-                          style:
-                              TextStyle(color: Colors.blue[700], fontSize: 12)),
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        size: 16,
+                        color: Colors.blue[700],
+                      ),
+                      label: Text(
+                        'Sửa',
+                        style: TextStyle(color: Colors.blue[700], fontSize: 12),
+                      ),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 6),
                         visualDensity: VisualDensity.compact,
@@ -617,17 +674,19 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Tiêu đề BottomSheet
                     Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.1),
+                            color: AppColors.primaryGreen.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(Icons.verified_user_outlined,
-                              color: primaryColor, size: 24),
+                          child: Icon(
+                            Icons.verified_user_outlined,
+                            color: AppColors.primaryGreen,
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
@@ -644,7 +703,10 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                               ),
                               Text(
                                 'Admin sẽ thẩm định và xuất bản tin trong vòng 24h',
-                                style: TextStyle(fontSize: 11.5, color: Colors.grey),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ],
                           ),
@@ -657,7 +719,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // Tóm tắt tin đăng gửi duyệt
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -670,7 +731,8 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                           ClipRRect(
                             borderRadius: BorderRadius.circular(6),
                             child: Image.asset(
-                              post['image'] ?? 'frontend/assets/images/anhPhongDemo.jpg',
+                              post['image'] ??
+                                  'frontend/assets/images/anhPhongDemo.jpg',
                               width: 55,
                               height: 55,
                               fit: BoxFit.cover,
@@ -678,7 +740,10 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                                 width: 55,
                                 height: 55,
                                 color: Colors.grey[200],
-                                child: const Icon(Icons.image, color: Colors.grey),
+                                child: const Icon(
+                                  Icons.image,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
                           ),
@@ -701,7 +766,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                                   post['room'] ?? '',
                                   style: TextStyle(
                                     fontSize: 11.5,
-                                    color: primaryColor,
+                                    color: AppColors.primaryGreen,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -721,7 +786,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // Cam kết tiêu chuẩn phê duyệt
                     const Text(
                       'Tiêu chuẩn kiểm duyệt bắt buộc:',
                       style: TextStyle(
@@ -735,7 +799,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                     CheckboxListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      activeColor: primaryColor,
+                      activeColor: AppColors.primaryGreen,
                       title: const Text(
                         'Thông tin và hình ảnh phòng trọ chính xác 100%',
                         style: TextStyle(fontSize: 12.5),
@@ -751,7 +815,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                     CheckboxListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      activeColor: primaryColor,
+                      activeColor: AppColors.primaryGreen,
                       title: const Text(
                         'Phòng trọ đáp ứng đầy đủ tiêu chuẩn an toàn PCCC',
                         style: TextStyle(fontSize: 12.5),
@@ -766,28 +830,32 @@ class _PostsManageScreenState extends State<PostsManageScreen>
 
                     const SizedBox(height: 10),
 
-                    // Lời nhắn / Ghi chú cho Admin
                     TextField(
                       controller: noteController,
                       maxLines: 2,
                       decoration: InputDecoration(
-                        hintText: 'Lời nhắn gửi Admin kiểm duyệt (không bắt buộc)...',
-                        hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                        hintText:
+                            'Lời nhắn gửi Admin kiểm duyệt (không bắt buộc)...',
+                        hintStyle: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                         contentPadding: const EdgeInsets.all(10),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE0E0E0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: primaryColor),
+                          borderSide: BorderSide(color: AppColors.primaryGreen),
                         ),
                       ),
                     ),
 
                     const SizedBox(height: 18),
 
-                    // Nút xác nhận gửi duyệt
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -797,8 +865,11 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                                 Navigator.pop(dialogCtx);
                                 _submitPost(post, noteController.text);
                               },
-                        icon: const Icon(Icons.send_rounded,
-                            color: Colors.white, size: 18),
+                        icon: const Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                         label: const Text(
                           'XÁC NHẬN GỬI ADMIN DUYỆT',
                           style: TextStyle(
@@ -808,7 +879,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
+                          backgroundColor: AppColors.primaryGreen,
                           disabledBackgroundColor: Colors.grey[300],
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
@@ -853,7 +924,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
             ),
           ],
         ),
-        backgroundColor: primaryColor,
+        backgroundColor: AppColors.primaryGreen,
         behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
           label: 'Xem Chờ duyệt',
@@ -891,7 +962,9 @@ class _PostsManageScreenState extends State<PostsManageScreen>
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               Navigator.pop(ctx);
