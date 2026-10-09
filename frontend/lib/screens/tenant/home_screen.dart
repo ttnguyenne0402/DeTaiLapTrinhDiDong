@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+
 import '../../widgets/tenant/room_card.dart';
+
 import 'search_filter_screen.dart';
+
 import 'room_detail_screen.dart';
+import 'booking_screen.dart';
+import 'favorites_screen.dart';
+import 'my_invoices_screen.dart';
+import 'notifications_screen.dart';
+import 'my_contracts_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,71 +29,124 @@ class _HomeScreenState extends State<HomeScreen> {
   final Set<String> _selectedQuickFilters = {};
 
   // ============================================================
+
   // DỮ LIỆU PHÒNG
+
   // ============================================================
 
   final List<Map<String, dynamic>> _allRooms = [
     {
       'id': 'ROOM001',
+
       'propertyId': 'PROP001',
+
       'propertyName': 'Khu trọ Nguyễn Văn Quá',
+
       'title': 'Phòng đầy đủ nội thất gần Đại học Công Thương',
+
       'district': 'Quận 12',
+
       'ward': 'Đông Hưng Thuận',
+
       'area': 22,
+
       'price': 2800000,
+
       'deposit': 2800000,
+
       'maxPeople': 2,
+
       'status': 'available',
+
       'amenities': ['Máy lạnh', 'Wifi', 'Tủ lạnh', 'WC riêng'],
+
       'image':
           'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
     },
+
     {
       'id': 'ROOM002',
+
       'propertyId': 'PROP002',
+
       'propertyName': 'An Phú Residence',
+
       'title': 'Căn hộ mini cao cấp, ban công thoáng',
+
       'district': 'TP. Thủ Đức',
+
       'ward': 'An Phú',
+
       'area': 35,
+
       'price': 6800000,
+
       'deposit': 6800000,
+
       'maxPeople': 3,
+
       'status': 'available',
+
       'amenities': ['Máy lạnh', 'Ban công', 'Thang máy', 'Wifi'],
+
       'image':
           'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
     },
+
     {
       'id': 'ROOM003',
+
       'propertyId': 'PROP003',
+
       'propertyName': 'Khu trọ Tân Phú',
+
       'title': 'Phòng mới xây, an ninh tốt, giờ giấc tự do',
+
       'district': 'Tân Phú',
+
       'ward': 'Tân Sơn Nhì',
+
       'area': 24,
+
       'price': 3200000,
+
       'deposit': 3200000,
+
       'maxPeople': 2,
+
       'status': 'available',
+
       'amenities': ['Wifi', 'Camera', 'WC riêng', 'Chỗ để xe'],
+
       'image':
           'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
     },
+
     {
       'id': 'ROOM004',
+
       'propertyId': 'PROP004',
+
       'propertyName': 'Saigon Green House',
+
       'title': 'Phòng rộng, gần chợ và tuyến Metro',
+
       'district': 'Bình Thạnh',
+
       'ward': 'Phường 25',
+
       'area': 28,
+
       'price': 4500000,
+
       'deposit': 4500000,
+
       'maxPeople': 2,
+
       'status': 'available',
+
       'amenities': ['Máy lạnh', 'Wifi', 'Máy giặt', 'Camera'],
+
       'image':
           'https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=1200&q=80',
     },
@@ -102,81 +164,150 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+
     super.dispose();
   }
 
   // ============================================================
+
   // TÌM KIẾM TIẾNG VIỆT
+
   // ============================================================
 
   String _removeVietnameseDiacritics(String value) {
     const replacements = {
       'à': 'a',
+
       'á': 'a',
+
       'ạ': 'a',
+
       'ả': 'a',
+
       'ã': 'a',
+
       'â': 'a',
+
       'ầ': 'a',
+
       'ấ': 'a',
+
       'ậ': 'a',
+
       'ẩ': 'a',
+
       'ẫ': 'a',
+
       'ă': 'a',
+
       'ằ': 'a',
+
       'ắ': 'a',
+
       'ặ': 'a',
+
       'ẳ': 'a',
+
       'ẵ': 'a',
+
       'è': 'e',
+
       'é': 'e',
+
       'ẹ': 'e',
+
       'ẻ': 'e',
+
       'ẽ': 'e',
+
       'ê': 'e',
+
       'ề': 'e',
+
       'ế': 'e',
+
       'ệ': 'e',
+
       'ể': 'e',
+
       'ễ': 'e',
+
       'ì': 'i',
+
       'í': 'i',
+
       'ị': 'i',
+
       'ỉ': 'i',
+
       'ĩ': 'i',
+
       'ò': 'o',
+
       'ó': 'o',
+
       'ọ': 'o',
+
       'ỏ': 'o',
+
       'õ': 'o',
+
       'ô': 'o',
+
       'ồ': 'o',
+
       'ố': 'o',
+
       'ộ': 'o',
+
       'ổ': 'o',
+
       'ỗ': 'o',
+
       'ơ': 'o',
+
       'ờ': 'o',
+
       'ớ': 'o',
+
       'ợ': 'o',
+
       'ở': 'o',
+
       'ỡ': 'o',
+
       'ù': 'u',
+
       'ú': 'u',
+
       'ụ': 'u',
+
       'ủ': 'u',
+
       'ũ': 'u',
+
       'ư': 'u',
+
       'ừ': 'u',
+
       'ứ': 'u',
+
       'ự': 'u',
+
       'ử': 'u',
+
       'ữ': 'u',
+
       'ỳ': 'y',
+
       'ý': 'y',
+
       'ỵ': 'y',
+
       'ỷ': 'y',
+
       'ỹ': 'y',
+
       'đ': 'd',
     };
 
@@ -194,7 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // ÁP DỤNG TỪ KHÓA
+
   // ============================================================
 
   List<Map<String, dynamic>> _applyKeyword(List<Map<String, dynamic>> source) {
@@ -221,7 +354,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // QUICK FILTER
+
   // ============================================================
 
   List<Map<String, dynamic>> _applyQuickFilters(
@@ -230,6 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
     List<Map<String, dynamic>> result = source;
 
     // Giá tốt
+
     if (_selectedQuickFilters.contains('price')) {
       result = result.where((room) {
         final price = (room['price'] as num?)?.toDouble() ?? 0;
@@ -239,6 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     // Gần trường
+
     if (_selectedQuickFilters.contains('school')) {
       result = result.where((room) {
         final title = _normalize(room['title']?.toString() ?? '');
@@ -250,6 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     // Có nội thất
+
     if (_selectedQuickFilters.contains('furniture')) {
       result = result.where((room) {
         final amenities = List<String>.from(
@@ -264,6 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     // Phòng mới
+
     if (_selectedQuickFilters.contains('new')) {
       result = result.where((room) {
         final title = _normalize(room['title']?.toString() ?? '');
@@ -276,7 +415,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // TÌM KIẾM HOME
+
   // ============================================================
 
   void _searchFromHome() {
@@ -285,6 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     result = _applyKeyword(result);
+
     result = _applyQuickFilters(result);
 
     final hasSearch =
@@ -293,6 +435,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       rooms = result;
+
       _isSearching = hasSearch;
     });
 
@@ -300,7 +443,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // TOGGLE QUICK FILTER
+
   // ============================================================
 
   void _toggleQuickFilter(String filter) {
@@ -314,15 +459,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // MỞ SEARCH FILTER SCREEN
+
   // ============================================================
 
   Future<void> _openFilterScreen() async {
     final result = await Navigator.push<List<Map<String, dynamic>>>(
       context,
+
       MaterialPageRoute(
         builder: (_) => SearchFilterScreen(
           rooms: _allRooms,
+
           initialKeyword: _searchController.text,
         ),
       ),
@@ -334,37 +483,150 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       rooms = result;
+
       _selectedQuickFilters.clear();
+
       _isSearching = true;
     });
   }
 
   // ============================================================
+
   // XÓA TÌM KIẾM
+
   // ============================================================
 
   void _clearSearch() {
     setState(() {
       _searchController.clear();
+
       _selectedQuickFilters.clear();
+
       rooms = List<Map<String, dynamic>>.from(_allRooms);
+
       _isSearching = false;
     });
 
     FocusScope.of(context).unfocus();
   }
 
+  void _openScreen(Widget screen) {
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
+  Widget _buildBottomNavItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool selected = false,
+  }) {
+    final color = selected ? AppColors.primaryGreen : AppColors.textSecondary;
+
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox.expand(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 22, color: color),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.5,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 68,
+        child: BottomAppBar(
+          color: const Color(0xFFF4EEF5),
+          elevation: 12,
+          padding: EdgeInsets.zero,
+          child: Row(
+            children: [
+              // Trang chủ
+              _buildBottomNavItem(
+                icon: Icons.home_rounded,
+                label: 'Trang chủ',
+                selected: true,
+                onTap: () {},
+              ),
+
+              // Hóa đơn
+              _buildBottomNavItem(
+                icon: Icons.receipt_long_rounded,
+                label: 'Hóa đơn',
+                onTap: () => _openScreen(const MyInvoicesScreen()),
+              ),
+
+              // Đặt lịch
+              _buildBottomNavItem(
+                icon: Icons.event_note_rounded,
+                label: 'Đặt lịch',
+                onTap: () => _openScreen(const booking_screen()),
+              ),
+
+              // Hợp đồng
+              _buildBottomNavItem(
+                icon: Icons.description_outlined,
+                label: 'Hợp đồng',
+                onTap: () => _openScreen(const MyContractsScreen()),
+              ),
+
+              // Yêu thích
+              _buildBottomNavItem(
+                icon: Icons.favorite_border_rounded,
+                label: 'Yêu thích',
+                onTap: () => _openScreen(const FavoritesScreen()),
+              ),
+
+              // Cá nhân
+              _buildBottomNavItem(
+                icon: Icons.person_outline_rounded,
+                label: 'Cá nhân',
+                onTap: () => _openScreen(const ProfileScreen()),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ============================================================
+
   // BUILD
+
   // ============================================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+
+      
+      bottomNavigationBar: _buildBottomNavigationBar(),
+
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
+
           slivers: [
             // HERO
             SliverToBoxAdapter(child: _buildHero()),
@@ -373,8 +635,10 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: Transform.translate(
                 offset: const Offset(0, -20),
+
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
+
                   child: _buildSearchBar(),
                 ),
               ),
@@ -384,6 +648,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+
                 child: _buildQuickFilters(),
               ),
             ),
@@ -393,6 +658,7 @@ class _HomeScreenState extends State<HomeScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+
                   child: _buildSearchStatus(),
                 ),
               ),
@@ -401,6 +667,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
+
                 child: _buildSectionTitle(),
               ),
             ),
@@ -410,32 +677,41 @@ class _HomeScreenState extends State<HomeScreen> {
               SliverToBoxAdapter(child: _buildEmptyState())
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final room = rooms[index];
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
+
                       child: RoomCard(
                         room: room,
+
                         onTap: () {
                           Navigator.push(
                             context,
+
                             MaterialPageRoute(
                               builder: (_) => RoomDetailScreen(room: room),
                             ),
                           );
                         },
+
                         onFavorite: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: AppColors.accentYellow,
+
                               behavior: SnackBarBehavior.floating,
+
                               content: const Text(
                                 'Đã thêm phòng vào yêu thích',
+
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
+
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -454,28 +730,38 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // HERO
+
   // ============================================================
 
   Widget _buildHero() {
     return SizedBox(
       height: 265,
+
       child: Stack(
         children: [
           Container(
             width: double.infinity,
+
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
                   Color(0xFF005D4B),
+
                   Color(0xFF157762),
+
                   Color(0xFF2D8D73),
                 ],
+
                 begin: Alignment.topLeft,
+
                 end: Alignment.bottomRight,
               ),
+
               borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(42),
+
                 bottomRight: Radius.circular(42),
               ),
             ),
@@ -484,12 +770,17 @@ class _HomeScreenState extends State<HomeScreen> {
           // Trang trí
           Positioned(
             right: -35,
+
             top: -35,
+
             child: Container(
               width: 145,
+
               height: 145,
+
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.07),
+
                 shape: BoxShape.circle,
               ),
             ),
@@ -497,12 +788,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
           Positioned(
             left: -40,
+
             bottom: 10,
+
             child: Container(
               width: 105,
+
               height: 105,
+
               decoration: BoxDecoration(
                 color: AppColors.accentYellow.withOpacity(0.10),
+
                 shape: BoxShape.circle,
               ),
             ),
@@ -511,23 +807,44 @@ class _HomeScreenState extends State<HomeScreen> {
           // Logo + notification
           Positioned(
             top: 20,
+
             left: 20,
+
             right: 20,
+
             child: Row(
               children: [
                 _buildLogo(),
+
                 const Spacer(),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
+
+                Material(
+                  color: Colors.transparent,
+
+                  child: InkWell(
+                    onTap: () => _openScreen(const NotificationsScreen()),
+
                     borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.notifications_none_rounded,
-                    color: Colors.white,
-                    size: 23,
+
+                    child: Container(
+                      width: 44,
+
+                      height: 44,
+
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.12),
+
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+
+                      child: const Icon(
+                        Icons.notifications_none_rounded,
+
+                        color: Colors.white,
+
+                        size: 23,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -537,22 +854,33 @@ class _HomeScreenState extends State<HomeScreen> {
           // Nội dung
           const Positioned(
             left: 21,
+
             top: 88,
+
             right: 155,
+
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+
               children: [
                 Text(
                   'Xin chào 👋',
+
                   style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
+
                 SizedBox(height: 5),
+
                 Text(
                   'Tìm phòng dễ dàng,\nsống thoải mái hơn.',
+
                   style: TextStyle(
                     color: Colors.white,
+
                     fontSize: 23,
+
                     fontWeight: FontWeight.w900,
+
                     height: 1.12,
                   ),
                 ),
@@ -566,26 +894,38 @@ class _HomeScreenState extends State<HomeScreen> {
           // Location
           Positioned(
             left: 21,
+
             bottom: 15,
+
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.12),
+
                 borderRadius: BorderRadius.circular(30),
               ),
+
               child: const Row(
                 children: [
                   Icon(
                     Icons.location_on_rounded,
+
                     color: AppColors.accentYellow,
+
                     size: 15,
                   ),
+
                   SizedBox(width: 5),
+
                   Text(
                     'Tìm trọ tại TP.HCM',
+
                     style: TextStyle(
                       color: Colors.white,
+
                       fontSize: 11,
+
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -601,27 +941,40 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLogo() {
     return const Row(
       mainAxisSize: MainAxisSize.min,
+
       children: [
         Icon(
           Icons.home_work_rounded,
+
           color: Colors.white,
+
           size: 29,
+
           shadows: [
             Shadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 3)),
           ],
         ),
+
         SizedBox(width: 9),
+
         Text(
           'TRỌ ƠI',
+
           style: TextStyle(
             color: Colors.white,
+
             fontSize: 25,
+
             fontWeight: FontWeight.w900,
+
             letterSpacing: 1.8,
+
             shadows: [
               Shadow(
                 color: Colors.black54,
+
                 blurRadius: 10,
+
                 offset: Offset(0, 3),
               ),
             ],
@@ -634,22 +987,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHouseIllustration() {
     return SizedBox(
       width: 140,
+
       height: 125,
+
       child: Stack(
         alignment: Alignment.bottomCenter,
+
         children: [
           Container(
             width: 125,
+
             height: 70,
+
             decoration: BoxDecoration(
               color: const Color(0xFFF7EFE0),
+
               borderRadius: BorderRadius.circular(18),
             ),
           ),
+
           Positioned(
             top: 14,
+
             child: CustomPaint(
               size: const Size(105, 70),
+
               painter: _HomeHousePainter(),
             ),
           ),
@@ -659,65 +1021,96 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // SEARCH BAR
+
   // ============================================================
 
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.all(7),
+
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
+
         borderRadius: BorderRadius.circular(21),
+
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.11),
+
             blurRadius: 24,
+
             offset: const Offset(0, 9),
           ),
         ],
       ),
+
       child: Row(
         children: [
           Expanded(
             child: Container(
               height: 50,
+
               padding: const EdgeInsets.symmetric(horizontal: 13),
+
               decoration: BoxDecoration(
                 color: AppColors.background,
+
                 borderRadius: BorderRadius.circular(14),
               ),
+
               child: Row(
                 children: [
                   const Icon(
                     Icons.search_rounded,
+
                     color: AppColors.primaryGreen,
+
                     size: 22,
                   ),
+
                   const SizedBox(width: 8),
+
                   Expanded(
                     child: TextField(
                       controller: _searchController,
+
                       keyboardType: TextInputType.text,
+
                       textInputAction: TextInputAction.search,
+
                       textCapitalization: TextCapitalization.none,
+
                       autocorrect: false,
+
                       enableSuggestions: false,
+
                       maxLines: 1,
+
                       onSubmitted: (_) {
                         _searchFromHome();
                       },
+
                       style: const TextStyle(
                         color: AppColors.textPrimary,
+
                         fontSize: 13,
+
                         fontWeight: FontWeight.w600,
                       ),
+
                       decoration: const InputDecoration(
                         hintText: 'Tìm quận, khu vực, tên phòng...',
+
                         hintStyle: TextStyle(
                           color: AppColors.textSecondary,
+
                           fontSize: 12,
                         ),
+
                         border: InputBorder.none,
+
                         isCollapsed: true,
                       ),
                     ),
@@ -732,19 +1125,27 @@ class _HomeScreenState extends State<HomeScreen> {
           // Nút Tìm
           SizedBox(
             height: 50,
+
             child: ElevatedButton(
               onPressed: _searchFromHome,
+
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGreen,
+
                 foregroundColor: Colors.white,
+
                 elevation: 0,
+
                 padding: const EdgeInsets.symmetric(horizontal: 15),
+
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
+
               child: const Text(
                 'Tìm',
+
                 style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900),
               ),
             ),
@@ -755,16 +1156,24 @@ class _HomeScreenState extends State<HomeScreen> {
           // Nút Lọc -> SearchFilterScreen
           Material(
             color: AppColors.accentYellow,
+
             borderRadius: BorderRadius.circular(14),
+
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
+
               onTap: _openFilterScreen,
+
               child: const SizedBox(
                 width: 50,
+
                 height: 50,
+
                 child: Icon(
                   Icons.tune_rounded,
+
                   color: AppColors.textPrimary,
+
                   size: 22,
                 ),
               ),
@@ -776,64 +1185,94 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // QUICK FILTER
+
   // ============================================================
 
   Widget _buildQuickFilters() {
     final filters = [
       {
         'key': 'price',
+
         'title': 'Giá tốt',
+
         'subtitle': '≤ 3.5 triệu',
+
         'icon': Icons.local_offer_outlined,
+
         'color': const Color(0xFFE7A900),
       },
+
       {
         'key': 'school',
+
         'title': 'Gần trường',
+
         'subtitle': 'Tiện đi học',
+
         'icon': Icons.school_outlined,
+
         'color': const Color(0xFF356D9E),
       },
+
       {
         'key': 'furniture',
+
         'title': 'Có nội thất',
+
         'subtitle': 'Dọn vào ngay',
+
         'icon': Icons.weekend_outlined,
+
         'color': const Color(0xFF8059A9),
       },
+
       {
         'key': 'new',
+
         'title': 'Phòng mới',
+
         'subtitle': 'Mới xây',
+
         'icon': Icons.auto_awesome_outlined,
+
         'color': const Color(0xFF27856F),
       },
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+
       children: [
         Row(
           children: [
             const Expanded(
               child: Text(
                 'Tìm nhanh',
+
                 style: TextStyle(
                   fontSize: 19,
+
                   fontWeight: FontWeight.w900,
+
                   color: AppColors.textPrimary,
                 ),
               ),
             ),
+
             if (_selectedQuickFilters.isNotEmpty)
               GestureDetector(
                 onTap: _clearSearch,
+
                 child: const Text(
                   'Bỏ chọn',
+
                   style: TextStyle(
                     color: AppColors.primaryGreen,
+
                     fontSize: 12,
+
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -845,6 +1284,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         const Text(
           'Chạm vào thẻ để tìm nhanh',
+
           style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
         ),
 
@@ -852,63 +1292,87 @@ class _HomeScreenState extends State<HomeScreen> {
 
         SizedBox(
           height: 108,
+
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+
             physics: const BouncingScrollPhysics(),
+
             itemCount: filters.length,
+
             separatorBuilder: (_, __) => const SizedBox(width: 11),
+
             itemBuilder: (context, index) {
               final item = filters[index];
 
               final key = item['key'] as String;
+
               final selected = _selectedQuickFilters.contains(key);
+
               final color = item['color'] as Color;
 
               return GestureDetector(
                 onTap: () {
                   _toggleQuickFilter(key);
                 },
+
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
+
                   width: 150,
+
                   padding: const EdgeInsets.all(13),
+
                   decoration: BoxDecoration(
                     color: selected
                         ? AppColors.primaryGreen
                         : AppColors.cardSurface,
+
                     borderRadius: BorderRadius.circular(18),
+
                     border: Border.all(
                       color: selected
                           ? AppColors.primaryGreen
                           : const Color(0xFFE5E7EB),
                     ),
+
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(
                           selected ? 0.08 : 0.025,
                         ),
+
                         blurRadius: selected ? 12 : 7,
+
                         offset: const Offset(0, 4),
                       ),
                     ],
                   ),
+
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+
                     children: [
                       Row(
                         children: [
                           Container(
                             width: 36,
+
                             height: 36,
+
                             decoration: BoxDecoration(
                               color: selected
                                   ? Colors.white.withOpacity(0.14)
                                   : color.withOpacity(0.10),
+
                               borderRadius: BorderRadius.circular(11),
                             ),
+
                             child: Icon(
                               item['icon'] as IconData,
+
                               color: selected ? Colors.white : color,
+
                               size: 19,
                             ),
                           ),
@@ -917,23 +1381,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
                           Container(
                             width: 21,
+
                             height: 21,
+
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
+
                               color: selected
                                   ? AppColors.accentYellow
                                   : Colors.transparent,
+
                               border: Border.all(
                                 color: selected
                                     ? AppColors.accentYellow
                                     : const Color(0xFFD1D5DB),
+
                                 width: 1.5,
                               ),
                             ),
+
                             child: selected
                                 ? const Icon(
                                     Icons.check_rounded,
+
                                     size: 14,
+
                                     color: AppColors.textPrimary,
                                   )
                                 : null,
@@ -945,11 +1417,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       Text(
                         item['title'] as String,
+
                         style: TextStyle(
                           color: selected
                               ? Colors.white
                               : AppColors.textPrimary,
+
                           fontSize: 13,
+
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -958,10 +1433,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       Text(
                         item['subtitle'] as String,
+
                         style: TextStyle(
                           color: selected
                               ? Colors.white70
                               : AppColors.textSecondary,
+
                           fontSize: 10.5,
                         ),
                       ),
@@ -977,7 +1454,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // SEARCH STATUS
+
   // ============================================================
 
   Widget _buildSearchStatus() {
@@ -989,23 +1468,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+
       decoration: BoxDecoration(
         color: AppColors.lightGreen,
+
         borderRadius: BorderRadius.circular(15),
+
         border: Border.all(color: AppColors.primaryGreen.withOpacity(0.10)),
       ),
+
       child: Row(
         children: [
           Container(
             width: 34,
+
             height: 34,
+
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.75),
+
               borderRadius: BorderRadius.circular(10),
             ),
+
             child: const Icon(
               Icons.filter_alt_outlined,
+
               color: AppColors.primaryGreen,
+
               size: 18,
             ),
           ),
@@ -1015,9 +1504,12 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: Text(
               text,
+
               style: const TextStyle(
                 color: AppColors.primaryGreen,
+
                 fontSize: 12.5,
+
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1025,17 +1517,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
           GestureDetector(
             onTap: _clearSearch,
+
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+
               decoration: BoxDecoration(
                 color: Colors.white,
+
                 borderRadius: BorderRadius.circular(9),
               ),
+
               child: const Text(
                 'Xóa',
+
                 style: TextStyle(
                   color: AppColors.primaryGreen,
+
                   fontSize: 11,
+
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1047,7 +1546,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // SECTION TITLE
+
   // ============================================================
 
   Widget _buildSectionTitle() {
@@ -1056,9 +1557,12 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: Text(
             _isSearching ? 'Kết quả tìm kiếm' : 'Phòng nổi bật',
+
             style: const TextStyle(
               fontSize: 21,
+
               fontWeight: FontWeight.w900,
+
               color: AppColors.textPrimary,
             ),
           ),
@@ -1067,15 +1571,21 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!_isSearching)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+
             decoration: BoxDecoration(
               color: AppColors.cardSurface,
+
               borderRadius: BorderRadius.circular(9),
             ),
+
             child: Text(
               '${rooms.length} phòng',
+
               style: const TextStyle(
                 color: AppColors.primaryGreen,
+
                 fontSize: 11,
+
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -1085,30 +1595,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============================================================
+
   // EMPTY STATE
+
   // ============================================================
 
   Widget _buildEmptyState() {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 35),
+
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
+
         borderRadius: BorderRadius.circular(22),
+
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
+
       child: Column(
         children: [
           Container(
             width: 74,
+
             height: 74,
+
             decoration: const BoxDecoration(
               color: AppColors.lightGreen,
+
               shape: BoxShape.circle,
             ),
+
             child: const Icon(
               Icons.search_off_rounded,
+
               color: AppColors.primaryGreen,
+
               size: 35,
             ),
           ),
@@ -1117,9 +1640,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const Text(
             'Không tìm thấy phòng',
+
             style: TextStyle(
               color: AppColors.textPrimary,
+
               fontSize: 17,
+
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1128,10 +1654,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const Text(
             'Hãy thử đổi từ khóa hoặc dùng bộ lọc nâng cao.',
+
             textAlign: TextAlign.center,
+
             style: TextStyle(
               color: AppColors.textSecondary,
+
               fontSize: 12.5,
+
               height: 1.45,
             ),
           ),
@@ -1140,18 +1670,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
           Row(
             mainAxisSize: MainAxisSize.min,
+
             children: [
               OutlinedButton(
                 onPressed: _clearSearch,
+
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primaryGreen,
+
                   side: const BorderSide(color: AppColors.primaryGreen),
+
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+
                 child: const Text(
                   'Xóa tìm kiếm',
+
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -1160,16 +1696,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
               ElevatedButton(
                 onPressed: _openFilterScreen,
+
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGreen,
+
                   foregroundColor: Colors.white,
+
                   elevation: 0,
+
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+
                 child: const Text(
                   'Mở bộ lọc',
+
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -1182,7 +1724,9 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ============================================================================
+
 // MINIMAL HOUSE PAINTER
+
 // ============================================================================
 
 class _HomeHousePainter extends CustomPainter {
@@ -1206,13 +1750,17 @@ class _HomeHousePainter extends CustomPainter {
 
     final body = Rect.fromLTWH(
       size.width * 0.17,
+
       size.height * 0.38,
+
       size.width * 0.66,
+
       size.height * 0.48,
     );
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(body, const Radius.circular(4)),
+
       wallPaint,
     );
 
@@ -1220,12 +1768,17 @@ class _HomeHousePainter extends CustomPainter {
       RRect.fromRectAndRadius(
         Rect.fromLTWH(
           size.width * 0.28,
+
           size.height * 0.51,
+
           size.width * 0.17,
+
           size.height * 0.17,
         ),
+
         const Radius.circular(2),
       ),
+
       windowPaint,
     );
 
@@ -1233,12 +1786,17 @@ class _HomeHousePainter extends CustomPainter {
       RRect.fromRectAndRadius(
         Rect.fromLTWH(
           size.width * 0.55,
+
           size.height * 0.51,
+
           size.width * 0.17,
+
           size.height * 0.17,
         ),
+
         const Radius.circular(2),
       ),
+
       windowPaint,
     );
 
@@ -1246,12 +1804,17 @@ class _HomeHousePainter extends CustomPainter {
       RRect.fromRectAndRadius(
         Rect.fromLTWH(
           size.width * 0.41,
+
           size.height * 0.68,
+
           size.width * 0.18,
+
           size.height * 0.18,
         ),
+
         const Radius.circular(2),
       ),
+
       doorPaint,
     );
   }
