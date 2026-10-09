@@ -156,7 +156,14 @@ class _TenantListScreenState extends State<TenantListScreen> {
               );
             }),
             const SizedBox(width: 40),
-            _buildNavItem(Icons.people_alt, 'Người thuê', true, () {}),
+            _buildNavItem(Icons.people_alt, 'Người thuê', true, () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TenantListScreen(),
+                  ),
+              );
+            }),
             _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
 
             }),
