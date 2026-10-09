@@ -59,25 +59,12 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
+        centerTitle: true,
         title: const Text(
           'Hợp đồng của tôi',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
 
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.home,
-                    (route) => false,
-              );
-            }
-          },
-        ),
         elevation: 0,
       ),
       body: Column(
