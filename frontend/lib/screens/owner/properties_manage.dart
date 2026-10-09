@@ -3,6 +3,7 @@ import '../../widgets/owner/owner_drawer.dart';
 import 'owner_dashboard.dart';
 import 'property_form.dart';
 import 'rooms_manage.dart';
+import 'tenant_list_screen.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 
@@ -138,7 +139,14 @@ class PropertiesManageScreen extends StatelessWidget {
                 );
               }),
               const SizedBox(width: 40),
-              _buildNavItem(Icons.people_outline, 'Người thuê', false, () {}),
+              _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TenantListScreen(),
+                    ),
+                );
+              }),
               _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
             ],
           ),
