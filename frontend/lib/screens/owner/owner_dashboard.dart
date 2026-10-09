@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../widgets/owner/dashboard_card.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'properties_manage.dart';
 import '../tenant/profile_screen.dart';
@@ -92,18 +91,18 @@ class OwnerDashboard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: DashboardCard(
+                          child: _buildDashboardCard(
                             icon: Icons.meeting_room,
                             value: '12',
                             label: 'Phòng đang cho thuê',
                           ),
                         ),
                         Expanded(
-                          child: DashboardCard(
+                          child: _buildDashboardCard(
                             icon: Icons.calendar_today,
                             value: '5',
                             label: 'Lịch xem phòng',
@@ -112,18 +111,18 @@ class OwnerDashboard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: DashboardCard(
+                          child: _buildDashboardCard(
                             icon: Icons.door_front_door_outlined,
                             value: '8',
                             label: 'Phòng trống',
                           ),
                         ),
                         Expanded(
-                          child: DashboardCard(
+                          child: _buildDashboardCard(
                             icon: Icons.build_circle_outlined,
                             value: '3',
                             label: 'Yêu cầu sửa chữa',
@@ -240,6 +239,38 @@ class OwnerDashboard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // Hàm DashboardCard
+  Widget _buildDashboardCard({
+    required IconData icon,
+    required String value,
+    required String label,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: Colors.white70, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+      ],
     );
   }
 

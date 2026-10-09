@@ -10,9 +10,10 @@ class PostsManageScreen extends StatefulWidget {
   State<PostsManageScreen> createState() => _PostsManageScreenState();
 }
 
-class _PostsManageScreenState extends State<PostsManageScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _PostsManageScreenState extends State<PostsManageScreen> {
+  // Dùng GlobalKey để điều khiển TabBarView từ bên ngoài mà không cần TabController thủ công
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Key _tab3Key = UniqueKey();
 
   // Danh sách bài đăng quản lý
   final List<Map<String, dynamic>> _posts = [
@@ -77,18 +78,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     // Đếm số lượng theo trạng thái
     final int activeCount = _posts.where((p) => p['status'] == 'active').length;
@@ -104,96 +93,130 @@ class _PostsManageScreenState extends State<PostsManageScreen>
         )
         .length;
 
-    return Scaffold(
-      backgroundColor: AppColors.primaryGreen,
-      drawer: const OwnerDrawer(currentRoute: 'posts'),
-      appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            tooltip: 'Menu',
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        title: const Text(
-          'Quản lý tin đăng',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicatorColor: Colors.orange,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-          tabs: [
-            Tab(text: 'Đang hiển thị ($activeCount)'),
-            Tab(text: 'Chờ duyệt ($pendingCount)'),
-            Tab(text: 'Bản nháp / Ẩn ($hiddenOrDraftCount)'),
-          ],
-        ),
-      ),
-      body: Container(
-        color: AppColors.primaryGreen,
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: const BoxDecoration(
-            color: Color(0xFFF9F9FB),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
-          ),
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildPostList('active'),
-              _buildPostList('pending'),
-              _buildPostList('hidden_draft'),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final newPost = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const PostFormScreen()),
-          );
-          if (newPost != null && newPost is Map<String, dynamic>) {
-            setState(() {
-              _posts.insert(0, newPost);
-            });
-            if (newPost['status'] == 'pending') {
-              _tabController.animateTo(1);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text(
-                    'Đã gửi bài đăng mới cho Admin duyệt thành công!',
-                  ),
-                  backgroundColor: AppColors.primaryGreen,
+    return DefaultTabController(
+      length: 3,
+      child: Builder(
+        builder: (tabContext) {
+          return Scaffold(
+            key: _scaffoldKey,
+            backgroundColor: AppColors.primaryGreen,
+            drawer: const OwnerDrawer(currentRoute: 'posts'),
+            appBar: AppBar(
+              backgroundColor: AppColors.primaryGreen,
+              elevation: 0,
+              iconTheme: const IconThemeData(color: Colors.white),
+              leading: Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu, color: Colors.white),
+                  tooltip: 'Menu',
+                  onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
-              );
-            }
-          }
+              ),
+              title: const Text(
+                'Quản lý tin đăng',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              centerTitle: true,
+              bottom: TabBar(
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                indicatorColor: Colors.orange,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+                tabs: [
+                  Tab(text: 'Đang hiển thị ($activeCount)'),
+                  Tab(text: 'Chờ duyệt ($pendingCount)'),
+                  Tab(text: 'Bản nháp / Ẩn ($hiddenOrDraftCount)'),
+                ],
+              ),
+            ),
+            body: Container(
+              color: AppColors.primaryGreen,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF9F9FB),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: TabBarView(
+                  children: [
+                    _buildPostList('active'),
+                    _buildPostList('pending'),
+                    KeyedSubtree(
+                      key: _tab3Key,
+                      child: _buildPostList('hidden_draft'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () async {
+                final newPost = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PostFormScreen(),
+                  ),
+                );
+
+                if (newPost != null && newPost is Map<String, dynamic>) {
+                  setState(() {
+                    _posts.insert(0, Map<String, dynamic>.from(newPost));
+                    _tab3Key = UniqueKey();
+                  });
+
+                  final tabController = DefaultTabController.of(tabContext);
+
+                  // Nếu bấm Gửi Admin duyệt -> Nhảy sang Tab 2 (Chờ duyệt)
+                  if (newPost['status'] == 'pending') {
+                    tabController.animateTo(1);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text(
+                          'Đã gửi bài đăng mới cho Admin duyệt thành công!',
+                        ),
+                        backgroundColor: AppColors.primaryGreen,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                  // Nếu bấm Lưu Nháp -> Nhảy sang Tab 3 (Bản nháp / Ẩn)
+                  else if (newPost['status'] == 'draft') {
+                    tabController.animateTo(2);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Đã lưu bài viết vào bản nháp thành công!',
+                        ),
+                        backgroundColor: Colors.orange,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              backgroundColor: Colors.orange,
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'Tạo tin đăng',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          );
         },
-        backgroundColor: Colors.orange,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Tạo tin đăng',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
       ),
     );
   }
@@ -274,7 +297,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dòng trên cùng: Badge trạng thái & Ngày tạo
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -286,8 +308,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
               ],
             ),
             const SizedBox(height: 10),
-
-            // Thông tin chi tiết: Ảnh + Tiêu đề + Phòng + Giá
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -344,8 +364,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                 ),
               ],
             ),
-
-            // Dải cảnh báo nếu là pending hoặc rejected
             if (status == 'pending') ...[
               const SizedBox(height: 10),
               Container(
@@ -381,7 +399,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                 ),
               ),
             ],
-
             if (status == 'rejected') ...[
               const SizedBox(height: 10),
               Container(
@@ -416,17 +433,13 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                 ),
               ),
             ],
-
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
               child: Divider(height: 1),
             ),
-
-            // Dòng dưới cùng: Thống kê & NÚT HÀNH ĐỘNG
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Số lượt xem & thích
                 Row(
                   children: [
                     Icon(
@@ -452,8 +465,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                     ),
                   ],
                 ),
-
-                // Các nút hành động chính
                 Row(
                   children: [
                     if (status == 'pending') ...[
@@ -481,7 +492,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                         ),
                       ),
                     ],
-
                     if (status == 'draft' ||
                         status == 'hidden' ||
                         status == 'rejected') ...[
@@ -516,7 +526,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                       ),
                       const SizedBox(width: 6),
                     ],
-
                     if (status == 'active') ...[
                       TextButton.icon(
                         onPressed: () {
@@ -547,7 +556,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                         ),
                       ),
                     ],
-
                     TextButton.icon(
                       onPressed: () {
                         Navigator.push(
@@ -581,7 +589,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
     );
   }
 
-  // Badge nhãn trạng thái bài đăng
   Widget _buildStatusBadge(String status) {
     Color bg;
     Color text;
@@ -646,7 +653,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
     );
   }
 
-  // BOTTOM SHEET: GỬI BÀI ĐĂNG CHO ADMIN KIỂM DUYỆT
   void _showSubmitApprovalBottomSheet(Map<String, dynamic> post) {
     final noteController = TextEditingController();
     bool agreeTruth = true;
@@ -679,7 +685,9 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryGreen.withOpacity(0.1),
+                            color: AppColors.primaryGreen.withValues(
+                              alpha: 0.1,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -718,7 +726,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                       ],
                     ),
                     const SizedBox(height: 16),
-
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -785,7 +792,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     const Text(
                       'Tiêu chuẩn kiểm duyệt bắt buộc:',
                       style: TextStyle(
@@ -795,7 +801,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                       ),
                     ),
                     const SizedBox(height: 6),
-
                     CheckboxListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
@@ -811,7 +816,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                         });
                       },
                     ),
-
                     CheckboxListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
@@ -827,9 +831,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                         });
                       },
                     ),
-
                     const SizedBox(height: 10),
-
                     TextField(
                       controller: noteController,
                       maxLines: 2,
@@ -853,9 +855,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 18),
-
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -898,7 +898,6 @@ class _PostsManageScreenState extends State<PostsManageScreen>
     );
   }
 
-  // Xử lý gửi duyệt thành công
   void _submitPost(Map<String, dynamic> post, String note) {
     setState(() {
       post['status'] = 'pending';
@@ -924,20 +923,10 @@ class _PostsManageScreenState extends State<PostsManageScreen>
             ),
           ],
         ),
-        backgroundColor: AppColors.primaryGreen,
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'Xem Chờ duyệt',
-          textColor: Colors.orangeAccent,
-          onPressed: () {
-            _tabController.animateTo(1);
-          },
-        ),
       ),
     );
   }
 
-  // Xác nhận thu hồi yêu cầu duyệt
   void _confirmCancelApproval(Map<String, dynamic> post) {
     showDialog(
       context: context,
@@ -973,7 +962,7 @@ class _PostsManageScreenState extends State<PostsManageScreen>
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Đã thu hồi yêu cầu duyệt tin đăng.'),
+                  content: Text('Dé thu hồi yêu cầu duyệt tin đăng.'),
                   duration: Duration(seconds: 2),
                 ),
               );

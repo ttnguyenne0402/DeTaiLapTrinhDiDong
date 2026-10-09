@@ -278,7 +278,7 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: primaryColor.withOpacity(0.1),
+            backgroundColor: primaryColor.withValues(alpha: 0.1),
             child: Icon(Icons.add_a_photo_outlined, color: primaryColor),
           ),
           const SizedBox(height: 8),
