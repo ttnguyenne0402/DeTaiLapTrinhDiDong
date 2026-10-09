@@ -1,10 +1,11 @@
+
 import 'package:flutter/material.dart';
-import '../../widgets/owner/utility_card_w.dart';
 import '../../core/constants/app_colors.dart';
+import '../../widgets/owner/utility_card_w.dart';
 import '../../widgets/owner/owner_drawer.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
-  const InvoiceCreateScreen({Key? key}) : super(key: key);
+  const InvoiceCreateScreen({super.key});
 
   @override
   State<InvoiceCreateScreen> createState() => _InvoiceCreateScreenState();
@@ -13,116 +14,211 @@ class InvoiceCreateScreen extends StatefulWidget {
 class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   int _selectedFilterIndex = 0;
 
+  final Map<String, RoomUtilityStatus> _roomStatuses = {
+    '201': RoomUtilityStatus.completed,
+    '302': RoomUtilityStatus.abnormal,
+    '102': RoomUtilityStatus.inputting,
+    '204': RoomUtilityStatus.pending,
+  };
+
+  final Map<String, String> _elecNewValues = {
+    '201': '1545',
+  };
+
+  final Map<String, String> _waterNewValues = {
+    '201': '91',
+  };
+
+  void _enterInput(String room) {
+    setState(() {
+      _roomStatuses[room] = RoomUtilityStatus.inputting;
+    });
+  }
+
+  void _saveReading(String room, String elec, String water) {
+    setState(() {
+      _elecNewValues[room] = elec;
+      _waterNewValues[room] = water;
+      _roomStatuses[room] = RoomUtilityStatus.completed;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Đã lưu chỉ số mẫu phòng $room.')),
+    );
+  }
+
+  bool _matchesFilter(RoomUtilityStatus status) {
+    switch (_selectedFilterIndex) {
+      case 1:
+        return status == RoomUtilityStatus.pending ||
+            status == RoomUtilityStatus.inputting;
+      case 2:
+        return status == RoomUtilityStatus.completed;
+      case 3:
+        return status == RoomUtilityStatus.abnormal;
+      default:
+        return true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final rooms = [
+      _RoomInfo(
+        id: '201',
+        roomName: 'Phòng 201',
+        tenant: 'Hoàng Minh Trí (Tầng 2)',
+        status: RoomUtilityStatus.completed,
+        elecOld: '1420',
+        waterOld: '85',
+        totalAmount: '625.000đ',
+        elecCost: '475.000đ',
+        waterCost: '150.000đ',
+        proofCount: 2,
+      ),
+      _RoomInfo(
+        id: '302',
+        roomName: 'Phòng 302',
+        tenant: 'Trần Thị Bích',
+        phone: '0933 555 789',
+        status: RoomUtilityStatus.abnormal,
+        elecOld: '980',
+        waterOld: '42',
+        warningTag: 'Tăng đột biến +85%',
+        warningMessage:
+        'Số điện tháng này cao bất thường. Khuyến nghị đối chiếu lại ảnh đồng hồ trước khi lập hóa đơn.',
+      ),
+      _RoomInfo(
+        id: '102',
+        roomName: 'Phòng 102',
+        tenant: 'Lê Văn Cường (Tầng 1)',
+        status: RoomUtilityStatus.inputting,
+        elecOld: '650',
+        waterOld: '38',
+      ),
+      _RoomInfo(
+        id: '204',
+        roomName: 'Phòng 204',
+        tenant: 'Phạm Thị Duyên (Tầng 2)',
+        status: RoomUtilityStatus.pending,
+        elecOld: '810',
+        waterOld: '49',
+      ),
+    ];
+
+    final filteredRooms = rooms.where((room) {
+      return _matchesFilter(_roomStatuses[room.id] ?? room.status);
+    }).toList();
+
+    final completedCount = _roomStatuses.values
+        .where((status) => status == RoomUtilityStatus.completed)
+        .length;
+
+    final pendingCount = _roomStatuses.values
+        .where((status) =>
+    status == RoomUtilityStatus.pending ||
+        status == RoomUtilityStatus.inputting)
+        .length;
+
+    final progress = completedCount / rooms.length;
+
     return Scaffold(
-      backgroundColor: AppColors.primaryGreen, //nền xanh đậm cho header phía trên
+      backgroundColor: AppColors.primaryGreen,
       body: SafeArea(
         bottom: false,
         child: Column(
           children: [
-            //1. header xanh lá đậm trên cùng
             _buildTopHeader(),
-
-            //2. phần thân bo tròn góc trên phủ lên nền xanh đậm
             Expanded(
               child: Container(
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: AppColors.background,
                   borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(24), //bo tròn góc chuẩn theo hình
+                    top: Radius.circular(24),
                   ),
                 ),
                 child: Column(
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 16,
+                        ),
                         child: Column(
                           children: [
-                            //khung xanh chứa thông tin cơ sở và kỳ chốt
                             _buildGreenInfoCard(),
                             const SizedBox(height: 12),
-
-                            //khung tiến độ ghi số
-                            _buildProgressCard(),
+                            _buildProgressCard(
+                              completedCount,
+                              rooms.length,
+                              pendingCount,
+                              progress,
+                            ),
                             const SizedBox(height: 12),
-
-                            //banner AI OCR
                             _buildOcrBanner(),
                             const SizedBox(height: 12),
-
-                            //thanh filter chuyển tabs
-                            _buildFilterTabs(),
-                            const SizedBox(height: 12),
-
-                            //thẻ card mẫu 1: đã chốt số (có thumbnail ảnh OCR)
-                            const RoomUtilityCard(
-                              roomName: 'Phòng 201',
-                              tenantName: 'Hoàng Minh Trí (Tầng 2)',
-                              status: RoomUtilityStatus.completed,
-                              totalAmount: '625.000đ',
-                              elecOld: '1.420',
-                              elecNew: '1.545',
-                              elecDiff: '+125 kWh',
-                              elecCost: '475.000đ',
-                              waterOld: '85',
-                              waterNew: '91',
-                              waterDiff: '+6 m³',
-                              waterCost: '150.000đ',
-                              proofImagesCount: 2,
+                            _buildFilterTabs(
+                              rooms.length,
+                              pendingCount,
+                              completedCount,
                             ),
                             const SizedBox(height: 12),
 
-                            //thẻ card mẫu 2: bất thường (có box báo đỏ & nút chụp lại/xác nhận)
-                            const RoomUtilityCard(
-                              roomName: 'Phòng 302',
-                              tenantName: 'Trần Thị Bích',
-                              phone: '0933 555 789',
-                              status: RoomUtilityStatus.abnormal,
-                              warningTag: 'Tăng đột biến +85%',
-                              warningMessage:
-                              'Số điện tháng này (270 kWh) cao gấp đôi mức trung bình 3 tháng qua (145 kWh). Khuyến nghị đối chiếu lại ảnh đồng hồ trước khi lập hóa đơn.',
-                              elecOld: '980',
-                              elecNew: '1250',
-                              elecDiff: '+270 kWh',
-                              waterOld: '42',
-                              waterNew: '55',
-                              waterDiff: '+13 m³',
-                            ),
-                            const SizedBox(height: 12),
+                            if (filteredRooms.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Column(
+                                  children: [
+                                    Icon(
+                                      Icons.inbox_outlined,
+                                      size: 38,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text('Không có phòng phù hợp.'),
+                                  ],
+                                ),
+                              ),
 
-                            //thẻ card mẫu 3: chờ nhập số (thiết kế ô nhập riêng + chip tăng nhanh)
-                            const RoomUtilityCard(
-                              roomName: 'Phòng 102',
-                              tenantName: 'Lê Văn Cường (Tầng 1)',
-                              status: RoomUtilityStatus.inputting,
-                              elecOld: '650',
-                              waterOld: '38',
-                            ),
-                            const SizedBox(height: 12),
+                            for (final room in filteredRooms) ...[
+                              RoomUtilityCard(
+                                key: ValueKey(
+                                  '${room.id}_${_roomStatuses[room.id]}',
+                                ),
+                                roomName: room.roomName,
+                                tenantName: room.tenant,
+                                phone: room.phone,
+                                status: _roomStatuses[room.id] ?? room.status,
+                                totalAmount: room.totalAmount,
+                                elecOld: int.tryParse(room.elecOld ?? ''),
+                                elecNew: int.tryParse(_elecNewValues[room.id] ?? ''),
+                                waterOld: int.tryParse(room.waterOld ?? ''),
+                                waterNew: int.tryParse(_waterNewValues[room.id] ?? ''),
+                                waterCost: room.waterCost,
+                                warningTag: room.warningTag,
+                                warningMessage: room.warningMessage,
+                                proofImagesCount: room.proofCount,
+                                onEnterInput: () => _enterInput(room.id),
+                                onSave: (elec, water) =>
+                                    _saveReading(room.id, elec, water),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
 
-                            //thẻ card mẫu 4: chưa nhập
-                            const RoomUtilityCard(
-                              roomName: 'Phòng 204',
-                              tenantName: 'Phạm Thị Duyên (Tầng 2)',
-                              status: RoomUtilityStatus.pending,
-                              elecOld: '810',
-                              waterOld: '49',
-                            ),
-                            const SizedBox(height: 16),
-
-                            //mẹo ghi nhanh
                             _buildTipBox(),
                             const SizedBox(height: 16),
                           ],
                         ),
                       ),
                     ),
-
-                    //footer cố định bên dưới
-                    _buildBottomFooter(),
+                    _buildBottomFooter(completedCount),
                   ],
                 ),
               ),
@@ -133,54 +229,48 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
   }
 
-  //widget header màu xanh đậm góc trên
   Widget _buildTopHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Builder(
-            builder: (context) {
-              return IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.white,
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              );
-            },
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+            ),
           ),
-          
-          Row(
-            children: [
-              const Text(
-                'Ghi số điện nước',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          const Expanded(
+            child: Text(
+              'Ghi số điện nước',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
-            ],
+            ),
           ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none, color: Colors.white),
-                onPressed: () {},
-              ),
-              const CircleAvatar(
-                backgroundColor: Colors.white24,
-                radius: 16,
-                child: Icon(Icons.person, color: Colors.white, size: 20),
-              )
-            ],
-          )
+          IconButton(
+            icon: const Icon(
+              Icons.notifications_none,
+              color: Colors.white,
+            ),
+            onPressed: () {},
+          ),
+          const CircleAvatar(
+            radius: 16,
+            backgroundColor: Colors.white24,
+            child: Icon(Icons.person, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 8),
         ],
       ),
     );
   }
 
-  //khung thông tin cơ sở màu xanh lá
   Widget _buildGreenInfoCard() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -188,128 +278,129 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         color: AppColors.primaryGreen,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.calendar_today, size: 14, color: Colors.white),
-                    SizedBox(width: 6),
-                    Text(
-                      'Kỳ chốt: Tháng 08/2024',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
               Row(
-                children: const [
-                  Text('Lịch sử ghi', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                  SizedBox(width: 4),
-                  Icon(Icons.history, color: Colors.white70, size: 16),
-                ],
-              )
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: const [
-              Text('CƠ SỞ CHO THUÊ', style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: const [
-                  Icon(Icons.corporate_fare, color: AppColors.warningOrange, size: 20),
-                  SizedBox(width: 8),
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                  SizedBox(width: 6),
                   Text(
-                    'Khu Trọ Xanh - Bình Thạ...',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    'Kỳ chốt: Tháng 08/2024',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+              Icon(Icons.history, color: Colors.white70, size: 18),
+            ],
+          ),
+          SizedBox(height: 12),
+          Text(
+            'CƠ SỞ CHO THUÊ',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 5),
+          Row(
+            children: [
+              Icon(
+                Icons.corporate_fare,
+                color: AppColors.warningOrange,
+                size: 20,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Khu Trọ Xanh - Bình Thạnh',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
-                child: const Text('12 phòng', style: TextStyle(color: Colors.white, fontSize: 11)),
+              ),
+              Text(
+                '12 phòng',
+                style: TextStyle(color: Colors.white, fontSize: 11),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
   }
 
-  //khung tiến độ ghi số
-  Widget _buildProgressCard() {
+  Widget _buildProgressCard(
+      int completed,
+      int total,
+      int pending,
+      double progress,
+      ) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
-                  Text('Tiến độ ghi số', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  SizedBox(width: 4),
-                  CircleAvatar(radius: 3, backgroundColor: Colors.brown),
-                ],
+              const Text(
+                'Tiến độ ghi số',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.door_back_door_outlined, size: 12, color: Colors.brown),
-                    SizedBox(width: 4),
-                    Text('Còn 4 phòng', style: TextStyle(fontSize: 11, color: Colors.brown, fontWeight: FontWeight.bold)),
-                  ],
+              Text(
+                'Còn $pending phòng',
+                style: const TextStyle(
+                  color: Colors.brown,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('Đã hoàn thành 8 trên 12 phòng', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             ],
           ),
           const SizedBox(height: 8),
           Row(
-            children: const [
-              Text('Tỷ lệ hoàn tất', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              Spacer(),
-              Text('67%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Đã hoàn thành $completed trên $total phòng',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                '${(progress * 100).round()}%',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: const LinearProgressIndicator(
-              value: 0.67,
-              backgroundColor: AppColors.primaryGreen,
-              color: AppColors.warningOrange,
+            borderRadius: BorderRadius.circular(5),
+            child: LinearProgressIndicator(
+              value: progress,
               minHeight: 6,
+              backgroundColor: AppColors.lightGreen,
+              color: AppColors.warningOrange,
             ),
           ),
         ],
@@ -317,53 +408,68 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
   }
 
-  //banner AI OCR
   Widget _buildOcrBanner() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F8E9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: const Color(0xFFDCEDC8), borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.crop_free, color: AppColors.primaryGreen, size: 20),
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chức năng quét AI OCR dùng để demo UI.'),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text('Quét AI OCR Hàng Loạt', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(color: AppColors.warningOrange.withOpacity(0.3), borderRadius: BorderRadius.circular(6)),
-                      child: const Text('Mới', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                const Text('Chụp liên tục đồng hồ, tự khớp số phòng', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F8E9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.document_scanner_outlined,
+              color: AppColors.primaryGreen,
+              size: 26,
             ),
-          ),
-          const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.textSecondary),
-        ],
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quét AI OCR hàng loạt',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Chụp đồng hồ và nhận diện chỉ số tự động',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, size: 14),
+          ],
+        ),
       ),
     );
   }
 
-  //thanh chuyển tabs lọc
-  Widget _buildFilterTabs() {
+  Widget _buildFilterTabs(
+      int total,
+      int pending,
+      int completed,
+      ) {
     final filters = [
-      {'title': 'Tất cả', 'count': '12'},
-      {'title': 'Chưa ghi', 'count': '4'},
-      {'title': 'Đã ghi', 'count': '8'},
+      {'title': 'Tất cả', 'count': '$total'},
+      {'title': 'Chưa ghi', 'count': '$pending'},
+      {'title': 'Đã ghi', 'count': '$completed'},
       {'title': 'Bất thường', 'count': ''},
     ];
 
@@ -371,48 +477,59 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: List.generate(filters.length, (index) {
-          bool isSelected = _selectedFilterIndex == index;
-          bool isAlert = index == 3;
+          final selected = _selectedFilterIndex == index;
+          final alert = index == 3;
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
-              selected: isSelected,
+              selected: selected,
               showCheckmark: false,
+              selectedColor: alert
+                  ? Colors.redAccent
+                  : AppColors.primaryGreen,
+              backgroundColor: Colors.white,
               label: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (isAlert) const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.redAccent),
-                  if (isAlert) const SizedBox(width: 4),
+                  if (alert) ...[
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      size: 14,
+                      color: Colors.redAccent,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Text(
                     filters[index]['title']!,
                     style: TextStyle(
-                      color: isAlert ? Colors.red : (isSelected ? Colors.white : AppColors.textPrimary),
+                      color: selected
+                          ? Colors.white
+                          : alert
+                          ? Colors.redAccent
+                          : AppColors.textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   if (filters[index]['count']!.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.white24 : Colors.black12,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        filters[index]['count']!,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : AppColors.textPrimary,
-                          fontSize: 10,
-                        ),
+                    const SizedBox(width: 5),
+                    Text(
+                      filters[index]['count']!,
+                      style: TextStyle(
+                        color: selected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                        fontSize: 10,
                       ),
                     ),
                   ],
                 ],
               ),
-              selectedColor: isAlert ? Colors.redAccent : AppColors.primaryGreen,
-              backgroundColor: isAlert ? Colors.redAccent : Colors.white,
-              onSelected: (val) {
-                setState(() => _selectedFilterIndex = index);
+              onSelected: (_) {
+                setState(() {
+                  _selectedFilterIndex = index;
+                });
               },
             ),
           );
@@ -421,30 +538,49 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
   }
 
-  //mẹo ghi nhanh
   Widget _buildTipBox() {
-    return Column(
-      children: const [
-        Icon(Icons.lightbulb_outline, color: AppColors.primaryGreen, size: 28),
-        SizedBox(height: 4),
-        Text('Mẹo ghi nhanh chỉ số', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        SizedBox(height: 4),
-        Text(
-          'Bạn có thể bật đèn Flash điện thoại khi mở camera OCR để\nmáy tự nhận diện chính xác kể cả trong hốc tối.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-        ),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Column(
+        children: [
+          Icon(
+            Icons.lightbulb_outline,
+            color: AppColors.primaryGreen,
+            size: 28,
+          ),
+          SizedBox(height: 5),
+          Text(
+            'Mẹo ghi nhanh chỉ số',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          SizedBox(height: 5),
+          Text(
+            'Có thể bật đèn flash khi chụp ảnh đồng hồ '
+                'để dễ đọc chỉ số trong khu vực thiếu sáng.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  //khung footer cố định bên dưới
-  Widget _buildBottomFooter() {
+  Widget _buildBottomFooter(int completed) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+        border: Border(
+          top: BorderSide(color: Color(0xFFEEEEEE)),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -454,59 +590,103 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Tổng dự kiến (8 phòng đã ghi)', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                  Text('6.850.000 đ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                children: [
+                  Text(
+                    'Tổng dự kiến ($completed phòng đã ghi)',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const Text(
+                    '6.850.000 đ',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.lightGreen,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: const [
-                    Icon(Icons.water_drop_outlined, size: 12, color: AppColors.primaryGreen),
-                    SizedBox(width: 4),
-                    Text('Giá bậc thang', style: TextStyle(fontSize: 11, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              )
+              const Icon(
+                Icons.water_drop_outlined,
+                color: AppColors.primaryGreen,
+              ),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                flex: 1,
                 child: OutlinedButton(
-                  onPressed: () {},
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Lưu nháp', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Đã lưu bản nháp giao diện mẫu.'),
+                      ),
+                    );
+                  },
+                  child: const Text('Lưu nháp'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.receipt_long, size: 18, color: Colors.black87),
-                  label: const Text('Chốt số & Tạo hóa đơn', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Chốt số và tạo hóa đơn mẫu.'),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long),
+                  label: const Text(
+                    'Chốt số & Tạo hóa đơn',
+                    textAlign: TextAlign.center,
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.warningOrange,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    foregroundColor: Colors.black87,
                   ),
                 ),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
   }
+}
+
+class _RoomInfo {
+  final String id;
+  final String roomName;
+  final String tenant;
+  final String? phone;
+  final RoomUtilityStatus status;
+  final String? elecOld;
+  final String? waterOld;
+  final String? totalAmount;
+  final String? elecCost;
+  final String? waterCost;
+  final String? warningTag;
+  final String? warningMessage;
+  final int proofCount;
+
+  const _RoomInfo({
+    required this.id,
+    required this.roomName,
+    required this.tenant,
+    required this.status,
+    this.phone,
+    this.elecOld,
+    this.waterOld,
+    this.totalAmount,
+    this.elecCost,
+    this.waterCost,
+    this.warningTag,
+    this.warningMessage,
+    this.proofCount = 0,
+  });
 }

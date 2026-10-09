@@ -1,14 +1,15 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
 
-//sở dĩ dùng enum để quản lý trạng thái hiển thị của 1 card duy nhất
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 enum RoomUtilityStatus {
-  completed, //đã chốt
-  abnormal,  //bất thường
-  inputting, //chờ nhập số
-  pending    //chưa nhập
+  completed,
+  abnormal,
+  inputting,
+  pending,
 }
 
-//hằng số màu sắc dùng riêng cho card
 class RoomCardColors {
   static const Color primaryDarkGreen = Color(0xFF0F3E2E);
   static const Color accentGreen = Color(0xFF1B5E20);
@@ -23,29 +24,33 @@ class RoomCardColors {
   static const Color chipGray = Color(0xFFE0E0E0);
 }
 
-//----------------------------------------------------
-//WIDGET CARD GỐC DUY NHẤT DÙNG CHUNG CHO CẢ 4 TRẠNG THÁI
-//----------------------------------------------------
-class RoomUtilityCard extends StatelessWidget {
+class RoomUtilityCard extends StatefulWidget {
   final String roomName;
   final String tenantName;
   final String? phone;
   final RoomUtilityStatus status;
   final String? totalAmount;
-  final String? elecOld;
-  final String? elecNew;
+
+  final int? elecOld;
+  final int? elecNew;
   final String? elecDiff;
   final String? elecCost;
-  final String? waterOld;
-  final String? waterNew;
+
+  final int? waterOld;
+  final int? waterNew;
   final String? waterDiff;
   final String? waterCost;
+
   final String? warningTag;
   final String? warningMessage;
   final int proofImagesCount;
 
+  // Callback để màn hình cha cập nhật trạng thái phòng.
+  final VoidCallback? onEnterInput;
+  final void Function(String elec, String water)? onSave;
+
   const RoomUtilityCard({
-    Key? key,
+    super.key,
     required this.roomName,
     required this.tenantName,
     this.phone,
@@ -62,472 +67,852 @@ class RoomUtilityCard extends StatelessWidget {
     this.warningTag,
     this.warningMessage,
     this.proofImagesCount = 0,
-  }) : super(key: key);
+    this.onEnterInput,
+    this.onSave,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    bool isAbnormal = status == RoomUtilityStatus.abnormal;
+  State<RoomUtilityCard> createState() => _RoomUtilityCardState();
+}
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isAbnormal ? const Color(0xFFFFF5F5) : RoomCardColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: isAbnormal ? Border.all(color: RoomCardColors.redAlert.withOpacity(0.3)) : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          //hàng tiêu đề: tên phòng + badge trạng thái + tạm tính tiền
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(roomName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(width: 8),
-                  _buildBadge(),
-                ],
-              ),
-              if (totalAmount != null)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Tạm tính điện nước', style: TextStyle(fontSize: 10, color: RoomCardColors.textSecondary)),
-                    Text(totalAmount!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  ],
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
+class _RoomUtilityCardState extends State<RoomUtilityCard> {
+  final ImagePicker _picker = ImagePicker();
 
-          //hàng hiển thị thông tin khách thuê + sđt
-          Row(
-            children: [
-              if (status != RoomUtilityStatus.abnormal)
-                Text('Khách: $tenantName', style: const TextStyle(fontSize: 12, color: RoomCardColors.textSecondary))
-              else ...[
-                const Icon(Icons.person_outline, size: 14, color: RoomCardColors.textSecondary),
-                const SizedBox(width: 4),
-                Text(tenantName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 12),
-                const Icon(Icons.phone_outlined, size: 14, color: RoomCardColors.textSecondary),
-                const SizedBox(width: 4),
-                Text(phone ?? '', style: const TextStyle(fontSize: 12, color: Colors.brown, fontWeight: FontWeight.bold)),
-              ]
-            ],
-          ),
-          const SizedBox(height: 10),
+  final TextEditingController _elecController = TextEditingController();
+  final TextEditingController _waterController = TextEditingController();
 
-          //box cảnh báo màu đỏ hồng nếu bất thường
-          if (isAbnormal && warningMessage != null) ...[
-            Container(
-              padding: const EdgeInsets.all(8),
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: RoomCardColors.redLightBg,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline, color: RoomCardColors.redAlert, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      warningMessage!,
-                      style: const TextStyle(color: RoomCardColors.redAlert, fontSize: 11, height: 1.3),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+  File? _electricityImage;
+  File? _waterImage;
 
-          //chuyển đổi nội dung ô nhập/thông số theo trạng thái
-          if (status == RoomUtilityStatus.inputting) ...[
-            _buildInputSection(),
-          ] else if (status == RoomUtilityStatus.pending) ...[
-            _buildPendingSection(),
-          ] else ...[
-            //dạng 2 cột điện & nước (Đã chốt / Bất thường)
-            Row(
-              children: [
-                Expanded(child: _buildMetricBox('⚡ Điện (kWh)', elecOld, elecNew, elecDiff, elecCost, isAbnormal)),
-                const SizedBox(width: 8),
-                Expanded(child: _buildMetricBox('💧 Nước (m³)', waterOld, waterNew, waterDiff, waterCost, false)),
-              ],
-            ),
-            const SizedBox(height: 10),
+  bool _saving = false;
 
-            if (status == RoomUtilityStatus.completed) _buildCompletedFooter(),
-            if (status == RoomUtilityStatus.abnormal) _buildAbnormalFooter(),
-          ],
-        ],
-      ),
-    );
-  }
+  @override
+  void initState() {
+    super.initState();
 
-  //badge trạng thái
-  Widget _buildBadge() {
-    switch (status) {
-      case RoomUtilityStatus.completed:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(color: RoomCardColors.greenLightBg, borderRadius: BorderRadius.circular(8)),
-          child: Row(
-            children: const [
-              Icon(Icons.check_circle_outline, size: 12, color: RoomCardColors.accentGreen),
-              SizedBox(width: 2),
-              Text('Đã chốt', style: TextStyle(color: RoomCardColors.accentGreen, fontSize: 10, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        );
-      case RoomUtilityStatus.abnormal:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(color: RoomCardColors.redLightBg, borderRadius: BorderRadius.circular(8)),
-          child: Row(
-            children: [
-              const Icon(Icons.ac_unit, size: 12, color: RoomCardColors.redAlert),
-              const SizedBox(width: 2),
-              Text(warningTag ?? 'Bất thường', style: const TextStyle(color: RoomCardColors.redAlert, fontSize: 10, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        );
-      case RoomUtilityStatus.inputting:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(color: const Color(0xFFFFF3E0), borderRadius: BorderRadius.circular(8)),
-          child: Row(
-            children: const [
-              Icon(Icons.edit_note, size: 12, color: Colors.brown),
-              SizedBox(width: 2),
-              Text('Chờ nhập số', style: TextStyle(color: Colors.brown, fontSize: 10, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        );
-      case RoomUtilityStatus.pending:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(color: RoomCardColors.chipGray, borderRadius: BorderRadius.circular(8)),
-          child: const Text('Chưa nhập', style: TextStyle(color: RoomCardColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold)),
-        );
+    if (widget.elecNew != null) {
+      _elecController.text = widget.elecNew.toString();
+    }
+
+    if (widget.waterNew != null) {
+      _waterController.text = widget.waterNew.toString();
     }
   }
 
-  //ô thông số Cũ / Mới / Tiền
-  Widget _buildMetricBox(String title, String? oldVal, String? newVal, String? diffVal, String? costVal, bool isAlert) {
+  @override
+  void dispose() {
+    _elecController.dispose();
+    _waterController.dispose();
+    super.dispose();
+  }
+
+  // Mở camera hoặc thư viện ảnh.
+  Future<void> _showImageSourcePicker({
+    required bool isElectricity,
+  }) async {
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isElectricity
+                      ? 'Ảnh công tơ điện - ${widget.roomName}'
+                      : 'Ảnh công tơ nước - ${widget.roomName}',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(
+                    Icons.camera_alt,
+                    color: RoomCardColors.accentGreen,
+                    size: 30,
+                  ),
+                  title: const Text('Chụp ảnh bằng camera'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickImage(
+                      ImageSource.camera,
+                      isElectricity: isElectricity,
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library,
+                    color: RoomCardColors.accentGreen,
+                    size: 30,
+                  ),
+                  title: const Text('Chọn ảnh từ thư viện'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickImage(
+                      ImageSource.gallery,
+                      isElectricity: isElectricity,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Chụp ảnh hoặc lấy ảnh từ thư viện bằng image_picker.
+  Future<void> _pickImage(
+      ImageSource source, {
+        required bool isElectricity,
+      }) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+
+      if (!mounted || pickedFile == null) return;
+
+      setState(() {
+        if (isElectricity) {
+          _electricityImage = File(pickedFile.path);
+        } else {
+          _waterImage = File(pickedFile.path);
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isElectricity
+                ? 'Đã thêm ảnh công tơ điện phòng ${widget.roomName}'
+                : 'Đã thêm ảnh công tơ nước phòng ${widget.roomName}',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không thể lấy ảnh: $e'),
+        ),
+      );
+    }
+  }
+
+  void _increaseReading({
+    required TextEditingController controller,
+    required int amount,
+  }) {
+    final currentValue = int.tryParse(controller.text) ?? 0;
+    controller.text = (currentValue + amount).toString();
+  }
+
+  void _saveReading() {
+    final electricity = int.tryParse(_elecController.text);
+    final water = int.tryParse(_waterController.text);
+
+    if (electricity == null ||
+        water == null ||
+        electricity < (widget.elecOld ?? 0) ||
+        water < (widget.waterOld ?? 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vui lòng nhập chỉ số hợp lệ và không nhỏ hơn chỉ số cũ.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    widget.onSave?.call(
+      electricity.toString(),
+      water.toString(),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Đã lưu số điện ${electricity} và nước ${water} '
+              'cho phòng ${widget.roomName}.',
+        ),
+      ),
+    );
+
+    setState(() => _saving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isAlert ? Colors.white : RoomCardColors.backgroundLight,
-        borderRadius: BorderRadius.circular(8),
+        color: RoomCardColors.cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: widget.status == RoomUtilityStatus.abnormal
+              ? RoomCardColors.redAlert.withValues(alpha: 0.4)
+              : Colors.grey.withValues(alpha: 0.15),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isAlert ? RoomCardColors.redAlert : RoomCardColors.textSecondary)),
-              if (diffVal != null) Text(diffVal, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isAlert ? RoomCardColors.redAlert : RoomCardColors.textPrimary)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Cũ: $oldVal', style: const TextStyle(fontSize: 11, color: RoomCardColors.textSecondary)),
-              Text(newVal ?? '', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isAlert ? RoomCardColors.redAlert : RoomCardColors.textPrimary)),
-            ],
-          ),
-          if (costVal != null) ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Tiền điện', style: TextStyle(fontSize: 10, color: RoomCardColors.textSecondary)),
-                Text(costVal, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-              ],
+          _buildHeader(),
+          const SizedBox(height: 12),
+          Text(
+            widget.tenantName,
+            style: const TextStyle(
+              fontSize: 14,
+              color: RoomCardColors.textSecondary,
             ),
-          ]
+          ),
+          if (widget.phone != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              widget.phone!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: RoomCardColors.textSecondary,
+              ),
+            ),
+          ],
+          if (widget.status == RoomUtilityStatus.abnormal)
+            _buildWarning(),
+          const SizedBox(height: 14),
+          if (widget.status == RoomUtilityStatus.inputting)
+            _buildInputSection()
+          else if (widget.status == RoomUtilityStatus.pending)
+            _buildPendingSection()
+          else
+            _buildRecordedSection(),
         ],
       ),
     );
   }
 
-  //thiết kế khung ô nhập chỉ số riêng (Chờ nhập số)
-  Widget _buildInputSection() {
-    return Column(
+  Widget _buildHeader() {
+    return Row(
       children: [
-        //khung nhập số điện riêng
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: RoomCardColors.backgroundLight, borderRadius: BorderRadius.circular(8)),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('⚡ Chỉ số điện mới (kWh)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  Text('Số cũ: ${elecOld ?? "0"}', style: const TextStyle(fontSize: 11, color: RoomCardColors.textSecondary)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                      child: const TextField(
-                        decoration: InputDecoration(hintText: 'Nhập số mới...', hintStyle: TextStyle(fontSize: 11), border: InputBorder.none),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(color: RoomCardColors.primaryDarkGreen, borderRadius: BorderRadius.circular(6)),
-                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                  )
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Text('Tăng nhanh:', style: TextStyle(fontSize: 10, color: RoomCardColors.textSecondary)),
-                  const SizedBox(width: 6),
-                  _buildQuickChip('+100'),
-                  const SizedBox(width: 4),
-                  _buildQuickChip('+125'),
-                  const SizedBox(width: 4),
-                  _buildQuickChip('+150'),
-                ],
-              )
-            ],
-          ),
+        const Icon(
+          Icons.meeting_room_outlined,
+          color: RoomCardColors.accentGreen,
+          size: 25,
         ),
-        const SizedBox(height: 8),
-
-        //khung nhập số nước riêng
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: RoomCardColors.backgroundLight, borderRadius: BorderRadius.circular(8)),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('💧 Chỉ số nước mới (m³)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  Text('Số cũ: ${waterOld ?? "0"}', style: const TextStyle(fontSize: 11, color: RoomCardColors.textSecondary)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-                      child: const TextField(
-                        decoration: InputDecoration(hintText: 'Nhập số mới...', hintStyle: TextStyle(fontSize: 11), border: InputBorder.none),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    height: 36,
-                    width: 36,
-                    decoration: BoxDecoration(color: RoomCardColors.primaryDarkGreen, borderRadius: BorderRadius.circular(6)),
-                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                  )
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Text('Tăng nhanh:', style: TextStyle(fontSize: 10, color: RoomCardColors.textSecondary)),
-                  const SizedBox(width: 6),
-                  _buildQuickChip('+5 m³'),
-                  const SizedBox(width: 4),
-                  _buildQuickChip('+8 m³'),
-                  const SizedBox(width: 4),
-                  _buildQuickChip('+12 m³'),
-                ],
-              )
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        //nút lưu số phòng
-        SizedBox(
-          width: double.infinity,
-          height: 38,
-          child: ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.save, size: 16, color: Colors.white),
-            label: Text('Lưu số $roomName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: RoomCardColors.primaryDarkGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            widget.roomName,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: RoomCardColors.textPrimary,
             ),
           ),
-        )
+        ),
+        Flexible(child: _buildStatusBadge()),
       ],
     );
   }
 
-  //giao diện chưa nhập
+  Widget _buildStatusBadge() {
+    Color color;
+    String label;
+
+    switch (widget.status) {
+      case RoomUtilityStatus.completed:
+        color = RoomCardColors.accentGreen;
+        label = 'Đã ghi';
+        break;
+      case RoomUtilityStatus.abnormal:
+        color = RoomCardColors.redAlert;
+        label = widget.warningTag ?? 'Bất thường';
+        break;
+      case RoomUtilityStatus.inputting:
+        color = Colors.orange.shade800;
+        label = 'Đang nhập';
+        break;
+      case RoomUtilityStatus.pending:
+        color = RoomCardColors.textSecondary;
+        label = 'Chưa ghi';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildWarning() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: RoomCardColors.redLightBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: RoomCardColors.redAlert,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.warningMessage ?? 'Chỉ số điện nước bất thường.',
+              style: const TextStyle(
+                fontSize: 12,
+                color: RoomCardColors.textPrimary,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPendingSection() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: RoomCardColors.backgroundLight, borderRadius: BorderRadius.circular(8)),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Điện cũ: ${elecOld ?? "0"} kWh', style: const TextStyle(fontSize: 11, color: RoomCardColors.textSecondary)),
-              Text('Nước cũ: ${waterOld ?? "0"} m³', style: const TextStyle(fontSize: 11, color: RoomCardColors.textSecondary)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
+        _buildOldReading('Điện', widget.elecOld, 'kWh'),
+        const SizedBox(height: 8),
+        _buildOldReading('Nước', widget.waterOld, 'm³'),
+        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.camera_alt_outlined, size: 16, color: RoomCardColors.primaryDarkGreen),
-                label: const Text('Chụp ảnh', style: TextStyle(color: RoomCardColors.primaryDarkGreen, fontSize: 12, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                onPressed: () => _showImageSourcePicker(
+                  isElectricity: true,
                 ),
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: const Text('Chụp điện'),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-                label: const Text('Nhập số', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: RoomCardColors.primaryDarkGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              child: OutlinedButton.icon(
+                onPressed: () => _showImageSourcePicker(
+                  isElectricity: false,
                 ),
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: const Text('Chụp nước'),
               ),
             ),
           ],
-        )
-      ],
-    );
-  }
-
-  //footer chứng từ cho card đã chốt
-  Widget _buildCompletedFooter() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            _buildProofThumb('OCR'),
-            const SizedBox(width: 4),
-            _buildProofThumb('OCR'),
-            const SizedBox(width: 6),
-            Text('$proofImagesCount ảnh chứng từ', style: const TextStyle(fontSize: 11, color: RoomCardColors.textSecondary)),
-          ],
         ),
-        OutlinedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.edit, size: 14, color: RoomCardColors.textPrimary),
-          label: const Text('Sửa', style: TextStyle(color: RoomCardColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold)),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          ),
-        )
-      ],
-    );
-  }
-
-  //footer thao tác cho card bất thường
-  Widget _buildAbnormalFooter() {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.camera_alt_outlined, size: 14, color: RoomCardColors.textPrimary),
-            label: const Text('Chụp lại công tơ', style: TextStyle(color: RoomCardColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold)),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.check_circle, size: 14, color: RoomCardColors.textPrimary),
-            label: const Text('Xác nhận số đúng', style: TextStyle(color: RoomCardColors.textPrimary, fontSize: 11, fontWeight: FontWeight.bold)),
+            onPressed: widget.onEnterInput,
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Nhập số'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: RoomCardColors.orangeWarning,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              backgroundColor: RoomCardColors.accentGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
             ),
           ),
         ),
+        _buildPhotoPreviews(),
       ],
     );
   }
 
-  //chip nút tăng nhanh
-  Widget _buildQuickChip(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.black12)),
-      child: Text(text, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  //thumbnail ảnh chứng từ có tag OCR
-  Widget _buildProofThumb(String tag) {
-    return Stack(
+  Widget _buildInputSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade300,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Icon(Icons.speed, size: 20, color: Colors.grey),
+        _buildInputMeter(
+          title: 'CÔNG TƠ ĐIỆN',
+          oldValue: widget.elecOld ?? 0,
+          unit: 'kWh',
+          controller: _elecController,
+          isElectricity: true,
+          quickValues: const [100, 125, 150],
         ),
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            color: Colors.black.withOpacity(0.6),
-            child: Text(
-              tag,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold),
+        const SizedBox(height: 16),
+        _buildInputMeter(
+          title: 'CÔNG TƠ NƯỚC',
+          oldValue: widget.waterOld ?? 0,
+          unit: 'm³',
+          controller: _waterController,
+          isElectricity: false,
+          quickValues: const [5, 8, 12],
+        ),
+        const SizedBox(height: 12),
+        _buildPhotoPreviews(),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _saving ? null : _saveReading,
+            icon: const Icon(Icons.save_outlined),
+            label: const Text('Lưu số'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: RoomCardColors.accentGreen,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
-        )
+        ),
       ],
+    );
+  }
+
+  Widget _buildInputMeter({
+    required String title,
+    required int oldValue,
+    required String unit,
+    required TextEditingController controller,
+    required bool isElectricity,
+    required List<int> quickValues,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: RoomCardColors.backgroundLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: RoomCardColors.accentGreen,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Chỉ số cũ: $oldValue $unit',
+            style: const TextStyle(
+              color: RoomCardColors.textSecondary,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Chỉ số mới',
+                    suffixText: unit,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: RoomCardColors.greenLightBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: IconButton(
+                  tooltip: 'Chụp ảnh hoặc chọn ảnh',
+                  onPressed: () => _showImageSourcePicker(  // khi chọn camera
+                    isElectricity: isElectricity,
+                  ),
+                  icon: const Icon(
+                    Icons.camera_alt,
+                    color: RoomCardColors.accentGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Tăng nhanh:',
+            style: TextStyle(
+              fontSize: 12,
+              color: RoomCardColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: quickValues.map((value) {
+              return ActionChip(
+                label: Text('+$value $unit'),
+                onPressed: () => _increaseReading(
+                  controller: controller,
+                  amount: value,
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOldReading(String title, int? value, String unit) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Chỉ số $title cũ',
+            style: const TextStyle(
+              color: RoomCardColors.textSecondary,
+            ),
+          ),
+        ),
+        Text(
+          '${value ?? 0} $unit',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecordedSection() {
+    return Column(
+      children: [
+        _buildMetricRow(
+          title: 'Điện',
+          oldValue: widget.elecOld,
+          newValue: widget.elecNew,
+          diff: widget.elecDiff,
+          cost: widget.elecCost,
+          unit: 'kWh',
+        ),
+        const SizedBox(height: 10),
+        _buildMetricRow(
+          title: 'Nước',
+          oldValue: widget.waterOld,
+          newValue: widget.waterNew,
+          diff: widget.waterDiff,
+          cost: widget.waterCost,
+          unit: 'm³',
+        ),
+        if (widget.totalAmount != null) ...[
+          const Divider(height: 24),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Tổng tiền điện nước',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                widget.totalAmount!,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: RoomCardColors.accentGreen,
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (widget.status == RoomUtilityStatus.abnormal) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showImageSourcePicker(
+                    isElectricity: true,
+                  ),
+                  icon: const Icon(Icons.camera_alt_outlined),
+                  label: const Text('Chụp lại'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    widget.onSave?.call(
+                        _elecController.text,
+                        _waterController.text,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: RoomCardColors.accentGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Xác nhận'),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (widget.status == RoomUtilityStatus.completed)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: widget.onEnterInput,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Sửa số'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMetricRow({
+    required String title,
+    required int? oldValue,
+    required int? newValue,
+    required String? diff,
+    required String? cost,
+    required String unit,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: RoomCardColors.backgroundLight,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: RoomCardColors.accentGreen,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _metricValue(
+                  'Chỉ số cũ',
+                  '${oldValue ?? 0}',
+                ),
+              ),
+              Expanded(
+                child: _metricValue(
+                  'Chỉ số mới',
+                  '${newValue ?? 0}',
+                ),
+              ),
+              Expanded(
+                child: _metricValue(
+                  'Tiêu thụ',
+                  diff ?? '—',
+                ),
+              ),
+            ],
+          ),
+          if (cost != null) ...[
+            const Divider(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Thành tiền ($unit)',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                Text(
+                  cost,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _metricValue(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: RoomCardColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoPreviews() {
+    if (_electricityImage == null && _waterImage == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          if (_electricityImage != null)
+            _buildPhotoThumbnail(
+              title: 'Công tơ điện',
+              file: _electricityImage!,
+              isElectricity: true,
+            ),
+          if (_waterImage != null)
+            _buildPhotoThumbnail(
+              title: 'Công tơ nước',
+              file: _waterImage!,
+              isElectricity: false,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoThumbnail({
+    required String title,
+    required File file,
+    required bool isElectricity,
+  }) {
+    return SizedBox(
+      width: 130,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.file(
+                  file,
+                  width: 130,
+                  height: 100,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 130,
+                      height: 100,
+                      color: Colors.grey.shade200,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined),
+                    );
+                  },
+                ),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: IconButton(
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.9),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      if (isElectricity) {
+                        _electricityImage = null;
+                      } else {
+                        _waterImage = null;
+                      }
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Đã đính kèm ảnh',
+            style: TextStyle(
+              fontSize: 11,
+              color: RoomCardColors.accentGreen,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
