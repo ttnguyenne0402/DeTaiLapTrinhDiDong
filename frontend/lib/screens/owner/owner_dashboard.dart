@@ -4,7 +4,7 @@ import '../../widgets/owner/owner_drawer.dart';
 import 'properties_manage.dart';
 import 'owner_profile_screen.dart';
 import 'tenant_list_screen.dart';
-
+import '../../core/constants/app_colors.dart';
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key});
 
@@ -32,7 +32,7 @@ class OwnerDashboard extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          color: Colors.grey[50],
+          color: AppColors.background,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
