@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 enum RoomUtilityStatus {
-  completed,
-  abnormal,
-  inputting,
-  pending,
+  completed,// đã ghi
+  abnormal,// bất thường
+  inputting,// đang nhập
+  pending,// chưa ghi chỉ số
 }
 
 class RoomCardColors {
