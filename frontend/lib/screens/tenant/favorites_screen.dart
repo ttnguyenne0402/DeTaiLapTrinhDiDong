@@ -292,65 +292,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     );
   }
 
-  Widget _buildBottomNavigationBar() {
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        height: 68,
-        child: BottomAppBar(
-          color: const Color(0xFFF4EEF5),
-          elevation: 12,
-          padding: EdgeInsets.zero,
-          child: Row(
-            children: [
-              // Trang chủ
-              _buildBottomNavItem(
-                icon: Icons.home_rounded,
-                label: 'Trang chủ',
-                onTap: _goBack,
-              ),
-
-              // Hóa đơn
-              _buildBottomNavItem(
-                icon: Icons.receipt_long_rounded,
-                label: 'Hóa đơn',
-                onTap: () => _openScreen(const MyInvoicesScreen()),
-              ),
-
-              // Đặt lịch
-              _buildBottomNavItem(
-                icon: Icons.event_note_rounded,
-                label: 'Đặt lịch',
-                onTap: () => _openScreen(const booking_screen()),
-              ),
-
-              // Hợp đồng
-              _buildBottomNavItem(
-                icon: Icons.description_outlined,
-                label: 'Hợp đồng',
-                onTap: () => _openScreen(const MyContractsScreen()),
-              ),
-
-              // Yêu thích
-              _buildBottomNavItem(
-                icon: Icons.favorite_border_rounded,
-                label: 'Yêu thích',
-                selected: true,
-                onTap: () {},
-              ),
-
-              // Cá nhân
-              _buildBottomNavItem(
-                icon: Icons.person_outline_rounded,
-                label: 'Cá nhân',
-                onTap: () => _openScreen(const ProfileScreen()),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   // ============================================================
   // BUILD
@@ -363,7 +304,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
 
-      bottomNavigationBar: _buildBottomNavigationBar(),
+
 
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
@@ -379,15 +320,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
             foregroundColor: Colors.white,
             automaticallyImplyLeading: false,
 
-            leading: IconButton(
-              onPressed: _goBack,
-              tooltip: 'Quay lại',
-              icon: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 21,
-              ),
-            ),
+
             flexibleSpace: FlexibleSpaceBar(
               background: _FavoriteHeader(total: _favorites.length),
             ),

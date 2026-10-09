@@ -79,25 +79,12 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
+        centerTitle: true,
         title: const Text(
           'Hóa đơn & Thanh toán',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
 
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.home,
-                    (route) => false,
-              );
-            }
-          },
-        ),
       ),
 
       body: Column(

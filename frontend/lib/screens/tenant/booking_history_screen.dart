@@ -65,21 +65,7 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
 
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.home,
-                    (route) => false,
-              );
-            }
-          },
-        ),
         elevation: 0,
       ),
       body: ListView.builder(
