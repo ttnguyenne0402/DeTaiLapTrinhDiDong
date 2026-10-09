@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../../widgets/owner/dashboard_card.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'properties_manage.dart';
-import 'owner_profile_screen.dart';
+import '../tenant/profile_screen.dart';
 import 'tenant_list_screen.dart';
 import '../../core/constants/app_colors.dart';
+
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key});
 
@@ -213,10 +214,10 @@ class OwnerDashboard extends StatelessWidget {
             const SizedBox(width: 40),
             _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
               Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TenantListScreen(),
-                  ),
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TenantListScreen(),
+                ),
               );
             }),
 
@@ -224,7 +225,15 @@ class OwnerDashboard extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const OwnerProfileScreen(),
+                  builder: (context) => const ProfileScreen(
+                    user: {
+                      'Name': 'Nguyễn Văn A',
+                      'Email': '',
+                      'Phone': '',
+                      'Avatar': '',
+                      'Role': 'owner',
+                    },
+                  ),
                 ),
               );
             }),
