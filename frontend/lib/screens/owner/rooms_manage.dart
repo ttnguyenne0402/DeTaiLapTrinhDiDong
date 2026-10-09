@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/property_card.dart';
 import 'owner_dashboard.dart';
 import 'room_form.dart';
 
+// Màn hình quản lý danh sách phòng trọ của chủ trọ
 class RoomsManageScreen extends StatelessWidget {
   const RoomsManageScreen({super.key});
 
@@ -13,31 +15,30 @@ class RoomsManageScreen extends StatelessWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF9F9FB),
+        backgroundColor: AppColors.primaryGreen,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.primaryGreen,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
           ),
           title: const Text(
             'Quản lý phòng',
             style: TextStyle(
-              color: Colors.black,
+              color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 18,
             ),
           ),
           centerTitle: true,
 
-          // THANH TAB BAR
+          // Thanh bộ lọc trạng thái phòng
           bottom: TabBar(
-            labelColor: primaryColor,
-            unselectedLabelColor: Colors.grey,
-            indicatorColor: primaryColor,
-            indicatorWeight: 2.5,
-            indicatorSize: TabBarIndicatorSize.label,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            indicatorColor: Colors.orange,
+            indicatorWeight: 3,
             labelStyle: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,
@@ -54,15 +55,29 @@ class RoomsManageScreen extends StatelessWidget {
           ),
         ),
 
-        // DANH SÁCH PHÒNG LỌC THEO TAB
-        body: TabBarView(
-          children: [
-            _buildRoomList('rented'), // Màn hình lọc "Đang cho thuê"
-            _buildRoomList('empty'), // Màn hình lọc "Còn trống"
-            _buildRoomList('all'), // Màn hình hiển thị "Tất cả"
-          ],
+        // Thân màn hình bo góc lồng 2 lớp Container
+        body: Container(
+          color: AppColors.primaryGreen,
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF9F9FB),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
+              ),
+            ),
+            child: TabBarView(
+              children: [
+                _buildRoomList('rented'), // Lọc phòng đang cho thuê
+                _buildRoomList('empty'), // Lọc phòng còn trống
+                _buildRoomList('all'), // Hiển thị tất cả
+              ],
+            ),
+          ),
         ),
 
+        // Nút thêm phòng mới
         floatingActionButton: FloatingActionButton(
           onPressed: () {
             Navigator.push(
@@ -76,6 +91,7 @@ class RoomsManageScreen extends StatelessWidget {
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
+        // Thanh điều hướng đáy
         bottomNavigationBar: BottomAppBar(
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,
@@ -108,8 +124,9 @@ class RoomsManageScreen extends StatelessWidget {
     );
   }
 
-  // Hàm tạo danh sách phòng có áp dụng bộ lọc theo tham số filter
+  // Danh sách phòng có bộ lọc theo tab
   Widget _buildRoomList(String filter) {
+    // Dữ liệu danh sách phòng mẫu
     final sampleRooms = [
       {
         'roomName': 'Phòng 201',
@@ -145,7 +162,7 @@ class RoomsManageScreen extends StatelessWidget {
       },
     ];
 
-    // Logic lọc danh sách theo tham số truyền vào
+    // Lọc danh sách phòng theo tham số
     final filtered = sampleRooms.where((room) {
       if (filter == 'rented') return room['isRented'] == true;
       if (filter == 'empty') return room['isRented'] == false;
@@ -170,7 +187,7 @@ class RoomsManageScreen extends StatelessWidget {
     );
   }
 
-  // Widget Thẻ phòng
+  // Thẻ hiển thị thông tin từng phòng
   Widget _buildRoomCard({
     required String roomName,
     required String detail,
@@ -194,6 +211,7 @@ class RoomsManageScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
+          // Ảnh phòng
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.asset(
@@ -211,7 +229,7 @@ class RoomsManageScreen extends StatelessWidget {
           ),
           const SizedBox(width: 14),
 
-          // Cột thông tin phòng
+          // Thông tin chi tiết phòng
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +258,7 @@ class RoomsManageScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
 
-                // Trạng thái phòng
+                // Badge trạng thái phòng
                 _buildStatusBadge(status),
               ],
             ),
@@ -250,7 +268,7 @@ class RoomsManageScreen extends StatelessWidget {
     );
   }
 
-  // Hàm tạo Badge màu tương ứng từng trạng thái
+  // Badge nhãn trạng thái phòng
   Widget _buildStatusBadge(String status) {
     Color bgColor;
     Color textColor;
@@ -290,6 +308,7 @@ class RoomsManageScreen extends StatelessWidget {
     );
   }
 
+  // Nút điều hướng thanh dưới
   Widget _buildNavItem(
     IconData icon,
     String label,

@@ -17,9 +17,7 @@ class PropertiesManageScreen extends StatelessWidget {
       length: 3,
       child: Scaffold(
         backgroundColor: AppColors.primaryGreen,
-        drawer: const OwnerDrawer(
-          currentRoute: 'utilities',
-        ),
+        drawer: const OwnerDrawer(currentRoute: 'utilities'),
         appBar: AppBar(
           backgroundColor: AppColors.primaryGreen,
           elevation: 0,
@@ -36,7 +34,7 @@ class PropertiesManageScreen extends StatelessWidget {
               onPressed: () {},
             ),
 
-            const SizedBox(width: 10,),
+            const SizedBox(width: 10),
             const CircleAvatar(
               backgroundColor: Colors.white24,
               radius: 16,
@@ -58,7 +56,7 @@ class PropertiesManageScreen extends StatelessWidget {
           bottom: TabBar(
             labelColor: AppColors.lightGreen,
             unselectedLabelColor: AppColors.lightGreen,
-            indicatorColor: primaryColor,
+            indicatorColor: Colors.orange,
             indicatorWeight: 1,
             indicatorSize: TabBarIndicatorSize.label,
             labelStyle: const TextStyle(
@@ -331,9 +329,16 @@ class PropertiesManageScreen extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          Navigator.pushNamed(context, AppRoutes.utilityReadings);
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.utilityReadings,
+                          );
                         },
-                        icon: const Icon(Icons.bolt, size: 16, color: Colors.amber),
+                        icon: const Icon(
+                          Icons.bolt,
+                          size: 16,
+                          color: Colors.amber,
+                        ),
                         label: const Text(
                           'Ghi điện nước',
                           style: TextStyle(fontSize: 12, color: Colors.black87),
@@ -351,9 +356,16 @@ class PropertiesManageScreen extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          Navigator.pushNamed(context, AppRoutes.utilityHistory);
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.utilityHistory,
+                          );
                         },
-                        icon: const Icon(Icons.bar_chart, size: 16, color: Colors.blue),
+                        icon: const Icon(
+                          Icons.bar_chart,
+                          size: 16,
+                          color: Colors.blue,
+                        ),
                         label: const Text(
                           'Xem tiêu thụ',
                           style: TextStyle(fontSize: 12, color: Colors.black87),
@@ -456,11 +468,11 @@ class PropertiesManageScreen extends StatelessWidget {
   }
 
   Widget _buildNavItem(
-      IconData icon,
-      String label,
-      bool isActive,
-      VoidCallback onTap,
-      ) {
+    IconData icon,
+    String label,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
