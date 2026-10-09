@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'owner_dashboard.dart';
+import 'owner_profile_screen.dart';
 import 'property_form.dart';
 import 'rooms_manage.dart';
 import 'tenant_list_screen.dart';
@@ -32,15 +33,29 @@ class PropertiesManageScreen extends StatelessWidget {
           actions: [
             IconButton(
               icon: const Icon(Icons.notifications_none, color: Colors.white),
-              onPressed: () {},
+              onPressed: () {
+
+              },
             ),
 
             const SizedBox(width: 10),
-            const CircleAvatar(
+             CircleAvatar(
               backgroundColor: Colors.white24,
               radius: 16,
-              child: Icon(Icons.person, color: Colors.white, size: 20),
+              child: IconButton(
+                iconSize: 18,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.person, color: Colors.white,size: 20,),
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(
+                      builder: (context) => const OwnerProfileScreen(),
+                    ),
+                  );
+                },
+              ),
             ),
+
             const SizedBox(width: 16),
           ],
           title: const Text(
