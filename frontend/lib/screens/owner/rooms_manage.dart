@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/property_card.dart';
 import 'owner_dashboard.dart';
 import 'room_form.dart';
+import 'tenant_list_screen.dart';
 
 // Màn hình quản lý danh sách phòng trọ của chủ trọ
 class RoomsManageScreen extends StatelessWidget {
@@ -115,7 +116,14 @@ class RoomsManageScreen extends StatelessWidget {
                 );
               }),
               const SizedBox(width: 40),
-              _buildNavItem(Icons.people_outline, 'Người thuê', false, () {}),
+              _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TenantListScreen(),
+                    ),
+                );
+              }),
               _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
             ],
           ),
