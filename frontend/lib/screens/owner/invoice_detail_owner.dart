@@ -11,6 +11,7 @@ class InvoiceDetailScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
           onPressed: () => Navigator.pop(context),
@@ -25,13 +26,23 @@ class InvoiceDetailScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.cardSurface),
             onPressed: () {},
+            icon: const Icon(
+              Icons.notifications,
+              color: Colors.white,
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: AppColors.cardSurface),
-            onPressed: () {},
+          const SizedBox(width: 16),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Column(

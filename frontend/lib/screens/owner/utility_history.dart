@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_colors.dart';
 
 class LandlordUtilityScreen extends StatefulWidget {
@@ -23,13 +24,12 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
           icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
           onPressed: () => Navigator.maybePop(context),
         ),
-
         title: const Text(
           'Quản Lí Điện Nước',
           style: TextStyle(
-            color: AppColors.cardSurface,
-            fontWeight: FontWeight.bold,
-            fontSize: 18
+              color: AppColors.cardSurface,
+              fontWeight: FontWeight.bold,
+              fontSize: 18
           ),
         ),
         actions: [
@@ -70,9 +70,9 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          color: AppColors.background, // màu nền của nội dung bên dưới (trắng/kem)
+          color: AppColors.background,
           borderRadius: BorderRadius.vertical(
-            top: Radius.circular(24), // bo cong 2 góc trên (trái & phải)
+            top: Radius.circular(24),
           ),
         ),
         child: SingleChildScrollView(
@@ -115,14 +115,17 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
     );
   }
 
-  // --- widgets của chủ trọ ---
-
+  //widgets của chủ trọ
   Widget _buildRoomHeaderCard() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: Colors.grey.shade300,
+              width: 1.5
+          )
       ),
       child: Row(
         children: [
@@ -225,7 +228,7 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
   Widget _buildStatCard(IconData icon, Color iconColor, String title, String value, String subText) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16), border: Border.all(width: 1.5, color: Colors.grey.shade300)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -280,8 +283,8 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Biểu đồ tiêu thụ 6 tháng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          const Text('Tháng 03 - Tháng 08/2024', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          const Text('Biểu đồ tiêu thụ 12 tháng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const Text('Tháng 01 - Tháng 12/2024 (Vuốt ngang để xem thêm)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(10),
@@ -297,19 +300,88 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            height: 100,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildBarGroup('T03', 0.6, 0.5, false),
-                _buildBarGroup('T04', 0.7, 0.4, false),
-                _buildBarGroup('T05', 0.9, 0.6, false),
-                _buildBarGroup('T06', 0.75, 0.35, false),
-                _buildBarGroup('T07', 0.8, 0.45, false),
-                _buildBarGroup('T08', 0.85, 0.55, true),
-              ],
+          // Bọc trong SingleChildScrollView để vuốt ngang, chỉnh lại width cho từng cột thoáng hơn
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: 12 * 50.0, // Đặt chiều rộng đủ lớn cho 12 tháng (mỗi tháng 50px)
+              height: 180,
+              child: BarChart(
+                BarChartData(
+                  maxY: 20,
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => Colors.grey.shade700,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        String type = rodIndex == 0 ? 'Điện' : 'Nước';
+                        return BarTooltipItem(
+                          'Tháng ${group.x + 1}\n$type: ${rod.toY}',
+                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        );
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          int month = value.toInt() + 1;
+                          if (month < 1 || month > 12) return const SizedBox();
+                          bool isHighlight = (month == 8);
+                          return SideTitleWidget(
+                            meta: meta,
+                            space: 8,
+                            child: Text(
+                              'T${month < 10 ? '0$month' : '$month'}',
+                              style: TextStyle(
+                                color: isHighlight ? AppColors.primaryGreen : AppColors.textSecondary,
+                                fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 11,
+                              ),
+                            ),
+                          );
+                        },
+                        reservedSize: 28,
+                        interval: 1,
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 28,
+                        interval: 5,
+                        getTitlesWidget: (value, meta) {
+                          return SideTitleWidget(
+                            meta: meta,
+                            space: 0,
+                            child: Text('${value.toInt()}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: [
+                    _makeGroupData(0, 5, 4),
+                    _makeGroupData(1, 6, 4.5),
+                    _makeGroupData(2, 6, 5),
+                    _makeGroupData(3, 7, 4),
+                    _makeGroupData(4, 9, 6),
+                    _makeGroupData(5, 7.5, 3.5),
+                    _makeGroupData(6, 8, 4.5),
+                    _makeGroupData(7, 8.5, 5.5, isHighlight: true),
+                    _makeGroupData(8, 7, 4),
+                    _makeGroupData(9, 6.5, 3.8),
+                    _makeGroupData(10, 8, 4.8),
+                    _makeGroupData(11, 9.5, 6),
+                  ],
+                  gridData: const FlGridData(show: false),
+                ),
+              ),
             ),
           ),
         ],
@@ -317,20 +389,23 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
     );
   }
 
-  Widget _buildBarGroup(String label, double elecRatio, double waterRatio, bool isHighlight) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(width: 10, height: 70 * elecRatio, decoration: BoxDecoration(color: isHighlight ? AppColors.primaryGreen : AppColors.textSecondary.withOpacity(0.3), borderRadius: BorderRadius.circular(4))),
-            const SizedBox(width: 2),
-            Container(width: 10, height: 70 * waterRatio, decoration: BoxDecoration(color: AppColors.accentYellow, borderRadius: BorderRadius.circular(4))),
-          ],
+  BarChartGroupData _makeGroupData(int x, double y1, double y2, {bool isHighlight = false}) {
+    return BarChartGroupData(
+      barsSpace: 4,
+      x: x,
+      barRods: [
+        BarChartRodData(
+          toY: y1,
+          color: isHighlight ? AppColors.primaryGreen : AppColors.textSecondary.withOpacity(0.4),
+          width: 10,
+          borderRadius: BorderRadius.circular(4),
         ),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 11, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal, color: isHighlight ? AppColors.primaryGreen : AppColors.textSecondary)),
+        BarChartRodData(
+          toY: y2,
+          color: AppColors.accentYellow,
+          width: 10,
+          borderRadius: BorderRadius.circular(4),
+        ),
       ],
     );
   }
@@ -432,7 +507,11 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
   Widget _buildLandlordBottomActions() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300, width: 1.5)
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

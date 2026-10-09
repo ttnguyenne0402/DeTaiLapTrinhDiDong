@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_router.dart';
+import '../../route/app_routes.dart';
 
 class ContractDetailScreen extends StatefulWidget {
   const ContractDetailScreen({super.key});
@@ -16,23 +18,34 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Hop Dong Thue',
+          'Chi tiết hợp đồng thuê',
           style: TextStyle(color: AppColors.cardSurface, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.cardSurface),
             onPressed: () {},
+            icon: const Icon(
+              Icons.notifications,
+              color: Colors.white,
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: AppColors.cardSurface),
-            onPressed: () {},
+          const SizedBox(width: 16),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Column(
@@ -360,7 +373,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
               ),
               const SizedBox(height: 10),
 
-              // thành viên cùng phòng
+              // thành viên
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -375,13 +388,15 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Cùng phòng (contract_members)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                          Text('Cùng phòng', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                           Text('2 người đăng ký lưu trú', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
                     InkWell(
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.pushNamed(context, AppRoutes.contractMembers);
+                      },
                       child: Row(
                         children: const [
                           Text('Xem 2 người', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),

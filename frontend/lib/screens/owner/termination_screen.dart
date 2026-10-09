@@ -18,7 +18,7 @@ class _ContractLiquidationScreenState
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
-        centerTitle: false,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
           onPressed: () => Navigator.maybePop(context),
@@ -32,22 +32,23 @@ class _ContractLiquidationScreenState
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.cardSurface),
             onPressed: () {},
-          ),
-          Container(
-            margin: const EdgeInsets.only(right: 16, left: 4),
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: AppColors.cardSurface,
-              shape: BoxShape.circle,
+            icon: const Icon(
+              Icons.notifications,
+              color: Colors.white,
             ),
-            child: const Icon(
+          ),
+          const SizedBox(width: 10),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(
               Icons.person,
-              color: AppColors.primaryGreen,
+              color: Colors.white,
               size: 20,
             ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
 
@@ -191,20 +192,20 @@ class _ContractLiquidationScreenState
           const SizedBox(height: 8),
           const Row(
             children: [
-              Icon(Icons.person_outline, color: Colors.white70, size: 16),
+              Icon(Icons.person_outline, color: AppColors.lightGreen, size: 16),
               SizedBox(width: 6),
               Text('Nguyễn Văn An • 0908 123 456',
-                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  style: TextStyle(color: AppColors.lightGreen, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 4),
           const Row(
             children: [
               Icon(Icons.calendar_today_outlined,
-                  color: Colors.white70, size: 16),
+                  color: AppColors.lightGreen, size: 16),
               SizedBox(width: 6),
               Text('01/09/2023 ➔ 31/08/2024 (12 tháng)',
-                  style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  style: TextStyle(color: AppColors.lightGreen, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 16),
@@ -240,6 +241,10 @@ class _ContractLiquidationScreenState
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          width: 1.5,
+          color: Colors.grey.shade300,
+        )
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,6 +402,10 @@ class _ContractLiquidationScreenState
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade300,
+          width: 1.5
+        )
       ),
       child: Column(
         children: [
@@ -490,6 +499,10 @@ class _ContractLiquidationScreenState
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.shade300,
+          width: 1.5
+        )
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -586,6 +599,10 @@ class _ContractLiquidationScreenState
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: Colors.grey.shade300,
+              width: 1.5
+          )
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -716,6 +733,10 @@ class _ContractLiquidationScreenState
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: Colors.grey.shade300,
+              width: 1.5
+          )
       ),
       child: Column(
         children: [

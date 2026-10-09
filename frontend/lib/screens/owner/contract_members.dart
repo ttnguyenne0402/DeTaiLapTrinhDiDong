@@ -15,8 +15,9 @@ class TenantManagementScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
           onPressed: () => Navigator.pop(context),
         ),
+        centerTitle: true,
         title: const Text(
-          'Hop Dong Thue',
+          'Người ở cùng',
           style: TextStyle(
             color: AppColors.cardSurface,
             fontSize: 18,
@@ -25,13 +26,23 @@ class TenantManagementScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.cardSurface),
             onPressed: () {},
+            icon: const Icon(
+              Icons.notifications,
+              color: Colors.white,
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: AppColors.cardSurface),
-            onPressed: () {},
+          const SizedBox(width: 16),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Column(

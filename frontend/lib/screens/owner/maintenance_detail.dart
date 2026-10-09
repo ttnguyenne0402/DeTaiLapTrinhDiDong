@@ -24,6 +24,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -38,9 +39,23 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
             onPressed: () {},
+            icon: const Icon(
+              Icons.notifications,
+              color: Colors.white,
+            ),
           ),
+          const SizedBox(width: 16),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
         ],
       ),
       // Container chính bọc toàn bộ body, bo 2 góc trên trái và phải
@@ -610,7 +625,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text(
-                'Hủy yêu cầu',
+                'Hủy',
                 style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
               ),
             ),
