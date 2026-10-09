@@ -36,23 +36,34 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Duyệt Tin Đăng Phòng',
+          'Chi tiết tin',
           style: TextStyle(color: AppColors.cardSurface, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.more_vert, color: AppColors.cardSurface),
             onPressed: () {},
+            icon: const Icon(
+              Icons.notifications,
+              color: Colors.white,
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: AppColors.cardSurface),
-            onPressed: () {},
+          const SizedBox(width: 16),
+          const CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Column(
@@ -100,6 +111,8 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
 
           // thanh bottom bar cố định dưới cùng
           _buildBottomActionBar(),
+
+          SizedBox(height: 10,)
         ],
       ),
     );
@@ -690,6 +703,7 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                     Text('Phê duyệt ngay', style: TextStyle(color: AppColors.cardSurface, fontWeight: FontWeight.bold, fontSize: 13)),
                   ],
                 ),
+
               ),
             ),
           ),

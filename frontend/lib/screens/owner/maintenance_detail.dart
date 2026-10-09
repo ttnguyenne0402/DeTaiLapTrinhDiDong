@@ -104,6 +104,8 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
 
               // thanh nút bấm thao tác ở đáy màn hình
               _buildBottomActionButtons(),
+
+              const SizedBox(height: 10,)
             ],
           ),
         ),
@@ -538,6 +540,8 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
             isLast: true,
           ),
         ],
+
+
       ),
     );
   }
@@ -630,7 +634,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             flex: 2,
             child: ElevatedButton(
@@ -652,6 +656,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
               ),
             ),
           ),
+
         ],
       ),
     );

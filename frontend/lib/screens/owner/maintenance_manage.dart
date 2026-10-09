@@ -529,29 +529,55 @@ class _MaintenanceManageScreenState
                         priorityColor: AppColors.warningOrange,
                         statusText: 'Đang xử lý',
                         statusColor: AppColors.warningOrange,
-                        actionButtons: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryGreen,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                        actionButtons:Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {},
+                                icon: const Icon(
+                                  Icons.phone,
+                                  size: 16,
+                                  color: AppColors.primaryGreen,
+                                ),
+                                label: const Text(
+                                  'Gọi khách',
+                                  style: TextStyle(
+                                    color: AppColors.primaryGreen,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
                               ),
                             ),
-                            icon: const Icon(
-                              Icons.check_circle_outline,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'Xác nhận đã sửa xong',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pushNamed(context, AppRoutes.maintenanceDetail);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryGreen,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Tiếp nhận',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),

@@ -24,7 +24,7 @@ class _ContractLiquidationScreenState
           onPressed: () => Navigator.maybePop(context),
         ),
         title: const Text(
-          'Invoice Create',
+          'Thanh lý',
           style: TextStyle(
             color: AppColors.cardSurface,
             fontWeight: FontWeight.bold,

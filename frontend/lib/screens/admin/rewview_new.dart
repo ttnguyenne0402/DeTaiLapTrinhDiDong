@@ -66,12 +66,22 @@ class duyettin extends State<review>{
           actions: [
             IconButton(
               onPressed: () {},
-              icon: const Icon(Icons.menu, color: Colors.white, size: 24),
+              icon: const Icon(
+                Icons.notifications,
+                color: Colors.white,
+              ),
             ),
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.notifications, color: Colors.white, size: 24),
+            const SizedBox(width: 16),
+            const CircleAvatar(
+              backgroundColor: Colors.white24,
+              radius: 16,
+              child: Icon(
+                Icons.person,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
+            const SizedBox(width: 16),
           ],
 
 

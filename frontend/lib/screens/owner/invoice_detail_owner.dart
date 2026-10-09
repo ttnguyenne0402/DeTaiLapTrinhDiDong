@@ -17,7 +17,7 @@ class InvoiceDetailScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Tao Hoa Don',
+          'Xem chi tiết hóa đơn',
           style: TextStyle(
             color: AppColors.cardSurface,
             fontSize: 18,
@@ -700,6 +700,8 @@ class InvoiceDetailScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
+
+          const SizedBox(height: 10,)
         ],
       ),
     );
