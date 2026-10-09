@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'room_detail_screen.dart';
+import 'home_screen.dart';
+import 'booking_screen.dart';
+import 'my_invoices_screen.dart';
+import 'my_contracts_screen.dart';
+import 'profile_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -25,12 +30,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   // =========================
   String _selectedSort = 'Mới lưu';
 
-  final List<String> _sorts = [
-    'Mới lưu',
-    'Giá thấp',
-    'Giá cao',
-    'Diện tích',
-  ];
+  final List<String> _sorts = ['Mới lưu', 'Giá thấp', 'Giá cao', 'Diện tích'];
 
   // =========================
   // DỮ LIỆU PHÒNG YÊU THÍCH
@@ -48,12 +48,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       'isNew': true,
       'nearSchool': true,
       'goodPrice': true,
-      'amenities': [
-        'Máy lạnh',
-        'Wifi',
-        'Tủ lạnh',
-        'WC riêng',
-      ],
+      'amenities': ['Máy lạnh', 'Wifi', 'Tủ lạnh', 'WC riêng'],
       'image':
           'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
     },
@@ -69,12 +64,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       'isNew': true,
       'nearSchool': false,
       'goodPrice': true,
-      'amenities': [
-        'Wifi',
-        'Camera',
-        'WC riêng',
-        'Chỗ để xe',
-      ],
+      'amenities': ['Wifi', 'Camera', 'WC riêng', 'Chỗ để xe'],
       'image':
           'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
     },
@@ -90,12 +80,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       'isNew': false,
       'nearSchool': true,
       'goodPrice': false,
-      'amenities': [
-        'Máy lạnh',
-        'Wifi',
-        'Máy giặt',
-        'Camera',
-      ],
+      'amenities': ['Máy lạnh', 'Wifi', 'Máy giặt', 'Camera'],
       'image':
           'https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=1200&q=80',
     },
@@ -180,9 +165,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 
         return amenities.any(
           (item) =>
-              item == 'Máy lạnh' ||
-              item == 'Tủ lạnh' ||
-              item == 'Máy giặt',
+              item == 'Máy lạnh' || item == 'Tủ lạnh' || item == 'Máy giặt',
         );
       }).toList();
     }
@@ -192,27 +175,15 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     // ----------------------------------------------------------
 
     if (_selectedSort == 'Giá thấp') {
-      result.sort(
-        (a, b) => (a['price'] as int).compareTo(
-          b['price'] as int,
-        ),
-      );
+      result.sort((a, b) => (a['price'] as int).compareTo(b['price'] as int));
     }
 
     if (_selectedSort == 'Giá cao') {
-      result.sort(
-        (a, b) => (b['price'] as int).compareTo(
-          a['price'] as int,
-        ),
-      );
+      result.sort((a, b) => (b['price'] as int).compareTo(a['price'] as int));
     }
 
     if (_selectedSort == 'Diện tích') {
-      result.sort(
-        (a, b) => (b['area'] as int).compareTo(
-          a['area'] as int,
-        ),
-      );
+      result.sort((a, b) => (b['area'] as int).compareTo(a['area'] as int));
     }
 
     return result;
@@ -247,14 +218,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         content: const Text(
           'Đã bỏ phòng khỏi danh sách yêu thích',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -267,9 +234,119 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   void _openRoom(Map<String, dynamic> room) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => RoomDetailScreen(
-          room: room,
+      MaterialPageRoute(builder: (_) => RoomDetailScreen(room: room)),
+    );
+  }
+
+  // ============================================================
+  // ĐIỀU HƯỚNG
+  // ============================================================
+
+  void _openScreen(Widget screen) {
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
+  void _goBack() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+      );
+    }
+  }
+
+  Widget _buildBottomNavItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool selected = false,
+  }) {
+    final color = selected ? AppColors.primaryGreen : AppColors.textSecondary;
+
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox.expand(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 22, color: color),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.5,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 68,
+        child: BottomAppBar(
+          color: const Color(0xFFF4EEF5),
+          elevation: 12,
+          padding: EdgeInsets.zero,
+          child: Row(
+            children: [
+              // Trang chủ
+              _buildBottomNavItem(
+                icon: Icons.home_rounded,
+                label: 'Trang chủ',
+                onTap: _goBack,
+              ),
+
+              // Hóa đơn
+              _buildBottomNavItem(
+                icon: Icons.receipt_long_rounded,
+                label: 'Hóa đơn',
+                onTap: () => _openScreen(const MyInvoicesScreen()),
+              ),
+
+              // Đặt lịch
+              _buildBottomNavItem(
+                icon: Icons.event_note_rounded,
+                label: 'Đặt lịch',
+                onTap: () => _openScreen(const booking_screen()),
+              ),
+
+              // Hợp đồng
+              _buildBottomNavItem(
+                icon: Icons.description_outlined,
+                label: 'Hợp đồng',
+                onTap: () => _openScreen(const MyContractsScreen()),
+              ),
+
+              // Yêu thích
+              _buildBottomNavItem(
+                icon: Icons.favorite_border_rounded,
+                label: 'Yêu thích',
+                selected: true,
+                onTap: () {},
+              ),
+
+              // Cá nhân
+              _buildBottomNavItem(
+                icon: Icons.person_outline_rounded,
+                label: 'Cá nhân',
+                onTap: () => _openScreen(const ProfileScreen()),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -285,13 +362,15 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
+
+      bottomNavigationBar: _buildBottomNavigationBar(),
+
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
           // ======================================================
           // HEADER
           // ======================================================
-
           SliverAppBar(
             expandedHeight: 245,
             pinned: true,
@@ -299,32 +378,31 @@ class _FavoritesScreenState extends State<FavoritesScreen>
             backgroundColor: AppColors.primaryGreen,
             foregroundColor: Colors.white,
             automaticallyImplyLeading: false,
-            flexibleSpace: FlexibleSpaceBar(
-              background: _FavoriteHeader(
-                total: _favorites.length,
+
+            leading: IconButton(
+              onPressed: _goBack,
+              tooltip: 'Quay lại',
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 21,
               ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: _FavoriteHeader(total: _favorites.length),
             ),
             title: const Text(
               'Yêu thích',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
           ),
 
           // ======================================================
           // SUMMARY
           // ======================================================
-
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                22,
-                20,
-                0,
-              ),
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
               child: _buildSummary(),
             ),
           ),
@@ -332,15 +410,9 @@ class _FavoritesScreenState extends State<FavoritesScreen>
           // ======================================================
           // SỐ LƯỢNG + NÚT LỌC + SẮP XẾP
           // ======================================================
-
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                22,
-                20,
-                16,
-              ),
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
               child: Row(
                 children: [
                   Text(
@@ -371,65 +443,46 @@ class _FavoritesScreenState extends State<FavoritesScreen>
           // ======================================================
           // DANH SÁCH PHÒNG
           // ======================================================
-
           if (rooms.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _buildEmptyState(),
-            )
+            SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                0,
-                20,
-                30,
-              ),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final room = rooms[index];
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final room = rooms[index];
 
-                    final animation = CurvedAnimation(
-                      parent: _animationController,
-                      curve: Interval(
-                        (index * 0.12).clamp(0.0, 0.7),
-                        0.75 + (index * 0.08).clamp(0.0, 0.2),
-                        curve: Curves.easeOutCubic,
-                      ),
-                    );
+                  final animation = CurvedAnimation(
+                    parent: _animationController,
+                    curve: Interval(
+                      (index * 0.12).clamp(0.0, 0.7),
+                      0.75 + (index * 0.08).clamp(0.0, 0.2),
+                      curve: Curves.easeOutCubic,
+                    ),
+                  );
 
-                    return AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: animation.value,
-                          child: Transform.translate(
-                            offset: Offset(
-                              0,
-                              25 * (1 - animation.value),
-                            ),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: 18,
+                  return AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: animation.value,
+                        child: Transform.translate(
+                          offset: Offset(0, 25 * (1 - animation.value)),
+                          child: child,
                         ),
-                        child: _FavoriteRoomCard(
-                          room: room,
-                          priceText: _formatPrice(
-                            room['price'],
-                          ),
-                          onTap: () => _openRoom(room),
-                          onRemove: () => _removeFavorite(room),
-                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 18),
+                      child: _FavoriteRoomCard(
+                        room: room,
+                        priceText: _formatPrice(room['price']),
+                        onTap: () => _openRoom(room),
+                        onRemove: () => _removeFavorite(room),
                       ),
-                    );
-                  },
-                  childCount: rooms.length,
-                ),
+                    ),
+                  );
+                }, childCount: rooms.length),
               ),
             ),
         ],
@@ -443,16 +496,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 
   Widget _buildSummary() {
     final goodPriceCount = _favorites
-        .where(
-          (room) => room['goodPrice'] == true,
-        )
+        .where((room) => room['goodPrice'] == true)
         .length;
 
-    final newCount = _favorites
-        .where(
-          (room) => room['isNew'] == true,
-        )
-        .length;
+    final newCount = _favorites.where((room) => room['isNew'] == true).length;
 
     return Row(
       children: [
@@ -490,9 +537,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 35,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 35),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -539,9 +584,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                 });
               },
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(
-                  color: AppColors.primaryGreen,
-                ),
+                side: const BorderSide(color: AppColors.primaryGreen),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -577,26 +620,18 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       backgroundColor: Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  22,
-                  14,
-                  22,
-                  24,
-                ),
+                padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Thanh kéo
                       Center(
@@ -605,8 +640,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                           height: 5,
                           decoration: BoxDecoration(
                             color: Colors.grey.shade300,
-                            borderRadius:
-                                BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                       ),
@@ -637,7 +671,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       // ------------------------------------------------
                       // GIÁ
                       // ------------------------------------------------
-
                       const Text(
                         'Khoảng giá',
                         style: TextStyle(
@@ -652,8 +685,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       _FilterOption(
                         icon: Icons.apps_rounded,
                         title: 'Tất cả mức giá',
-                        selected:
-                            tempPriceFilter == 'Tất cả',
+                        selected: tempPriceFilter == 'Tất cả',
                         onTap: () {
                           setModalState(() {
                             tempPriceFilter = 'Tất cả';
@@ -664,13 +696,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       _FilterOption(
                         icon: Icons.savings_rounded,
                         title: 'Dưới 3 triệu',
-                        selected:
-                            tempPriceFilter ==
-                                'Dưới 3 triệu',
+                        selected: tempPriceFilter == 'Dưới 3 triệu',
                         onTap: () {
                           setModalState(() {
-                            tempPriceFilter =
-                                'Dưới 3 triệu';
+                            tempPriceFilter = 'Dưới 3 triệu';
                           });
                         },
                       ),
@@ -678,43 +707,32 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       _FilterOption(
                         icon: Icons.price_change_rounded,
                         title: '3 - 4 triệu',
-                        selected:
-                            tempPriceFilter ==
-                                '3 - 4 triệu',
+                        selected: tempPriceFilter == '3 - 4 triệu',
                         onTap: () {
                           setModalState(() {
-                            tempPriceFilter =
-                                '3 - 4 triệu';
+                            tempPriceFilter = '3 - 4 triệu';
                           });
                         },
                       ),
 
                       _FilterOption(
-                        icon:
-                            Icons.account_balance_wallet_rounded,
+                        icon: Icons.account_balance_wallet_rounded,
                         title: '4 - 5 triệu',
-                        selected:
-                            tempPriceFilter ==
-                                '4 - 5 triệu',
+                        selected: tempPriceFilter == '4 - 5 triệu',
                         onTap: () {
                           setModalState(() {
-                            tempPriceFilter =
-                                '4 - 5 triệu';
+                            tempPriceFilter = '4 - 5 triệu';
                           });
                         },
                       ),
 
                       _FilterOption(
-                        icon:
-                            Icons.currency_exchange_rounded,
+                        icon: Icons.currency_exchange_rounded,
                         title: 'Trên 5 triệu',
-                        selected:
-                            tempPriceFilter ==
-                                'Trên 5 triệu',
+                        selected: tempPriceFilter == 'Trên 5 triệu',
                         onTap: () {
                           setModalState(() {
-                            tempPriceFilter =
-                                'Trên 5 triệu';
+                            tempPriceFilter = 'Trên 5 triệu';
                           });
                         },
                       ),
@@ -724,7 +742,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       // ------------------------------------------------
                       // ĐẶC ĐIỂM
                       // ------------------------------------------------
-
                       const Text(
                         'Tiện ích & vị trí',
                         style: TextStyle(
@@ -739,9 +756,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       _FilterOption(
                         icon: Icons.apps_rounded,
                         title: 'Không giới hạn',
-                        selected:
-                            tempFeatureFilter ==
-                                'Tất cả',
+                        selected: tempFeatureFilter == 'Tất cả',
                         onTap: () {
                           setModalState(() {
                             tempFeatureFilter = 'Tất cả';
@@ -752,13 +767,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       _FilterOption(
                         icon: Icons.local_offer_rounded,
                         title: 'Giá tốt',
-                        selected:
-                            tempFeatureFilter ==
-                                'Giá tốt',
+                        selected: tempFeatureFilter == 'Giá tốt',
                         onTap: () {
                           setModalState(() {
-                            tempFeatureFilter =
-                                'Giá tốt';
+                            tempFeatureFilter = 'Giá tốt';
                           });
                         },
                       ),
@@ -766,13 +778,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       _FilterOption(
                         icon: Icons.school_rounded,
                         title: 'Gần trường',
-                        selected:
-                            tempFeatureFilter ==
-                                'Gần trường',
+                        selected: tempFeatureFilter == 'Gần trường',
                         onTap: () {
                           setModalState(() {
-                            tempFeatureFilter =
-                                'Gần trường';
+                            tempFeatureFilter = 'Gần trường';
                           });
                         },
                       ),
@@ -780,13 +789,10 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       _FilterOption(
                         icon: Icons.weekend_rounded,
                         title: 'Có nội thất',
-                        selected:
-                            tempFeatureFilter ==
-                                'Có nội thất',
+                        selected: tempFeatureFilter == 'Có nội thất',
                         onTap: () {
                           setModalState(() {
-                            tempFeatureFilter =
-                                'Có nội thất';
+                            tempFeatureFilter = 'Có nội thất';
                           });
                         },
                       ),
@@ -796,45 +802,30 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       // ------------------------------------------------
                       // BUTTON
                       // ------------------------------------------------
-
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
                                 setModalState(() {
-                                  tempPriceFilter =
-                                      'Tất cả';
-                                  tempFeatureFilter =
-                                      'Tất cả';
+                                  tempPriceFilter = 'Tất cả';
+                                  tempFeatureFilter = 'Tất cả';
                                 });
                               },
-                              style:
-                                  OutlinedButton.styleFrom(
-                                minimumSize:
-                                    const Size(
-                                  double.infinity,
-                                  52,
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 52),
+                                side: const BorderSide(
+                                  color: AppColors.primaryGreen,
                                 ),
-                                side:
-                                    const BorderSide(
-                                  color: AppColors
-                                      .primaryGreen,
-                                ),
-                                shape:
-                                    RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                               child: const Text(
                                 'Đặt lại',
                                 style: TextStyle(
-                                  color: AppColors
-                                      .primaryGreen,
-                                  fontWeight:
-                                      FontWeight.w800,
+                                  color: AppColors.primaryGreen,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ),
@@ -845,40 +836,24 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                             child: ElevatedButton(
                               onPressed: () {
                                 setState(() {
-                                  _selectedPriceFilter =
-                                      tempPriceFilter;
-                                  _selectedFeatureFilter =
-                                      tempFeatureFilter;
+                                  _selectedPriceFilter = tempPriceFilter;
+                                  _selectedFeatureFilter = tempFeatureFilter;
                                 });
 
                                 Navigator.pop(context);
                               },
-                              style:
-                                  ElevatedButton.styleFrom(
-                                minimumSize:
-                                    const Size(
-                                  double.infinity,
-                                  52,
-                                ),
-                                backgroundColor:
-                                    AppColors
-                                        .primaryGreen,
-                                foregroundColor:
-                                    Colors.white,
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 52),
+                                backgroundColor: AppColors.primaryGreen,
+                                foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape:
-                                    RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                               child: const Text(
                                 'Áp dụng',
-                                style: TextStyle(
-                                  fontWeight:
-                                      FontWeight.w800,
-                                ),
+                                style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                             ),
                           ),
@@ -906,25 +881,17 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  22,
-                  14,
-                  22,
-                  24,
-                ),
+                padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Center(
                       child: Container(
@@ -932,8 +899,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                         height: 5,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade300,
-                          borderRadius:
-                              BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                     ),
@@ -1018,24 +984,17 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(
-                            double.infinity,
-                            52,
-                          ),
-                          backgroundColor:
-                              AppColors.primaryGreen,
+                          minimumSize: const Size(double.infinity, 52),
+                          backgroundColor: AppColors.primaryGreen,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                         child: const Text(
                           'Áp dụng',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: TextStyle(fontWeight: FontWeight.w800),
                         ),
                       ),
                     ),
@@ -1074,23 +1033,14 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(13),
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 13,
-            vertical: 9,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(13),
-            border: Border.all(
-              color: AppColors.lightGreen,
-            ),
+            border: Border.all(color: AppColors.lightGreen),
           ),
           child: Row(
             children: [
-              Icon(
-                icon,
-                size: 17,
-                color: AppColors.primaryGreen,
-              ),
+              Icon(icon, size: 17, color: AppColors.primaryGreen),
               const SizedBox(width: 5),
               Text(
                 label,
@@ -1132,19 +1082,12 @@ class _FilterOption extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 7),
-        padding: const EdgeInsets.symmetric(
-          horizontal: 13,
-          vertical: 10,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.lightGreen
-              : AppColors.background,
+          color: selected ? AppColors.lightGreen : AppColors.background,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected
-                ? AppColors.primaryGreen
-                : Colors.transparent,
+            color: selected ? AppColors.primaryGreen : Colors.transparent,
           ),
         ),
         child: Row(
@@ -1153,17 +1096,13 @@ class _FilterOption extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.primaryGreen
-                    : Colors.white,
+                color: selected ? AppColors.primaryGreen : Colors.white,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
                 size: 18,
-                color: selected
-                    ? Colors.white
-                    : AppColors.textSecondary,
+                color: selected ? Colors.white : AppColors.textSecondary,
               ),
             ),
             const SizedBox(width: 11),
@@ -1172,9 +1111,7 @@ class _FilterOption extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: selected
-                      ? FontWeight.w800
-                      : FontWeight.w600,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
               ),
@@ -1183,9 +1120,7 @@ class _FilterOption extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_off_rounded,
-              color: selected
-                  ? AppColors.primaryGreen
-                  : Colors.grey.shade400,
+              color: selected ? AppColors.primaryGreen : Colors.grey.shade400,
               size: 21,
             ),
           ],
@@ -1202,9 +1137,7 @@ class _FilterOption extends StatelessWidget {
 class _FavoriteHeader extends StatelessWidget {
   final int total;
 
-  const _FavoriteHeader({
-    required this.total,
-  });
+  const _FavoriteHeader({required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -1239,15 +1172,13 @@ class _FavoriteHeader extends StatelessWidget {
           left: 24,
           right: 24,
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.12),
-                  borderRadius:
-                      BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Icon(
                   Icons.favorite_rounded,
@@ -1322,14 +1253,9 @@ class _SummaryBox extends StatelessWidget {
         ],
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 21,
-            color: AppColors.primaryGreen,
-          ),
+          Icon(icon, size: 21, color: AppColors.primaryGreen),
           const Spacer(),
           Text(
             value,
@@ -1371,19 +1297,16 @@ class _FavoriteRoomCard extends StatefulWidget {
   });
 
   @override
-  State<_FavoriteRoomCard> createState() =>
-      _FavoriteRoomCardState();
+  State<_FavoriteRoomCard> createState() => _FavoriteRoomCardState();
 }
 
-class _FavoriteRoomCardState
-    extends State<_FavoriteRoomCard> {
+class _FavoriteRoomCardState extends State<_FavoriteRoomCard> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final room = widget.room;
-    final amenities =
-        List<String>.from(room['amenities']);
+    final amenities = List<String>.from(room['amenities']);
 
     return MouseRegion(
       onEnter: (_) {
@@ -1398,24 +1321,15 @@ class _FavoriteRoomCardState
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        transform: Matrix4.translationValues(
-          0,
-          _hovered ? -4 : 0,
-          0,
-        ),
+        transform: Matrix4.translationValues(0, _hovered ? -4 : 0, 0),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(
-                _hovered ? 0.10 : 0.045,
-              ),
+              color: Colors.black.withOpacity(_hovered ? 0.10 : 0.045),
               blurRadius: _hovered ? 25 : 17,
-              offset: Offset(
-                0,
-                _hovered ? 10 : 7,
-              ),
+              offset: Offset(0, _hovered ? 10 : 7),
             ),
           ],
         ),
@@ -1425,50 +1339,36 @@ class _FavoriteRoomCardState
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildImage(room),
                 const SizedBox(width: 13),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(
-                      top: 3,
-                      right: 2,
-                    ),
+                    padding: const EdgeInsets.only(top: 3, right: 2),
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             if (room['isNew'] == true)
                               Container(
-                                padding:
-                                    const EdgeInsets
-                                        .symmetric(
+                                padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 4,
                                 ),
-                                decoration:
-                                    BoxDecoration(
-                                  color: AppColors
-                                      .accentYellow
-                                      .withOpacity(
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentYellow.withOpacity(
                                     0.16,
                                   ),
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(8),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Text(
                                   'MỚI',
                                   style: TextStyle(
-                                    color:
-                                        Color(0xFF996F00),
+                                    color: Color(0xFF996F00),
                                     fontSize: 9,
-                                    fontWeight:
-                                        FontWeight.w900,
+                                    fontWeight: FontWeight.w900,
                                   ),
                                 ),
                               ),
@@ -1478,17 +1378,13 @@ class _FavoriteRoomCardState
                               child: Container(
                                 width: 34,
                                 height: 34,
-                                decoration:
-                                    BoxDecoration(
-                                  color: Colors.red
-                                      .withOpacity(0.07),
-                                  shape:
-                                      BoxShape.circle,
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.07),
+                                  shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
                                   Icons.favorite_rounded,
-                                  color:
-                                      Colors.redAccent,
+                                  color: Colors.redAccent,
                                   size: 19,
                                 ),
                               ),
@@ -1501,15 +1397,12 @@ class _FavoriteRoomCardState
                         Text(
                           room['title'],
                           maxLines: 2,
-                          overflow:
-                              TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 14,
                             height: 1.25,
-                            fontWeight:
-                                FontWeight.w800,
-                            color:
-                                AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
                           ),
                         ),
 
@@ -1518,14 +1411,11 @@ class _FavoriteRoomCardState
                         Text(
                           room['propertyName'],
                           maxLines: 1,
-                          overflow:
-                              TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 11,
-                            color:
-                                AppColors.textSecondary,
-                            fontWeight:
-                                FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
 
@@ -1536,20 +1426,17 @@ class _FavoriteRoomCardState
                             const Icon(
                               Icons.location_on_rounded,
                               size: 14,
-                              color:
-                                  AppColors.primaryGreen,
+                              color: AppColors.primaryGreen,
                             ),
                             const SizedBox(width: 3),
                             Expanded(
                               child: Text(
                                 '${room['ward']}, ${room['district']}',
                                 maxLines: 1,
-                                overflow:
-                                    TextOverflow.ellipsis,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 11,
-                                  color: AppColors
-                                      .textSecondary,
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ),
@@ -1563,18 +1450,15 @@ class _FavoriteRoomCardState
                             Text(
                               widget.priceText,
                               style: const TextStyle(
-                                color: AppColors
-                                    .primaryGreen,
+                                color: AppColors.primaryGreen,
                                 fontSize: 17,
-                                fontWeight:
-                                    FontWeight.w900,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                             const Text(
                               ' /tháng',
                               style: TextStyle(
-                                color: AppColors
-                                    .textSecondary,
+                                color: AppColors.textSecondary,
                                 fontSize: 10,
                               ),
                             ),
@@ -1586,17 +1470,13 @@ class _FavoriteRoomCardState
                         Row(
                           children: [
                             _InfoTag(
-                              icon: Icons
-                                  .square_foot_rounded,
-                              text:
-                                  '${room['area']} m²',
+                              icon: Icons.square_foot_rounded,
+                              text: '${room['area']} m²',
                             ),
                             const SizedBox(width: 6),
                             _InfoTag(
-                              icon: Icons
-                                  .people_alt_rounded,
-                              text:
-                                  '${room['maxPeople']} người',
+                              icon: Icons.people_alt_rounded,
+                              text: '${room['maxPeople']} người',
                             ),
                           ],
                         ),
@@ -1606,46 +1486,29 @@ class _FavoriteRoomCardState
                         SizedBox(
                           height: 25,
                           child: ListView.separated(
-                            scrollDirection:
-                                Axis.horizontal,
-                            physics:
-                                const NeverScrollableScrollPhysics(),
-                            itemCount:
-                                amenities.length > 2
-                                    ? 2
-                                    : amenities.length,
-                            separatorBuilder:
-                                (_, __) =>
-                                    const SizedBox(
-                              width: 5,
-                            ),
-                            itemBuilder:
-                                (_, index) {
+                            scrollDirection: Axis.horizontal,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: amenities.length > 2
+                                ? 2
+                                : amenities.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 5),
+                            itemBuilder: (_, index) {
                               return Container(
-                                padding:
-                                    const EdgeInsets
-                                        .symmetric(
+                                padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 5,
                                 ),
-                                decoration:
-                                    BoxDecoration(
-                                  color:
-                                      AppColors
-                                          .background,
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.background,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   amenities[index],
-                                  style:
-                                      const TextStyle(
+                                  style: const TextStyle(
                                     fontSize: 9,
-                                    color: AppColors
-                                        .textSecondary,
-                                    fontWeight:
-                                        FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               );
@@ -1664,14 +1527,11 @@ class _FavoriteRoomCardState
     );
   }
 
-  Widget _buildImage(
-    Map<String, dynamic> room,
-  ) {
+  Widget _buildImage(Map<String, dynamic> room) {
     return Stack(
       children: [
         ClipRRect(
-          borderRadius:
-              BorderRadius.circular(19),
+          borderRadius: BorderRadius.circular(19),
           child: Image.network(
             room['image'],
             width: 118,
@@ -1684,8 +1544,7 @@ class _FavoriteRoomCardState
                 color: AppColors.lightGreen,
                 child: const Icon(
                   Icons.home_rounded,
-                  color:
-                      AppColors.primaryGreen,
+                  color: AppColors.primaryGreen,
                   size: 40,
                 ),
               );
@@ -1696,33 +1555,22 @@ class _FavoriteRoomCardState
           left: 8,
           bottom: 8,
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 5,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color:
-                  Colors.black.withOpacity(0.55),
-              borderRadius:
-                  BorderRadius.circular(9),
+              color: Colors.black.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(9),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.favorite_rounded,
-                  color: Colors.white,
-                  size: 12,
-                ),
+                Icon(Icons.favorite_rounded, color: Colors.white, size: 12),
                 SizedBox(width: 4),
                 Text(
                   'Đã lưu',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 9,
-                    fontWeight:
-                        FontWeight.w700,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -1742,32 +1590,20 @@ class _InfoTag extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _InfoTag({
-    required this.icon,
-    required this.text,
-  });
+  const _InfoTag({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 7,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
       decoration: BoxDecoration(
         color: AppColors.lightGreen,
-        borderRadius:
-            BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 11,
-            color: AppColors.primaryGreen,
-          ),
+          Icon(icon, size: 11, color: AppColors.primaryGreen),
           const SizedBox(width: 3),
           Text(
             text,
