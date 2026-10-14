@@ -3,11 +3,13 @@ import 'app_routes.dart';
 
 // Import màn hình từ frontend/lib/screens/
 import '../screens/admin/admin_dashboard.dart';
-// import '../screens/admin/admin_stats.dart';
+import '../screens/admin/StatsScreen.dart';
 import '../screens/admin/users_manage.dart';
 import '../screens/admin/rewview_new.dart';
 import '../screens/admin/content_moderation.dart';
 
+
+import '../screens/owner/owner_dashboard.dart';
 import '../screens/owner/contracts_manage.dart';
 import '../screens/owner/contract_form.dart';
 import '../screens/owner/contract_detail_owner.dart';
@@ -38,14 +40,16 @@ class AppRouter {
     switch (settings.name) {
       case AppRoutes.adminDashboard:
         return MaterialPageRoute(builder: (_) => const AdminDashboard());
-      // case AppRoutes.adminStats:
-      //   return MaterialPageRoute(builder: (_) => const AdminStatsScreen());
+      case AppRoutes.adminStats:
+        return MaterialPageRoute(builder: (_) => const AdminStatsScreen());
       case AppRoutes.usersManage:
         return MaterialPageRoute(builder: (_) => const User());
       case AppRoutes.maintenanceManage:
         return MaterialPageRoute(builder: (_) => const MaintenanceManageScreen());
       case AppRoutes.rewview:
         return MaterialPageRoute(builder: (_)=> const review());
+      case AppRoutes.OwnerDashboard:
+        return MaterialPageRoute(builder: (_)=> const OwnerDashboard() );
 
       case AppRoutes.contractsManage:
         return MaterialPageRoute(builder: (_) => const Contracts_manager());
