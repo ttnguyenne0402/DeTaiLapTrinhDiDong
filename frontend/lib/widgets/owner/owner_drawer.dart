@@ -90,7 +90,7 @@ class OwnerDrawer extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const InvoiceCreateScreen(),
+                          builder: (context) => const PropertiesManageScreen(),
                         ),
                       );
                     }
@@ -244,11 +244,9 @@ class OwnerDrawer extends StatelessWidget {
                         color: Colors.red.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
-                        Icons.logout_rounded,
+                      child:const Icon(Icons.logout_rounded,
                         color: Colors.red,
-                        size: 20,
-                      ),
+                        size: 20,)
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -308,13 +306,17 @@ class OwnerDrawer extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                 ),
-                child: const CircleAvatar(
+                child: CircleAvatar(
                   radius: 28,
                   backgroundColor: Color(0xFF2C7D73),
                   backgroundImage: AssetImage(
                     'frontend/assets/images/avatarDemo.jpg',
                   ),
-                  child: Icon(Icons.person, color: Colors.white, size: 28),
+                  child:InkWell(onTap: (){
+                    Navigator.pushNamed(context, AppRoutes.OwnerDashboard);
+                  },
+
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

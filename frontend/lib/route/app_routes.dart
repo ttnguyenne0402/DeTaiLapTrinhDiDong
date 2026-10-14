@@ -7,6 +7,7 @@ abstract class AppRoutes {
   static const String maintenanceManage = '/maintenance/manage';
 
   //hợp động với hóa đơn
+  static const String OwnerDashboard  = '/owner/dasboard';
   static const String contractsManage = '/owner/contracts';
   static const String contractForm = '/owner/contracts/form';
   static const String invoicesManage = '/owner/invoices';
