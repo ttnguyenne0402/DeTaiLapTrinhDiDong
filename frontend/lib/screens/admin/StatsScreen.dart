@@ -11,49 +11,116 @@ class AdminStatsScreen extends StatefulWidget {
 }
 
 class _AdminStatsScreenState extends State<AdminStatsScreen> {
-  // Bộ lọc thời gian cho trang Thống kê
+  // Bộ lọc thời gian cho Admin
   String _selectedReportType = 'Năm 2026';
   final List<String> _reportTypes = ['Tháng này', 'Quý 4/2026', 'Năm 2026'];
 
-  // Dữ liệu biểu đồ cột: Doanh thu theo Quý/Tháng
-  final List<_RevenueData> _revenueData = [
-    _RevenueData('Q1', 125000000),
-    _RevenueData('Q2', 180000000),
-    _RevenueData('Q3', 240000000),
-    _RevenueData('Q4', 310000000),
+  // Các bộ dữ liệu mẫu tương ứng với từng mốc thời gian
+  final List<_RevenueData> _dataThangNay = [
+    _RevenueData('Tuần 1', 2.1),
+    _RevenueData('Tuần 2', 3.5),
+    _RevenueData('Tuần 3', 4.0),
+    _RevenueData('Tuần 4', 5.2),
   ];
 
-  // Dữ liệu biểu đồ tròn: Tỷ lệ trạng thái phòng trọ
-  final List<_RoomStatusData> _roomStatusData = [
-    _RoomStatusData('Đang cho thuê', 68, Colors.green),
-    _RoomStatusData('Trống (Chờ khách)', 22, Colors.amber),
-    _RoomStatusData('Đang bảo trì', 10, Colors.redAccent),
+  final List<_RevenueData> _dataQuy4 = [
+    _RevenueData('Tháng 10', 8.5),
+    _RevenueData('Tháng 11', 10.2),
+    _RevenueData('Tháng 12', 12.3),
   ];
 
-  // Danh sách top khu trọ có doanh thu cao (Dữ liệu Mock cho Prototype)
-  final List<Map<String, dynamic>> _topProperties = [
+  final List<_RevenueData> _dataNam2026 = [
+    _RevenueData('Q1', 12.5),
+    _RevenueData('Q2', 18.0),
+    _RevenueData('Q3', 24.0),
+    _RevenueData('Q4', 31.0),
+  ];
+
+  // Biến lưu trữ dữ liệu hiện tại của biểu đồ cột
+  late List<_RevenueData> _currentRevenueData;
+
+  // Các chỉ số tổng quan thay đổi theo bộ lọc
+  String _totalCommission = '85.500.000 ₫';
+  String _totalProperties = '42 khu';
+  String _totalUsers = '1.250';
+
+  // Dữ liệu biểu đồ vành khuyên: Tỷ lệ phân bổ tài khoản
+  List<_SystemUserShareData> _userShareData = [
+    _SystemUserShareData('Khách thuê (Tenant)', 75, Colors.blue),
+    _SystemUserShareData('Chủ trọ (Landlord)', 25, AppColors.primaryGreen),
+  ];
+
+  late TooltipBehavior _tooltipBehavior;
+
+  // Danh sách Top khu trọ đóng góp hoa hồng cao
+  final List<Map<String, dynamic>> _topSystemProperties = [
     {
       'name': 'Khu trọ Sinh Viên Tân Phú',
       'owner': 'Nguyễn Văn A',
       'rooms': 24,
-      'revenue': '45.200.000 đ',
+      'commission': '4.520.000 đ',
       'rate': '95%',
     },
     {
       'name': 'Căn hộ dịch vụ Mini Q.10',
       'owner': 'Trần Thị B',
       'rooms': 12,
-      'revenue': '38.500.000 đ',
+      'commission': '3.850.000 đ',
       'rate': '100%',
     },
     {
       'name': 'Nhà nguyên căn Bình Thạnh',
       'owner': 'Lê Văn C',
       'rooms': 8,
-      'revenue': '28.000.000 đ',
+      'commission': '2.800.000 đ',
       'rate': '87%',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentRevenueData = _dataNam2026; // Mặc định ban đầu là Năm 2026
+    _tooltipBehavior = TooltipBehavior(enable: true);
+  }
+
+  // Hàm xử lý đổi dữ liệu khi chọn Dropdown
+  void _updateReportData(String selectedType) {
+    setState(() {
+      _selectedReportType = selectedType;
+      if (selectedType == 'Tháng này') {
+        _currentRevenueData = _dataThangNay;
+        _totalCommission = '14.800.000 ₫';
+        _totalProperties = '42 khu';
+        _totalUsers = '1.250';
+        _userShareData = [
+          _SystemUserShareData('Khách thuê ', 25, Colors.blue),
+          _SystemUserShareData('Chủ trọ', 35, AppColors.primaryGreen),
+        ];
+
+      } else if (selectedType == 'Quý 4/2026') {
+        _currentRevenueData = _dataQuy4;
+        _totalCommission = '31.000.000 ₫';
+        _totalProperties = '42 khu';
+        _totalUsers = '1.250';
+        _userShareData = [
+          _SystemUserShareData('Khách thuê ', 15, Colors.blue),
+          _SystemUserShareData('Chủ trọ', 25, AppColors.primaryGreen),
+        ];
+
+      } else {
+        _currentRevenueData = _dataNam2026;
+        _totalCommission = '85.500.000 ₫';
+        _totalProperties = '42 khu';
+        _totalUsers = '1.250';
+        _userShareData = [
+          _SystemUserShareData('Khách thuê ', 50, Colors.blue),
+          _SystemUserShareData('Chủ trọ', 15, AppColors.primaryGreen),
+        ];
+
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +136,6 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          // Dropdown chọn loại báo cáo
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Container(
@@ -93,15 +159,13 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                       value: type,
                       child: Text(
                         type,
-                        style: const TextStyle(color:Colors.black87),
+                        style: const TextStyle(color: Colors.black87),
                       ),
                     );
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) {
-                      setState(() {
-                        _selectedReportType = val;
-                      });
+                      _updateReportData(val);
                     }
                   },
                 ),
@@ -126,7 +190,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- 1. THẺ TỔNG QUAN TÀI CHÍNH ---
+                // --- 1. THẺ TỔNG QUAN VĨ MÔ CHO ADMIN ---
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -148,7 +212,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'TỔNG DOANH THU HỆ THỐNG (VNĐ)',
+                        'DOANH THU HOA HỒNG NỀN TẢNG (VNĐ)',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 11,
@@ -157,9 +221,9 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        '855.000.000 ₫',
-                        style: TextStyle(
+                      Text(
+                        _totalCommission,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -168,21 +232,21 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                       const SizedBox(height: 14),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          _OverviewIndicator(
-                            title: 'Tỷ lệ lấp đầy',
-                            value: '84.5%',
-                            icon: Icons.pie_chart_outline,
-                          ),
+                        children: [
                           _OverviewIndicator(
                             title: 'Tổng khu trọ',
-                            value: '42 khu',
+                            value: _totalProperties,
                             icon: Icons.apartment,
                           ),
                           _OverviewIndicator(
-                            title: 'Giao dịch',
-                            value: '1.420',
-                            icon: Icons.receipt_long,
+                            title: 'Tổng người dùng',
+                            value: _totalUsers,
+                            icon: Icons.group,
+                          ),
+                          const _OverviewIndicator(
+                            title: 'Yêu cầu hỗ trợ',
+                            value: '5 chờ xử lý',
+                            icon: Icons.support_agent,
                           ),
                         ],
                       ),
@@ -192,7 +256,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
                 const SizedBox(height: 20),
 
-                // --- 2. BIỂU ĐỒ CỘT: DOANH THU THEO KỲ ---
+                // --- 2. BIỂU ĐỒ CỘT: TĂNG TRƯỞNG HOA HỒNG ---
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -207,7 +271,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Biểu đồ tăng trưởng doanh thu',
+                            'Biểu đồ tăng trưởng hoa hồng',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -224,31 +288,33 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                       ),
                       const SizedBox(height: 10),
                       SizedBox(
-                        height: 210,
+                        height: 220,
                         child: SfCartesianChart(
                           margin: EdgeInsets.zero,
                           plotAreaBorderWidth: 0,
                           primaryXAxis: const CategoryAxis(
                             majorGridLines: MajorGridLines(width: 0),
+                            axisLine: AxisLine(width: 0),
                           ),
                           primaryYAxis: const NumericAxis(
                             isVisible: true,
                             axisLine: AxisLine(width: 0),
                             majorTickLines: MajorTickLines(color: Colors.transparent),
                           ),
-                          tooltipBehavior: TooltipBehavior(enable: true),
+                          tooltipBehavior: _tooltipBehavior,
                           series: <CartesianSeries<_RevenueData, String>>[
                             ColumnSeries<_RevenueData, String>(
-                              dataSource: _revenueData,
-                              xValueMapper: (_RevenueData data, _) => data.period,
-                              yValueMapper: (_RevenueData data, _) => data.revenue,
+                              dataSource: _currentRevenueData,
+                              xValueMapper: (_RevenueData data, _) => data.x,
+                              yValueMapper: (_RevenueData data, _) => data.y,
+                              name: 'Hoa hồng (Tr VNĐ)',
                               color: AppColors.primaryGreen,
                               borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(6),
+                                top: Radius.circular(8),
                               ),
                               dataLabelSettings: const DataLabelSettings(
                                 isVisible: true,
-                                textStyle: TextStyle(fontSize: 10),
+                                textStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
@@ -260,7 +326,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
                 const SizedBox(height: 20),
 
-                // --- 3. BIỂU ĐỒ TRÒN: TỶ LỆ TRẠNG THÁI PHÒNG ---
+                // --- 3. BIỂU ĐỒ TRÒN VÀNH KHUYÊN: PHÂN BỔ NGƯỜI DÙNG ---
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -272,7 +338,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Tỷ lệ trạng thái phòng trọ toàn hệ thống',
+                        'Tỷ lệ phân bổ tài khoản người dùng',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -280,19 +346,21 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                       ),
                       const SizedBox(height: 10),
                       SizedBox(
-                        height: 200,
+                        height: 210,
                         child: SfCircularChart(
+                          tooltipBehavior: _tooltipBehavior,
                           legend: const Legend(
                             isVisible: true,
                             position: LegendPosition.bottom,
                             overflowMode: LegendItemOverflowMode.wrap,
                           ),
-                          series: <DoughnutSeries<_RoomStatusData, String>>[
-                            DoughnutSeries<_RoomStatusData, String>(
-                              dataSource: _roomStatusData,
-                              xValueMapper: (_RoomStatusData data, _) => data.status,
-                              yValueMapper: (_RoomStatusData data, _) => data.percentage,
-                              pointColorMapper: (_RoomStatusData data, _) => data.color,
+                          series: <CircularSeries<_SystemUserShareData, String>>[
+                            DoughnutSeries<_SystemUserShareData, String>(
+                              dataSource: _userShareData,
+                              xValueMapper: (_SystemUserShareData data, _) => data.x,
+                              yValueMapper: (_SystemUserShareData data, _) => data.y,
+                              pointColorMapper: (_SystemUserShareData data, _) => data.color,
+                              name: 'Tỷ lệ',
                               dataLabelSettings: const DataLabelSettings(
                                 isVisible: true,
                                 labelPosition: ChartDataLabelPosition.outside,
@@ -308,9 +376,9 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
                 const SizedBox(height: 20),
 
-                // --- 4. BẢNG XẾP HẠNG TOP KHU TRỌ ---
+                // --- 4. BẢNG TOP KHU TRỌ ĐÓNG GÓP HOA HỒNG CAO ---
                 const Text(
-                  'Top Khu trọ hiệu suất cao',
+                  'Top khu trọ đóng góp hoa hồng cao nhất',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -320,9 +388,9 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _topProperties.length,
+                  itemCount: _topSystemProperties.length,
                   itemBuilder: (context, index) {
-                    final item = _topProperties[index];
+                    final item = _topSystemProperties[index];
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(12),
@@ -334,50 +402,59 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor: AppColors.primaryGreen.withOpacity(0.1),
-                                child: Text(
-                                  '#${index + 1}',
-                                  style: TextStyle(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: AppColors.primaryGreen.withOpacity(0.1),
+                                  child: Text(
+                                    '#${index + 1}',
+                                    style: TextStyle(
+                                      color: AppColors.primaryGreen,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item['name'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item['name'],
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Chủ: ${item['owner']} • ${item['rooms']} phòng',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Chủ trọ: ${item['owner']} • ${item['rooms']} phòng',
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                item['revenue'],
+                                item['commission'],
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.primaryGreen,
-                                  fontSize: 14,
+                                  fontSize: 13,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -402,9 +479,9 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
         ),
       ),
 
-      // --- BOTTOM NAVIGATION BAR ĐỒNG BỘ ---
+      // --- BOTTOM NAVIGATION BAR CHO ADMIN ---
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 2, // Tab 2 đang được chọn là Thống kê
+        currentIndex: 2,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppColors.primaryGreen,
         unselectedItemColor: Colors.grey,
@@ -419,7 +496,6 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
               Navigator.pushNamed(context, AppRoutes.rewview);
               break;
             case 2:
-            // Đang ở Thống kê rồi
               break;
             case 3:
               Navigator.pushNamed(context, AppRoutes.usersManage);
@@ -449,22 +525,22 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
   }
 }
 
-// Model cho Biểu đồ cột Doanh thu
+// Model cho Biểu đồ cột
 class _RevenueData {
-  _RevenueData(this.period, this.revenue);
-  final String period;
-  final double revenue;
+  _RevenueData(this.x, this.y);
+  final String x;
+  final double y;
 }
 
-// Model cho Biểu đồ tròn Trạng thái phòng
-class _RoomStatusData {
-  _RoomStatusData(this.status, this.percentage, this.color);
-  final String status;
-  final double percentage;
+// Model cho Biểu đồ tròn vành khuyên
+class _SystemUserShareData {
+  _SystemUserShareData(this.x, this.y, this.color);
+  final String x;
+  final double y;
   final Color color;
 }
 
-// Widget con hiển thị chỉ số nhỏ trong thẻ Tổng quan
+// Widget con hiển thị chỉ số nhỏ trong thẻ Tổng quan vĩ mô
 class _OverviewIndicator extends StatelessWidget {
   final String title;
   final String value;
