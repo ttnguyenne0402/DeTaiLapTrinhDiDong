@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/invoice_form_w.dart';
 
@@ -16,6 +17,12 @@ class _InvoiceFormState extends State<Invoice_form> {
   final TextEditingController _nuocCuController = TextEditingController(text: '85');
   final TextEditingController _nuocMoiController = TextEditingController(text: '91');
 
+  final ImagePicker _picker = ImagePicker();
+
+  // Biến kiểm tra xem đã có ảnh đồng hồ hay chưa
+  String? _dienImagePath;
+  String? _nuocImagePath;
+
   @override
   void dispose() {
     _dienCuController.dispose();
@@ -23,6 +30,100 @@ class _InvoiceFormState extends State<Invoice_form> {
     _nuocCuController.dispose();
     _nuocMoiController.dispose();
     super.dispose();
+  }
+
+  // Hàm chọn/chụp ảnh và cập nhật trạng thái
+  Future<void> _pickImage(String type, ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null && mounted) {
+        setState(() {
+          if (type == 'điện') {
+            _dienImagePath = image.path;
+          } else {
+            _nuocImagePath = image.path;
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã cập nhật ảnh chỉ số $type thành công!'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể mở thiết bị ảnh ($type): $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  // Hộp thoại tùy chọn chụp mới hoặc chọn từ thư viện
+  void _showImagePickerSheet(String type) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Text(
+                  'Cập nhật ảnh đồng hồ $type',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: AppColors.primaryGreen),
+                  title: const Text('Chụp ảnh trực tiếp từ Camera'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(type, ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: AppColors.primaryGreen),
+                  title: const Text('Chọn ảnh từ Thư viện'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(type, ImageSource.gallery);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -263,7 +364,7 @@ class _InvoiceFormState extends State<Invoice_form> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Card Điện
+                    // Card Điện: Có ảnh thì hiện "Đổi ảnh", chưa có thì hiện "Chụp ảnh"
                     InvoiceWidgetHelpers.buildUtilityCard(
                       icon: Icons.electric_bolt,
                       title: 'Điện sinh hoạt',
@@ -273,13 +374,13 @@ class _InvoiceFormState extends State<Invoice_form> {
                       newController: _dienMoiController,
                       unitLabel: 'kWh',
                       consumption: '125 kWh',
-                      actionText: 'Đổi ảnh',
+                      actionText: _dienImagePath != null ? 'Đổi ảnh' : 'Chụp ảnh',
                       actionIcon: Icons.camera_alt_outlined,
-                      onActionPressed: () {},
+                      onActionPressed: () => _showImagePickerSheet('điện'),
                     ),
                     const SizedBox(height: 10),
 
-                    // Card Nước
+                    // Card Nước: Có ảnh thì hiện "Đổi ảnh", chưa có thì hiện "Chụp ảnh"
                     InvoiceWidgetHelpers.buildUtilityCard(
                       icon: Icons.water_drop,
                       title: 'Nước sinh hoạt',
@@ -289,9 +390,9 @@ class _InvoiceFormState extends State<Invoice_form> {
                       newController: _nuocMoiController,
                       unitLabel: 'm³',
                       consumption: '6 m³',
-                      actionText: 'Chụp lại',
+                      actionText: _nuocImagePath != null ? 'Đổi ảnh' : 'Chụp ảnh',
                       actionIcon: Icons.camera_alt_outlined,
-                      onActionPressed: () {},
+                      onActionPressed: () => _showImagePickerSheet('nước'),
                     ),
                     const SizedBox(height: 14),
 
@@ -532,12 +633,10 @@ class _InvoiceFormState extends State<Invoice_form> {
                       ),
                     ),
                   ),
-
                 ],
               ),
             ),
-
-            const SizedBox(height: 10,)
+            const SizedBox(height: 10)
           ],
         ),
       ),

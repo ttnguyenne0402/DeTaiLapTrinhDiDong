@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
@@ -19,6 +18,21 @@ class Contract_form extends StatefulWidget {
 
 class HopDongMoi extends State<Contract_form> {
   bool _agreeTerms = false;
+
+  // Controller quản lý dữ liệu nhập từ các ô TextField
+  late final TextEditingController _tenantNameController;
+  late final TextEditingController _tenantPhoneController;
+  late final TextEditingController _cccdController;
+  late final TextEditingController _issueDateController;
+  late final TextEditingController _issuePlaceController;
+
+  late final TextEditingController _startDateController;
+  late final TextEditingController _endDateController;
+  late final TextEditingController _rentPriceController;
+  late final TextEditingController _depositPriceController;
+
+  late final TextEditingController _electricIndexController;
+  late final TextEditingController _waterIndexController;
 
   late final SignatureController _ownerSignatureController;
   late final SignatureController _tenantSignatureController;
@@ -52,6 +66,44 @@ class HopDongMoi extends State<Contract_form> {
   void initState() {
     super.initState();
 
+    final c = widget.contract;
+
+    _tenantNameController = TextEditingController(
+      text: c?['tenantName'] ?? 'Nguyễn Văn An',
+    );
+    _tenantPhoneController = TextEditingController(
+      text: c?['tenantPhone'] ?? '0908123456',
+    );
+    _cccdController = TextEditingController(
+      text: c?['cccd'] ?? '079098001234',
+    );
+    _issueDateController = TextEditingController(
+      text: c?['issueDate'] ?? '12/04/2021',
+    );
+    _issuePlaceController = TextEditingController(
+      text: c?['issuePlace'] ?? 'Cục CSQLHC về trật tự xã hội',
+    );
+
+    _startDateController = TextEditingController(
+      text: c?['startDate'] ?? '01/09/2024',
+    );
+    _endDateController = TextEditingController(
+      text: c?['endDate'] ?? '31/08/2025',
+    );
+    _rentPriceController = TextEditingController(
+      text: (c?['rentPrice'] ?? '4.500.000').replaceAll('đ', '').trim(),
+    );
+    _depositPriceController = TextEditingController(
+      text: (c?['depositPrice'] ?? '9.000.000').replaceAll('đ', '').trim(),
+    );
+
+    _electricIndexController = TextEditingController(
+      text: c?['electricIndex'] ?? '1420',
+    );
+    _waterIndexController = TextEditingController(
+      text: c?['waterIndex'] ?? '85',
+    );
+
     _ownerSignatureController = SignatureController(
       penStrokeWidth: 2.5,
       penColor: Colors.black,
@@ -78,6 +130,18 @@ class HopDongMoi extends State<Contract_form> {
     _tenantSignatureController.removeListener(_refreshSignatureState);
     _ownerSignatureController.dispose();
     _tenantSignatureController.dispose();
+
+    _tenantNameController.dispose();
+    _tenantPhoneController.dispose();
+    _cccdController.dispose();
+    _issueDateController.dispose();
+    _issuePlaceController.dispose();
+    _startDateController.dispose();
+    _endDateController.dispose();
+    _rentPriceController.dispose();
+    _depositPriceController.dispose();
+    _electricIndexController.dispose();
+    _waterIndexController.dispose();
     super.dispose();
   }
 
@@ -85,6 +149,18 @@ class HopDongMoi extends State<Contract_form> {
     return {
       ...?widget.contract,
       'status': status,
+      'tenantName': _tenantNameController.text.trim(),
+      'tenantPhone': _tenantPhoneController.text.trim(),
+      'cccd': _cccdController.text.trim(),
+      'issueDate': _issueDateController.text.trim(),
+      'issuePlace': _issuePlaceController.text.trim(),
+      'startDate': _startDateController.text.trim(),
+      'endDate': _endDateController.text.trim(),
+      'duration': '📅 ${_startDateController.text.trim()} - ${_endDateController.text.trim()}',
+      'rentPrice': '${_rentPriceController.text.trim()}đ',
+      'depositPrice': '${_depositPriceController.text.trim()}đ',
+      'electricIndex': _electricIndexController.text.trim(),
+      'waterIndex': _waterIndexController.text.trim(),
       'termsAccepted': _agreeTerms,
       'ownerSigned': _ownerHasSigned,
       'tenantSigned': _tenantHasSigned,
@@ -479,18 +555,18 @@ class HopDongMoi extends State<Contract_form> {
                               Expanded(
                                 child: ContractFormWidgets.buildTextField(
                                   'Họ và tên',
-                                  widget.contract?['tenantName'] ??
-                                      'Nguyễn Văn An',
+                                  _tenantNameController.text,
                                   false,
+                                  controller: _tenantNameController,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: ContractFormWidgets.buildTextField(
                                   'Số điện thoại',
-                                  widget.contract?['tenantPhone'] ??
-                                      '0908123456',
+                                  _tenantPhoneController.text,
                                   false,
+                                  controller: _tenantPhoneController,
                                 ),
                               ),
                             ],
@@ -501,16 +577,18 @@ class HopDongMoi extends State<Contract_form> {
                               Expanded(
                                 child: ContractFormWidgets.buildTextField(
                                   'Số CCCD / CMND',
-                                  '079098001234',
+                                  _cccdController.text,
                                   false,
+                                  controller: _cccdController,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: ContractFormWidgets.buildTextField(
                                   'Ngày cấp',
-                                  '12/04/2021',
+                                  _issueDateController.text,
                                   false,
+                                  controller: _issueDateController,
                                 ),
                               ),
                             ],
@@ -518,8 +596,9 @@ class HopDongMoi extends State<Contract_form> {
                           const SizedBox(height: 8),
                           ContractFormWidgets.buildTextField(
                             'Nơi cấp',
-                            'Cục CSQLHC về trật tự xã hội',
+                            _issuePlaceController.text,
                             false,
+                            controller: _issuePlaceController,
                           ),
                         ],
                       ),
@@ -635,18 +714,20 @@ class HopDongMoi extends State<Contract_form> {
                         Expanded(
                           child: ContractFormWidgets.buildTextField(
                             'Ngày bắt đầu',
-                            '01/09/2024',
+                            _startDateController.text,
                             true,
                             suffixIcon: Icons.calendar_today,
+                            controller: _startDateController,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: ContractFormWidgets.buildTextField(
                             'Ngày kết thúc',
-                            '31/08/2025',
+                            _endDateController.text,
                             true,
                             suffixIcon: Icons.calendar_today,
+                            controller: _endDateController,
                           ),
                         ),
                       ],
@@ -675,18 +756,20 @@ class HopDongMoi extends State<Contract_form> {
                         Expanded(
                           child: ContractFormWidgets.buildTextField(
                             'Giá thuê hàng tháng',
-                            widget.contract?['rentPrice'] ?? '4.500.000',
+                            _rentPriceController.text,
                             true,
                             suffixText: 'đ',
+                            controller: _rentPriceController,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: ContractFormWidgets.buildTextField(
                             'Tiền đặt cọc (Deposit)',
-                            widget.contract?['depositPrice'] ?? '9.000.000',
+                            _depositPriceController.text,
                             true,
                             suffixText: 'đ',
+                            controller: _depositPriceController,
                           ),
                         ),
                       ],
@@ -742,9 +825,9 @@ class HopDongMoi extends State<Contract_form> {
                       children: [
                         Expanded(
                           child: _buildUtilityBox(
+                            controller: _electricIndexController,
                             icon: Icons.flash_on,
                             title: 'Điện ban đầu',
-                            value: '1420',
                             unit: 'kWh',
                             iconColor: AppColors.accentYellow,
                           ),
@@ -752,9 +835,9 @@ class HopDongMoi extends State<Contract_form> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildUtilityBox(
+                            controller: _waterIndexController,
                             icon: Icons.water_drop,
                             title: 'Nước ban đầu',
-                            value: '85',
                             unit: 'm³',
                             iconColor: Colors.blue,
                           ),
@@ -933,9 +1016,9 @@ class HopDongMoi extends State<Contract_form> {
   }
 
   Widget _buildUtilityBox({
+    required TextEditingController controller,
     required IconData icon,
     required String title,
-    required String value,
     required String unit,
     required Color iconColor,
   }) {
@@ -970,7 +1053,7 @@ class HopDongMoi extends State<Contract_form> {
             children: [
               Expanded(
                 child: TextFormField(
-                  initialValue: value,
+                  controller: controller,
                   keyboardType: TextInputType.number,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
