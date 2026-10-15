@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/contract_card.dart';
 import '../../route/app_routes.dart';
+import 'contract_detail_owner.dart';
 import 'properties_manage.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'contract_form.dart';
@@ -16,6 +17,7 @@ class Contracts_manager extends StatefulWidget {
 
 class HienThiQuanLyHopDong extends State<Contracts_manager> {
   String _selectedRole = "Tất cả";
+  String _searchKeyword = "";
 
   // dữ liệu mẫu
   final List<Map<String, dynamic>> contracts = [
@@ -80,11 +82,18 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
   @override
   Widget build(BuildContext context) {
     final filteredContracts = contracts.where((contract) {
-      if (_selectedRole == "Tất cả") {
-        return true;
-      }
+      final matchesRole = (_selectedRole == "Tất cả") || (contract['status'] == _selectedRole);
+      final code = (contract['code'] ?? '').toString().toLowerCase();
+      final name = (contract['tenantName'] ?? '').toString().toLowerCase();
+      final phone = (contract['tenantPhone'] ?? '').toString().toLowerCase();
 
-      return contract['status'] == _selectedRole;
+      final matchesSearch = _searchKeyword.isEmpty ||
+          code.contains(_searchKeyword) ||
+          name.contains(_searchKeyword) ||
+          phone.contains(_searchKeyword);
+
+      return matchesSearch && matchesRole;
+
     }).toList();
 
     final activeCount = contracts.where(
@@ -128,11 +137,40 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       ),
 
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.pushNamed(
-            context,
-            AppRoutes.contractForm,
+        onPressed: () async{
+          final result = await Navigator.push<Map<String, dynamic>>(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const Contract_form(),
+              ),
           );
+
+          if(result != null && mounted){
+            setState(() {
+              final newContract = {
+                'code': 'HD-${DateTime.now().year}-P${DateTime.now().millisecondsSinceEpoch % 1000}',
+                'room': result['room'] ?? 'Phòng 201 • Tầng 2',
+                'address': result['address'] ?? 'Khu trọ Bình Thạnh • 35 m²',
+                'tenantName': result['tenantName'] ?? 'Chưa xác định',
+                'tenantPhone': result['tenantPhone'] ?? 'Chưa có SĐT',
+                'rentPrice': result['rentPrice'] ?? '4.500.000đ',
+                'depositPrice': result['depositPrice'] ?? '9.000.000đ',
+                'duration': '📅 01/10/2026 - 30/09/2027',
+                'cycleText': 'Kỳ thu: Ngày 05',
+                'noteText': result['status'] == 'Chờ ký'
+                    ? 'Chủ trọ đã gửi ký, chờ khách thuê xác nhận'
+                    : 'Bản nháp lưu tạm',
+                'timeText': result['status'] == 'Chờ ký'
+                    ? 'Chờ ký'
+                    : 'Bản nháp mới tạo',
+                ...result,
+              };
+              contracts.insert(0, newContract);
+            });
+            _showMessage('Đã tạo hợp đồng mới thành công!');
+          }
+
+
         },
         backgroundColor: const Color(0xFFFFA726),
         elevation: 4,
@@ -172,6 +210,11 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
 
               // tìm kiếm
               TextField(
+                onChanged: (value){
+                   setState(() {
+                     _searchKeyword = value.toLowerCase().trim();
+                   });
+                },
                 decoration: InputDecoration(
                   hintText:
                   'Tìm mã HĐ, tên hoặc SĐT khách thuê...',
@@ -327,7 +370,7 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
                   child: Row(
                     children: [
                       "Tất cả",
-                      "Đang hiệu lục",
+                      "Đang hiệu lực",
                       "Sắp hết hạn",
                       "Chờ ký",
                       "Bản nháp",
@@ -510,7 +553,7 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
 
       // xem chi tiết
       onTapDetail: () {
-        Navigator.pushNamed(context,AppRoutes.contractDetailOwner);
+        Navigator.push(context, MaterialPageRoute(builder: (context)=>ContractDetailScreen(contract: contract,)));
       },
 
       // nút chính
@@ -523,16 +566,29 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
 
 
 
-  void _openContract(
-      Map<String, dynamic> contract) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Contract_form(
-          contract: contract,
-        ),
-      ),
-    );
+  Future<void> _openContract(Map<String, dynamic> contract) async {
+    final result = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(
+        builder: (context) => Contract_form(contract: contract,)
+    ));
+
+    if(result != null && mounted){
+      setState(() {
+        final index = contracts.indexWhere((c) => c['code'] == result['code']);
+        if(index != -1){
+          contracts[index] ={
+            ...contracts[index],
+            ...result,
+            if (result['status'] == 'Chờ ký')
+              'timeText': 'Đang chờ các bên ký'
+            else if (result['status'] == 'Đang hiệu lực')
+              'timeText': 'Hợp đồng đã có hiệu lực',
+          };
+        }
+      });
+      _showMessage('Đã cập nhập trạng thái hợp đồng thành công');
+    }
+
+
   }
 
   void _handlePrimaryButton(

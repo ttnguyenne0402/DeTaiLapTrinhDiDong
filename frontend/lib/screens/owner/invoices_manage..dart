@@ -52,7 +52,7 @@ class _InvoiceManaState extends State<Invoice_mana> {
 
   final List<InvoiceData> _invoices = [
     InvoiceData(
-      room: '102',
+      room: 'Phòng 102',
       code: '#HD-T08-P102',
       tenant: 'Lê Văn Cường',
       phone: '',
@@ -62,7 +62,7 @@ class _InvoiceManaState extends State<Invoice_mana> {
       paymentInfo: 'QR Techcombank (02/09 - 14:20)',
     ),
     InvoiceData(
-      room: '201',
+      room: 'Phòng 201',
       code: '#HD-T08-P201',
       tenant: 'Nguyễn Văn An',
       phone: '0908123456',
@@ -71,7 +71,7 @@ class _InvoiceManaState extends State<Invoice_mana> {
       initialStatus: InvoiceStatus.unpaid,
     ),
     InvoiceData(
-      room: '302',
+      room: 'Phòng 302',
       code: '#HD-T08-P302',
       tenant: 'Trần Thị Bích',
       phone: '',
@@ -80,7 +80,7 @@ class _InvoiceManaState extends State<Invoice_mana> {
       initialStatus: InvoiceStatus.overdue,
     ),
     InvoiceData(
-      room: '401',
+      room: 'Phòng 401',
       code: '#HD-T08-P401',
       tenant: 'Phạm Minh Tuấn',
       phone: '0912345678',
@@ -543,7 +543,7 @@ class _InvoiceManaState extends State<Invoice_mana> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Phòng ${invoice.room}',
+                      invoice.room,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,

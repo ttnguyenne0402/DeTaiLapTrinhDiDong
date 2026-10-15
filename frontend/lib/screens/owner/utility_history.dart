@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_colors.dart';
+import 'utility_readings.dart';
 
 class LandlordUtilityScreen extends StatefulWidget {
   const LandlordUtilityScreen({super.key});
@@ -55,7 +56,14 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
 
       // fab ghi chỉ số dành riêng cho chủ trọ
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const InvoiceCreateScreen(),
+            ),
+          );
+        },
         backgroundColor: AppColors.primaryGreen,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         icon: const Icon(Icons.add, color: AppColors.cardSurface),

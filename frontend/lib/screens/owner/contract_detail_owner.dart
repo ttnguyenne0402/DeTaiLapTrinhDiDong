@@ -4,13 +4,17 @@ import '../../route/app_router.dart';
 import '../../route/app_routes.dart';
 
 class ContractDetailScreen extends StatefulWidget {
-  const ContractDetailScreen({super.key});
+  final Map<String,dynamic>? contract;
+
+  const ContractDetailScreen({super.key,required this.contract});
 
   @override
   State<ContractDetailScreen> createState() => _ContractDetailScreenState();
 }
 
 class _ContractDetailScreenState extends State<ContractDetailScreen> {
+  Map<String,dynamic> get _c => widget.contract ?? {};
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,8 +171,8 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'MÃ HỢP ĐỒNG: #HD-2024-P201',
+                child: Text(
+                  'MÃ HỢP ĐỒNG: ${_c['code'] ?? "#HD-2024-P201"}',
                   style: TextStyle(color: AppColors.cardSurface, fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -178,27 +182,27 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                   color: AppColors.lightGreen,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child:  Row(
                   children: [
                     Icon(Icons.circle, size: 6, color: AppColors.primaryGreen),
                     SizedBox(width: 4),
-                    Text('Đang hiệu lực', style: TextStyle(fontSize: 10, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
+                    Text(_c['status'] ?? 'Đang hiệu lực', style: const TextStyle(fontSize: 10, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Phòng 201 – Tầng 2',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.cardSurface),
+          Text(
+            _c['room'] ?? 'Phòng 201 – Tầng 2',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.cardSurface),
           ),
           const SizedBox(height: 4),
-          const Row(
+          Row(
             children: [
               Icon(Icons.domain, size: 14, color: AppColors.lightGreen),
               SizedBox(width: 6),
-              Text('Khu Trọ Bình Thạnh (Nhà A • 12 phòng)', style: TextStyle(color: AppColors.lightGreen, fontSize: 12)),
+              Text(_c['address'] ?? 'Khu Trọ Bình Thạnh (Nhà A • 12 phòng)', style: const TextStyle(color: AppColors.lightGreen, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 16),
@@ -300,11 +304,11 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Nguyễn Văn An', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                        SizedBox(height: 2),
-                        Text('SĐT: 0908 123 456', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                        Text('CCCD: 079098001234', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                      children: [
+                        Text(_c['tenantName'] ?? 'Nguyễn Văn An', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        const SizedBox(height: 2),
+                        Text('SĐT: ${_c['tenantPhone'] ?? "0908 123 456"}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        Text('CCCD: ${_c['cccd'] ?? "079098001234"}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),

@@ -55,13 +55,14 @@ class ContractFormWidgets {
       String initialValue,
       bool isTrue, {
         IconData? suffixIcon,
-        String? suffixText
+        String? suffixText,
+        TextEditingController? controller,
       }) {
     return TextField(
-      controller: TextEditingController(text: initialValue),
+      controller: controller ?? TextEditingController(text: initialValue),
       style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
       decoration: InputDecoration(
-        labelText: label,// là nếu kh rỗng thì nó được đưa lên trên
+        labelText: label,
         fillColor: isTrue ? AppColors.lightGreen : Colors.white,
         filled: true,
         labelStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
