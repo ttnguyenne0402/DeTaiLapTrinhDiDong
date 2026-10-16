@@ -12,6 +12,7 @@ class User extends StatefulWidget {
 
 class _UserState extends State<User> {
   String _selectedRole = "Tất cả";
+  String _searchKeyword = "";
 
   // dữ liệu ảo
   final List<Map<String, dynamic>> _allUsers = [
@@ -41,8 +42,17 @@ class _UserState extends State<User> {
   @override
   Widget build(BuildContext context) {
     final filterUser = _allUsers.where((u){
-      if(_selectedRole == "Tất cả") return true;
-      return u["role"] == _selectedRole;
+      final matchesRole = (_selectedRole == "Tất cả") || (u["role"] == _selectedRole);
+
+      //khớp từ khóa tìm kiếm (Tên hoặc Email)
+      final name = (u['name'] ?? '').toString().toLowerCase();
+      final email = (u['email'] ?? '').toString().toLowerCase();
+
+      final matchesSearch = _searchKeyword.isEmpty ||
+          name.contains(_searchKeyword) ||
+          email.contains(_searchKeyword);
+
+      return matchesRole && matchesSearch;
     }).toList();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -150,6 +160,11 @@ class _UserState extends State<User> {
 
                              // Ô tìm kiếm
                              TextField(
+                               onChanged: (value){
+                                 setState(() {
+                                   _searchKeyword = value.trim().toLowerCase();
+                                 });
+                               },
                                decoration: InputDecoration(
                                  hintText: "Tìm kiếm (Tên, Email, SĐT)",
                                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 15),
@@ -194,6 +209,9 @@ class _UserState extends State<User> {
                  break;
                case 1:
                  Navigator.pushNamed(context, AppRoutes.rewview);
+                 break;
+               case 2:
+                 Navigator.pushNamed(context, AppRoutes.adminStats);
                  break;
                case 3:
                  Navigator.pushNamed(context, AppRoutes.usersManage);

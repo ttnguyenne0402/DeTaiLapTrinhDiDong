@@ -32,7 +32,7 @@ class duyettin extends State<review>{
       'price': '4.200.000',
       'address': 'Cộng Hòa, Q. Tân Bình',
       'owner_name': 'Trần Thị B',
-      'status': 'Đã duyệt',
+      'status': 'Chờ duyệt',
       'image': 'https://picsum.photos/200/200?random=2',
     },
     {
@@ -41,13 +41,16 @@ class duyettin extends State<review>{
       'price': '1.800.000',
       'address': 'Tây Thạnh, Q. Tân Phú',
       'owner_name': 'Lê Văn C',
-      'status': 'Từ chối',
+      'status': 'Chờ duyệt',
       'image': 'https://picsum.photos/200/200?random=3',
     },
   ];
   @override
   Widget build(BuildContext context) {
 
+    final danhSachHienThi = danhSachTinDangMau.where((item) {
+      return item['status'] == _selectedRole;
+    }).toList();
     return Scaffold(
         backgroundColor: AppColors.primaryGreen,
         appBar: AppBar(
@@ -119,7 +122,7 @@ class duyettin extends State<review>{
                                 selected: isSelected,
                                 selectedColor: AppColors.primaryGreen,
                                 backgroundColor: AppColors.background,
-                                showCheckmark: false,
+                                showCheckmark: false,// tách dấu tích
                                 side: BorderSide.none,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -147,7 +150,7 @@ class duyettin extends State<review>{
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 10,),
-                              Expanded(child: tinDang(rev: danhSachTinDangMau))
+                              Expanded(child: tinDang(rev: danhSachHienThi))
 
                             ],
                           ),
@@ -174,6 +177,9 @@ class duyettin extends State<review>{
                 break;
               case 1:
                 Navigator.pushNamed(context, AppRoutes.rewview);
+                break;
+              case 2:
+                Navigator.pushNamed(context, AppRoutes.adminStats);
                 break;
               case 3:
                 Navigator.pushNamed(context, AppRoutes.usersManage);
@@ -386,7 +392,7 @@ class tinDang extends StatelessWidget {
                                   ),
                                 ),
                                 onPressed: () {
-                                  // Xử lý Từ chối tại đây
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chờ hoàn thành việc từ chối'),));
                                 },
                                 child: const Text("Từ chối", style: TextStyle(fontSize: 13)),
                               ),
@@ -404,7 +410,7 @@ class tinDang extends StatelessWidget {
                                   ),
                                 ),
                                 onPressed: () {
-                                  // Xử lý Duyệt thành công tại đây
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chờ hoàn thành việc duyệt'),));
                                 },
                                 child: const Text(
                                   "Duyệt",

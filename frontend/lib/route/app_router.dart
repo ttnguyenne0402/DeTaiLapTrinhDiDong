@@ -57,8 +57,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => Contract_form()); // địa chỉ
       case AppRoutes.invoicesManage:
         return MaterialPageRoute(builder: (_) => const Invoice_mana());
-      case AppRoutes.invoiceForm:
-        return MaterialPageRoute(builder: (_) => Invoice_form()); //địa chỉ
+      // case AppRoutes.invoiceForm:
+      //   return MaterialPageRoute(builder: (_) => Invoice_form()); //địa chỉ
 
       case AppRoutes.utilityReadings:
         return MaterialPageRoute(builder: (_) => const InvoiceCreateScreen());

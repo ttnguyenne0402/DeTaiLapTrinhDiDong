@@ -1,4 +1,4 @@
-
+import 'owner_profile_screen.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/utility_card_w.dart';
@@ -260,10 +260,21 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             ),
             onPressed: () {},
           ),
-          const CircleAvatar(
-            radius: 16,
+          CircleAvatar(
             backgroundColor: Colors.white24,
-            child: Icon(Icons.person, color: Colors.white, size: 20),
+            radius: 16,
+            child: IconButton(
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: const Icon(Icons.person, color: Colors.white,size: 20,),
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => const OwnerProfileScreen(),
+                ),
+                );
+              },
+            ),
           ),
           const SizedBox(width: 8),
         ],

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/invoice_form_w.dart';
+import 'invoices_manage..dart';
 
 class Invoice_form extends StatefulWidget {
-  const Invoice_form({super.key});
+  final InvoiceData? invoice;
+  const Invoice_form({super.key,required this.invoice});
 
   @override
   State<Invoice_form> createState() => _InvoiceFormState();
@@ -252,9 +254,10 @@ class _InvoiceFormState extends State<Invoice_form> {
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(color: Colors.grey.shade200),
                                 ),
-                                child: const Text(
-                                  '#HD-2024-P201',
-                                  style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                                child:Text(
+                                  widget.invoice?.code ?? '#HD-2024-P201',
+                                  style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+
                                 ),
                               ),
                             ],
@@ -271,8 +274,11 @@ class _InvoiceFormState extends State<Invoice_form> {
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: const [
-                                Text('Khu Trọ Xanh • Phòng 201 – Tầng 2', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                              children:[
+                                Text(
+                                  'Khu Trọ Xanh • ${widget.invoice?.room ?? "Phòng 201 – Tầng 2"}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                ),
                                 Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.textSecondary),
                               ],
                             ),
@@ -305,7 +311,10 @@ class _InvoiceFormState extends State<Invoice_form> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text('Nguyễn Văn An', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
+                                          Text(
+                                            widget.invoice?.tenant ?? 'Nguyễn Văn An',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                                          ),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
@@ -317,7 +326,12 @@ class _InvoiceFormState extends State<Invoice_form> {
                                         ],
                                       ),
                                       const SizedBox(height: 2),
-                                      const Text('0912 ••• 889 • HĐ 12 tháng', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                                      Text(
+                                        widget.invoice != null && widget.invoice!.phone.isNotEmpty
+                                            ? '${widget.invoice!.phone} • HĐ 12 tháng'
+                                            : '0912 ••• 889 • HĐ 12 tháng',
+                                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                                      ),
                                       const SizedBox(height: 6),
                                       Row(
                                         children: const [
@@ -596,7 +610,12 @@ class _InvoiceFormState extends State<Invoice_form> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.pop(context, {
+                          'status': InvoiceStatus.draft,
+                          'code': widget.invoice?.code,
+                        });
+                      },
                       style: OutlinedButton.styleFrom(
                         backgroundColor: Colors.grey.shade100,
                         side: BorderSide.none,
@@ -617,7 +636,12 @@ class _InvoiceFormState extends State<Invoice_form> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.pop(context, {
+                          'status': InvoiceStatus.unpaid,
+                          'code': widget.invoice?.code,
+                        });
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accentYellow,
                         padding: const EdgeInsets.symmetric(vertical: 12),

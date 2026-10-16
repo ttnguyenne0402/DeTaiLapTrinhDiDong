@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../widgets/owner/owner_drawer.dart';
+import 'invoice_form.dart';
 
 enum InvoiceStatus {
   draft,
@@ -238,7 +239,33 @@ class _InvoiceManaState extends State<Invoice_mana> {
   }
 
   // nhấn nút chuyển trang
-  void _handleAction(InvoiceData invoice, String action) {
+  void _handleAction(InvoiceData invoice, String action) async {
+    if (action == 'edit') {
+      final result = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Invoice_form(
+            invoice: invoice,
+          ),
+        ),
+      );
+
+
+      if (result != null && mounted) {
+        setState(() {
+          invoice.status = result['status'];
+        });
+
+        if (result['status'] == InvoiceStatus.pendingConfirmation) {
+          _showMessage('Đã phát hành hóa đơn ${invoice.code}. Chờ khách thanh toán & xác nhận!');
+        } else {
+          _showMessage('Đã lưu bản nháp hóa đơn ${invoice.code}.');
+        }
+      }
+      return;
+    }
+
+    // các hành động
     setState(() {
       switch (action) {
         case 'issue':
@@ -291,10 +318,6 @@ class _InvoiceManaState extends State<Invoice_mana> {
 
         case 'partial':
           _showMessage('Mở chức năng ghi nhận khoản thu tiếp theo.');
-          break;
-
-        case 'edit':
-          _showMessage('Mở chức năng chỉnh sửa bản nháp.');
           break;
 
         case 'detail':
@@ -1035,11 +1058,35 @@ class _InvoiceManaState extends State<Invoice_mana> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pushNamed(
+                      onPressed: () async {
+                        final result = await Navigator.push<Map<String, dynamic>>(
                           context,
-                          AppRoutes.invoiceForm,
+                          MaterialPageRoute(
+                            builder: (context) => const Invoice_form(invoice: null),
+                          ),
                         );
+
+                        if (result != null && mounted) {
+                          setState(() {
+                            final newInvoice = InvoiceData(
+                              room: 'Phòng 201',
+                              code: '#HD-T08-P201-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                              tenant: 'Nguyễn Văn An',
+                              phone: '0912345678',
+                              dueDate: DateTime.now().add(const Duration(days: 5)),
+                              total: 5275000,
+                              initialStatus: result['status'] ?? InvoiceStatus.pendingConfirmation,
+                            );
+
+                            _invoices.insert(0, newInvoice);
+                          });
+
+                          if (result['status'] == InvoiceStatus.pendingConfirmation) {
+                            _showMessage('Đã tạo và phát hành hóa đơn mới thành công! Chờ duyệt.');
+                          } else {
+                            _showMessage('Đã lưu bản nháp hóa đơn mới thành công!');
+                          }
+                        }
                       },
                       icon: const Icon(
                         Icons.add_circle_outline,
@@ -1063,6 +1110,8 @@ class _InvoiceManaState extends State<Invoice_mana> {
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 10,)
                 ],
               ),
             ),

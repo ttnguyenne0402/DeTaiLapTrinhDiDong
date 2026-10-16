@@ -585,7 +585,13 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
           };
         }
       });
-      _showMessage('Đã cập nhập trạng thái hợp đồng thành công');
+      if (result['status'] == 'Chờ ký') {
+        _showMessage('Đã gửi liên kết ký hợp đồng tới email khách thuê!');
+      } else if (result['status'] == 'Đang hiệu lực') {
+        _showMessage('Hợp đồng đã được kích hoạt hiệu lực!');
+      } else {
+        _showMessage('Đã lưu bản nháp hợp đồng!');
+      }
     }
 
 

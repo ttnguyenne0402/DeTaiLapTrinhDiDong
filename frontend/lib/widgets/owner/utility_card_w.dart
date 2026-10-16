@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/constants/app_colors.dart';
+
 enum RoomUtilityStatus {
   completed,// đã ghi
   abnormal,// bất thường
@@ -306,7 +308,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
               ),
             ),
           ],
-          if (widget.status == RoomUtilityStatus.abnormal)
+          if (widget.status == RoomUtilityStatus.abnormal) //bất thường
             _buildWarning(),
           const SizedBox(height: 14),
           if (widget.status == RoomUtilityStatus.inputting)
@@ -314,7 +316,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
           else if (widget.status == RoomUtilityStatus.pending)
             _buildPendingSection()
           else
-            _buildRecordedSection(),
+            _buildRecordedSection(), // khi đã hoàn thành
         ],
       ),
     );
@@ -458,7 +460,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Nhập số'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: RoomCardColors.accentGreen,
+              backgroundColor: AppColors.primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
             ),
@@ -500,7 +502,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
             icon: const Icon(Icons.save_outlined),
             label: const Text('Lưu số'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: RoomCardColors.accentGreen,
+              backgroundColor: AppColors.primaryGreen,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
@@ -695,7 +697,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: RoomCardColors.accentGreen,
+                    backgroundColor: AppColors.primaryGreen,
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('Xác nhận'),
