@@ -1,6 +1,9 @@
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_zalo/flutter_zalo.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../tenant/home_screen.dart';
@@ -21,8 +24,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
+
   bool _obscurePassword = true;
   bool _rememberMe = false;
+  bool _isSocialLoading = false;
 
   @override
   void dispose() {
@@ -31,10 +39,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // ============================================================
-  // INPUT
-  // ============================================================
-
   InputDecoration _inputDecoration({
     required String hintText,
     required IconData prefixIcon,
@@ -42,12 +46,22 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-      prefixIcon: Icon(prefixIcon, color: AppColors.textSecondary, size: 21),
+      hintStyle: const TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 13,
+      ),
+      prefixIcon: Icon(
+        prefixIcon,
+        color: AppColors.textSecondary,
+        size: 21,
+      ),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: AppColors.background,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 16,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
@@ -58,7 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: AppColors.primaryGreen, width: 1.5),
+        borderSide: const BorderSide(
+          color: AppColors.primaryGreen,
+          width: 1.5,
+        ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
@@ -66,15 +83,32 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        borderSide: const BorderSide(
+          color: Colors.redAccent,
+          width: 1.5,
+        ),
       ),
     );
   }
 
-  // ============================================================
-  // QUÊN MẬT KHẨU
-  // ============================================================
+  void _showNotice(String message, {bool isError = false}) {
+    if (!mounted) return;
 
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor:
+            isError ? Colors.redAccent : AppColors.primaryGreen,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+
+  // QUÊN MẬT KHẨU
   void _showForgotPasswordDialog() {
     final TextEditingController controller = TextEditingController();
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -88,9 +122,6 @@ class _LoginScreenState extends State<LoginScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-          contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 10),
-          actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
           title: const Row(
             children: [
               Icon(
@@ -135,7 +166,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Vui lòng nhập email hoặc SĐT';
                     }
-
                     return null;
                   },
                 ),
@@ -158,30 +188,18 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (!formKey.currentState!.validate()) {
-                  return;
-                }
+                if (!formKey.currentState!.validate()) return;
 
                 final String target = controller.text.trim();
 
                 Navigator.pop(dialogContext);
                 controller.dispose();
 
-                if (!mounted) {
-                  return;
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Mã khôi phục đã được gửi tới $target'),
-                    backgroundColor: AppColors.primaryGreen,
-                    behavior: SnackBarBehavior.floating,
-                    margin: const EdgeInsets.all(16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
+                _showNotice(
+                  'Chức năng gửi mã khôi phục chưa được kết nối.',
                 );
+
+                debugPrint('Password recovery requested: $target');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGreen,
@@ -200,111 +218,152 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         );
       },
-    );
+    ).then((_) {
+      controller.dispose();
+    });
   }
 
-  // ============================================================
-  // ĐĂNG NHẬP
-  // ============================================================
-
+  // ĐĂNG NHẬP BẰNG TÀI KHOẢN TEST
   void _login() {
     FocusScope.of(context).unfocus();
 
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     final String email = _emailController.text.trim().toLowerCase();
     final String password = _passwordController.text;
-
-    // ==========================================================
-    // TÀI KHOẢN TEST
-    // ==========================================================
 
     const String tenantEmail = 'tenant@gmail.com';
     const String ownerEmail = 'owner@gmail.com';
     const String adminEmail = 'admin@gmail.com';
     const String testPassword = '123456';
 
-    // ==========================================================
-    // TENANT - NGƯỜI THUÊ
-    // ==========================================================
-
     if (email == tenantEmail && password == testPassword) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (BuildContext context) => const HomeScreen(),
+          builder: (_) => const HomeScreen(),
         ),
       );
-
       return;
     }
-
-    // ==========================================================
-    // OWNER - CHỦ TRỌ
-    // ==========================================================
 
     if (email == ownerEmail && password == testPassword) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (BuildContext context) => const OwnerDashboard(),
+          builder: (_) => const OwnerDashboard(),
         ),
       );
-
       return;
     }
-    // ==========================================================
-    // ADMIN - QUẢN TRỊ VIÊN
-    // ==========================================================
 
     if (email == adminEmail && password == testPassword) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (BuildContext context) => const AdminDashboard(),
+          builder: (_) => const AdminDashboard(),
         ),
       );
-
       return;
     }
-    // ==========================================================
-    // SAI TÀI KHOẢN / MẬT KHẨU
-    // ==========================================================
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Email hoặc mật khẩu không chính xác.'),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
+    _showNotice(
+      'Email hoặc mật khẩu không chính xác.',
+      isError: true,
     );
   }
 
-  // ============================================================
-  // ĐI TỚI ĐĂNG KÝ
-  // ============================================================
+  // ĐĂNG NHẬP GOOGLE
+  Future<void> _handleGoogleSignIn() async {
+    if (_isSocialLoading) return;
+
+    setState(() => _isSocialLoading = true);
+
+    try {
+      final GoogleSignInAccount? account =
+          await _googleSignIn.signIn();
+
+      if (!mounted) return;
+
+      if (account == null) {
+        return;
+      }
+
+      debugPrint('Google account: ${account.email}');
+
+      _showNotice(
+        'Đã chọn tài khoản Google. Cần kết nối backend Trọ Ơi để đăng nhập.',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Google Sign-In error: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      _showNotice(
+        'Đăng nhập Google chưa thành công.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSocialLoading = false);
+      }
+    }
+  }
+
+  // ĐĂNG NHẬP ZALO
+  Future<void> _handleZaloSignIn() async {
+    if (_isSocialLoading) return;
+
+    setState(() => _isSocialLoading = true);
+
+    try {
+      final bool? result = await FlutterZalo().logIn();
+
+      if (!mounted) return;
+
+      if (result != true) {
+        _showNotice(
+          'Đăng nhập Zalo chưa thành công hoặc đã bị hủy.',
+          isError: true,
+        );
+        return;
+      }
+
+      final profile = await FlutterZalo().getProfile();
+
+      if (!mounted) return;
+
+      debugPrint('Zalo profile: $profile');
+
+      _showNotice(
+        'Đã xác thực Zalo. Cần kết nối backend Trọ Ơi để hoàn tất đăng nhập.',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Zalo Sign-In error: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      _showNotice(
+        'Không thể đăng nhập Zalo. Hãy kiểm tra cấu hình ứng dụng Zalo.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSocialLoading = false);
+      }
+    }
+  }
 
   void _goToRegister() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (BuildContext context) => const RegisterScreen(),
+        builder: (_) => const RegisterScreen(),
       ),
     );
   }
 
-  // ============================================================
-  // BUILD
-  // ============================================================
-
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
-
     final double heroHeight = size.height * 0.49;
 
     return Scaffold(
@@ -312,9 +371,6 @@ class _LoginScreenState extends State<LoginScreen> {
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
-          // ========================================================
-          // HERO - PHÒNG TRỌ
-          // ========================================================
           SizedBox(
             height: heroHeight,
             width: double.infinity,
@@ -322,7 +378,11 @@ class _LoginScreenState extends State<LoginScreen> {
               painter: const CozyRoomHeroPainter(),
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 28, left: 26, right: 26),
+                  padding: const EdgeInsets.only(
+                    top: 28,
+                    left: 26,
+                    right: 26,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -383,12 +443,10 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
 
-          // ========================================================
-          // LOGIN CARD
-          // ========================================================
           SafeArea(
             child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.only(
                 top: size.height * 0.355,
                 left: 19,
@@ -428,9 +486,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-
                       const SizedBox(height: 7),
-
                       const Text(
                         'Chào mừng bạn quay trở lại!',
                         textAlign: TextAlign.center,
@@ -439,10 +495,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           fontSize: 13,
                         ),
                       ),
-
                       const SizedBox(height: 27),
 
-                      // EMAIL / SĐT
                       const Text(
                         'Email hoặc số điện thoại',
                         style: TextStyle(
@@ -451,9 +505,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
@@ -466,14 +518,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (value == null || value.trim().isEmpty) {
                             return 'Vui lòng nhập Email hoặc SĐT';
                           }
-
                           return null;
                         },
                       ),
 
                       const SizedBox(height: 18),
-
-                      // MẬT KHẨU
                       const Text(
                         'Mật khẩu',
                         style: TextStyle(
@@ -482,9 +531,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
@@ -512,14 +559,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Vui lòng nhập mật khẩu';
                           }
-
                           return null;
                         },
                       ),
 
                       const SizedBox(height: 11),
-
-                      // GHI NHỚ + QUÊN MẬT KHẨU
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -569,8 +613,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
 
                       const SizedBox(height: 22),
-
-                      // BUTTON ĐĂNG NHẬP
                       SizedBox(
                         height: 53,
                         child: ElevatedButton(
@@ -596,8 +638,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
 
                       const SizedBox(height: 24),
-
-                      // HOẶC
                       Row(
                         children: [
                           Expanded(
@@ -629,7 +669,98 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 20),
 
-                      // ĐĂNG KÝ
+                      // GOOGLE + ZALO
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _isSocialLoading
+                                  ? null
+                                  : _handleGoogleSignIn,
+                              icon: const Icon(
+                                Icons.g_mobiledata_rounded,
+                                size: 29,
+                                color: Color(0xFF4285F4),
+                              ),
+                              label: const Text(
+                                'Google',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(0, 49),
+                                side: const BorderSide(
+                                  color: Color(0xFFE1E5E2),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _isSocialLoading
+                                  ? null
+                                  : _handleZaloSignIn,
+                              icon: Container(
+                                width: 23,
+                                height: 23,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0068FF),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Text(
+                                  'Z',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              label: const Text(
+                                'Zalo',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(0, 49),
+                                side: const BorderSide(
+                                  color: Color(0xFFE1E5E2),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      if (_isSocialLoading) ...[
+                        const SizedBox(height: 12),
+                        const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.3,
+                              color: AppColors.primaryGreen,
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -739,10 +870,10 @@ class CozyRoomHeroPainter extends CustomPainter {
       Paint()..color = Colors.white.withOpacity(0.90),
     );
 
-    final Paint cloudPaint = Paint()..color = Colors.white.withOpacity(0.55);
+    final Paint cloudPaint = Paint()
+      ..color = Colors.white.withOpacity(0.55);
 
     _cloud(canvas, Offset(w * 0.18, h * 0.12), 46, cloudPaint);
-
     _cloud(canvas, Offset(w * 0.75, h * 0.08), 60, cloudPaint);
 
     final Paint cloudPaintSmall = Paint()
@@ -780,10 +911,10 @@ class CozyRoomHeroPainter extends CustomPainter {
       seed: 3,
     );
 
-    final Paint treeLinePaint = Paint()..color = leafDark.withOpacity(0.85);
+    final Paint treeLinePaint = Paint()
+      ..color = leafDark.withOpacity(0.85);
 
     final Path treePath = Path()..moveTo(0, h * 0.80);
-
     final math.Random rnd = math.Random(7);
 
     double x = 0;
@@ -812,7 +943,11 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   void _cloud(Canvas canvas, Offset center, double scale, Paint paint) {
     canvas.drawOval(
-      Rect.fromCenter(center: center, width: scale * 1.6, height: scale * 0.6),
+      Rect.fromCenter(
+        center: center,
+        width: scale * 1.6,
+        height: scale * 0.6,
+      ),
       paint,
     );
 
@@ -845,24 +980,25 @@ class CozyRoomHeroPainter extends CustomPainter {
     required int seed,
   }) {
     final math.Random rnd = math.Random(seed);
-
     final Paint buildingPaint = Paint()..color = color;
-
     final Paint litPaint = Paint()..color = windowLit.withOpacity(0.85);
 
     double x = -20;
 
     while (x < w + 20) {
       final double bw = 30 + rnd.nextDouble() * 46;
-
       final double bh = h * heightScale * (0.5 + rnd.nextDouble());
 
-      final Rect rect = Rect.fromLTWH(x, baseY - bh, bw, bh + (h - baseY));
+      final Rect rect = Rect.fromLTWH(
+        x,
+        baseY - bh,
+        bw,
+        bh + (h - baseY),
+      );
 
       canvas.drawRect(rect, buildingPaint);
 
       final int cols = math.max(1, math.min(6, (bw / 12).floor()));
-
       final int rows = math.max(1, math.min(8, (bh / 14).floor()));
 
       for (int r = 0; r < rows; r++) {
@@ -887,8 +1023,12 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   void _paintRightCurtain(Canvas canvas, double w, double h) {
     final double curtainW = w * 0.16;
-
-    final Rect rect = Rect.fromLTWH(w - curtainW, 0, curtainW, h * 0.90);
+    final Rect rect = Rect.fromLTWH(
+      w - curtainW,
+      0,
+      curtainW,
+      h * 0.90,
+    );
 
     final Path path = Path()
       ..moveTo(rect.left + curtainW * 0.15, rect.top)
@@ -931,7 +1071,6 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   void _paintRightWall(Canvas canvas, double w, double h) {
     final Rect rect = Rect.fromLTWH(w * 0.90, 0, w * 0.10, h);
-
     canvas.drawRect(rect, Paint()..color = wall);
 
     _polaroid(
@@ -958,11 +1097,8 @@ class CozyRoomHeroPainter extends CustomPainter {
     );
 
     canvas.save();
-
     canvas.translate(noteRect.center.dx, noteRect.center.dy);
-
     canvas.rotate(-0.03);
-
     canvas.translate(-noteRect.center.dx, -noteRect.center.dy);
 
     canvas.drawRRect(
@@ -1001,7 +1137,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     );
 
     canvas.save();
-
     canvas.translate(center.dx, center.dy);
     canvas.rotate(tilt);
     canvas.translate(-center.dx, -center.dy);
@@ -1015,13 +1150,21 @@ class CozyRoomHeroPainter extends CustomPainter {
       size * 0.80,
     );
 
-    canvas.drawRect(photoRect, Paint()..color = photoColor.withOpacity(0.8));
+    canvas.drawRect(
+      photoRect,
+      Paint()..color = photoColor.withOpacity(0.8),
+    );
 
     canvas.restore();
   }
 
   void _paintBedCorner(Canvas canvas, double w, double h) {
-    final Rect bedRect = Rect.fromLTWH(w * 0.80, h * 0.66, w * 0.20, h * 0.34);
+    final Rect bedRect = Rect.fromLTWH(
+      w * 0.80,
+      h * 0.66,
+      w * 0.20,
+      h * 0.34,
+    );
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(bedRect, const Radius.circular(18)),
@@ -1041,7 +1184,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     );
 
     final Paint checkPaint = Paint()..color = green.withOpacity(0.55);
-
     const double step = 10;
 
     for (double gx = pillowRect.left; gx < pillowRect.right; gx += step * 2) {
@@ -1060,7 +1202,12 @@ class CozyRoomHeroPainter extends CustomPainter {
   }
 
   void _paintShelfAndPlant(Canvas canvas, double w, double h) {
-    final Rect shelfRect = Rect.fromLTWH(-10, h * 0.03, w * 0.22, h * 0.045);
+    final Rect shelfRect = Rect.fromLTWH(
+      -10,
+      h * 0.03,
+      w * 0.22,
+      h * 0.045,
+    );
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(shelfRect, const Radius.circular(3)),
@@ -1099,9 +1246,15 @@ class CozyRoomHeroPainter extends CustomPainter {
       shelfRect.bottom,
     );
 
-    final Offset control = Offset(vineStart.dx - 30, vineStart.dy + h * 0.18);
+    final Offset control = Offset(
+      vineStart.dx - 30,
+      vineStart.dy + h * 0.18,
+    );
 
-    final Offset end = Offset(vineStart.dx + 10, vineStart.dy + h * 0.34);
+    final Offset end = Offset(
+      vineStart.dx + 10,
+      vineStart.dy + h * 0.34,
+    );
 
     final Path vinePath = Path()
       ..moveTo(vineStart.dx, vineStart.dy)
@@ -1110,7 +1263,6 @@ class CozyRoomHeroPainter extends CustomPainter {
     canvas.drawPath(vinePath, vinePaint);
 
     final Paint leafPaint = Paint()..color = leafLight;
-
     final math.Random rnd = math.Random(5);
 
     for (double t = 0.1; t < 0.95; t += 0.12) {
@@ -1128,10 +1280,14 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   Offset _quadPoint(Offset p0, Offset p1, Offset p2, double t) {
     final double x =
-        (1 - t) * (1 - t) * p0.dx + 2 * (1 - t) * t * p1.dx + t * t * p2.dx;
+        (1 - t) * (1 - t) * p0.dx +
+        2 * (1 - t) * t * p1.dx +
+        t * t * p2.dx;
 
     final double y =
-        (1 - t) * (1 - t) * p0.dy + 2 * (1 - t) * t * p1.dy + t * t * p2.dy;
+        (1 - t) * (1 - t) * p0.dy +
+        2 * (1 - t) * t * p1.dy +
+        t * t * p2.dy;
 
     return Offset(x, y);
   }
@@ -1144,12 +1300,15 @@ class CozyRoomHeroPainter extends CustomPainter {
     Paint paint,
   ) {
     canvas.save();
-
     canvas.translate(pos.dx, pos.dy);
     canvas.rotate(rotate);
 
     canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: size, height: size * 0.55),
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: size,
+        height: size * 0.55,
+      ),
       paint,
     );
 
@@ -1157,14 +1316,20 @@ class CozyRoomHeroPainter extends CustomPainter {
   }
 
   void _paintPinboard(Canvas canvas, double w, double h) {
-    final Rect board = Rect.fromLTWH(-16, h * 0.20, w * 0.16, h * 0.34);
+    final Rect board = Rect.fromLTWH(
+      -16,
+      h * 0.20,
+      w * 0.16,
+      h * 0.34,
+    );
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(board, const Radius.circular(6)),
       Paint()..color = cardboard,
     );
 
-    final Paint dotPaint = Paint()..color = woodDark.withOpacity(0.08);
+    final Paint dotPaint = Paint()
+      ..color = woodDark.withOpacity(0.08);
 
     final math.Random rnd = math.Random(11);
 
@@ -1192,7 +1357,10 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     _polaroid(
       canvas,
-      Offset(board.left + board.width * 0.42, board.top + board.height * 0.68),
+      Offset(
+        board.left + board.width * 0.42,
+        board.top + board.height * 0.68,
+      ),
       board.width * 0.55,
       tilt: 0.05,
       photoColor: leafDark,
@@ -1205,13 +1373,25 @@ class CozyRoomHeroPainter extends CustomPainter {
       board.height * 0.20,
     );
 
-    canvas.drawRect(sticky, Paint()..color = const Color(0xFFF7D774));
+    canvas.drawRect(
+      sticky,
+      Paint()..color = const Color(0xFFF7D774),
+    );
 
-    final Paint heartPaint = Paint()..color = Colors.redAccent.withOpacity(0.7);
+    final Paint heartPaint = Paint()
+      ..color = Colors.redAccent.withOpacity(0.7);
 
-    canvas.drawCircle(sticky.center.translate(-3, -2), 3, heartPaint);
+    canvas.drawCircle(
+      sticky.center.translate(-3, -2),
+      3,
+      heartPaint,
+    );
 
-    canvas.drawCircle(sticky.center.translate(3, -2), 3, heartPaint);
+    canvas.drawCircle(
+      sticky.center.translate(3, -2),
+      3,
+      heartPaint,
+    );
 
     final Path heartPath = Path()
       ..moveTo(sticky.center.dx - 6, sticky.center.dy - 1)
@@ -1224,16 +1404,18 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   void _pinnedNote(Canvas canvas, Rect rect, {double tilt = 0}) {
     canvas.save();
-
     canvas.translate(rect.center.dx, rect.center.dy);
-
     canvas.rotate(tilt);
-
     canvas.translate(-rect.center.dx, -rect.center.dy);
 
     final Path shadowPath = Path()..addRect(rect);
 
-    canvas.drawShadow(shadowPath, Colors.black.withOpacity(0.15), 3, true);
+    canvas.drawShadow(
+      shadowPath,
+      Colors.black.withOpacity(0.15),
+      3,
+      true,
+    );
 
     canvas.drawRect(rect, Paint()..color = paperWhite);
 
@@ -1279,14 +1461,23 @@ class CozyRoomHeroPainter extends CustomPainter {
     for (int i = 1; i <= 4; i++) {
       final double gy = deskRect.top + deskRect.height * (i / 5);
 
-      canvas.drawLine(Offset(0, gy), Offset(w, gy), grainPaint);
+      canvas.drawLine(
+        Offset(0, gy),
+        Offset(w, gy),
+        grainPaint,
+      );
     }
 
     final Offset bookBase = Offset(w * 0.02, deskRect.top - 4);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(bookBase.dx, bookBase.dy - 10, w * 0.09, 12),
+        Rect.fromLTWH(
+          bookBase.dx,
+          bookBase.dy - 10,
+          w * 0.09,
+          12,
+        ),
         const Radius.circular(2),
       ),
       Paint()..color = green,
@@ -1294,7 +1485,12 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(bookBase.dx + 4, bookBase.dy - 20, w * 0.08, 11),
+        Rect.fromLTWH(
+          bookBase.dx + 4,
+          bookBase.dy - 20,
+          w * 0.08,
+          11,
+        ),
         const Radius.circular(2),
       ),
       Paint()..color = greenDark,
@@ -1302,7 +1498,12 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(-w * 0.02, deskRect.top - 2, w * 0.14, 8),
+        Rect.fromLTWH(
+          -w * 0.02,
+          deskRect.top - 2,
+          w * 0.14,
+          8,
+        ),
         const Radius.circular(2),
       ),
       Paint()..color = const Color(0xFFB9C2BC),
@@ -1312,7 +1513,11 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: mugCenter, width: 46, height: 40),
+        Rect.fromCenter(
+          center: mugCenter,
+          width: 46,
+          height: 40,
+        ),
         const Radius.circular(8),
       ),
       Paint()..color = cream,
@@ -1337,32 +1542,37 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(mugCenter.dx - 16, mugCenter.dy - 20, 32, 6),
+        Rect.fromLTWH(
+          mugCenter.dx - 16,
+          mugCenter.dy - 20,
+          32,
+          6,
+        ),
         const Radius.circular(3),
       ),
       Paint()..color = woodDark,
     );
 
     final Paint mugLeafPaint = Paint()..color = leafDark;
-
     const List<double> angles = [-0.7, -0.2, 0.25, 0.7];
 
     for (final double angle in angles) {
       canvas.save();
-
       canvas.translate(mugCenter.dx, mugCenter.dy - 20);
-
       canvas.rotate(angle);
 
       canvas.drawOval(
-        Rect.fromCenter(center: const Offset(0, -14), width: 10, height: 22),
+        Rect.fromCenter(
+          center: const Offset(0, -14),
+          width: 10,
+          height: 22,
+        ),
         mugLeafPaint,
       );
 
       canvas.restore();
     }
 
-    // Điện thoại
     final Rect phoneRect = Rect.fromLTWH(
       w * 0.30,
       deskRect.top - 10,
@@ -1383,7 +1593,10 @@ class CozyRoomHeroPainter extends CustomPainter {
       ..shader = RadialGradient(
         center: const Alignment(0, -0.2),
         radius: 1.1,
-        colors: [Colors.white.withOpacity(0.18), Colors.transparent],
+        colors: [
+          Colors.white.withOpacity(0.18),
+          Colors.transparent,
+        ],
       ).createShader(fullRect);
 
     canvas.drawRect(fullRect, glow);
@@ -1394,7 +1607,10 @@ class CozyRoomHeroPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [Colors.black.withOpacity(0.10), Colors.transparent],
+        colors: [
+          Colors.black.withOpacity(0.10),
+          Colors.transparent,
+        ],
       ).createShader(topRect);
 
     canvas.drawRect(topRect, edge);

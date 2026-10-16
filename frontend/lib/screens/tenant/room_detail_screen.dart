@@ -5,6 +5,8 @@ import '../../widgets/tenant/image_slider.dart';
 import 'favorites_screen.dart';
 import 'reviews_screen.dart';
 import 'booking_screen.dart';
+import '../../widgets/tenant/open_street_map_widget.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class RoomDetailScreen extends StatefulWidget {
   final Map<String, dynamic> room;
@@ -35,13 +37,31 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   String get ward => room['ward']?.toString() ?? '';
 
   String get address {
+    final street = (room['street'] ?? '').toString().trim();
+    final rawAddress = (room['address'] ?? room['fullAddress'] ?? '')
+        .toString()
+        .trim();
+
     final parts = <String>[
+      if (street.isNotEmpty) street else if (rawAddress.isNotEmpty) rawAddress,
       if (ward.isNotEmpty) ward,
       if (district.isNotEmpty) district,
       'TP. Hồ Chí Minh',
+      'Việt Nam',
     ];
 
-    return parts.join(', ');
+    // Loại bỏ các phần địa chỉ bị trùng, không phân biệt chữ hoa/thường.
+    final uniqueParts = <String>[];
+    final seen = <String>{};
+
+    for (final part in parts) {
+      final normalized = part.toLowerCase().trim();
+      if (normalized.isNotEmpty && seen.add(normalized)) {
+        uniqueParts.add(part);
+      }
+    }
+
+    return uniqueParts.join(', ');
   }
 
   int get price => (room['price'] as num?)?.toInt() ?? 0;
@@ -305,6 +325,34 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _openGoogleMapsFallback() async {
+    final fullAddress = (room['address'] ?? room['fullAddress'] ?? address)
+        .toString()
+        .trim();
+
+    if (fullAddress.isEmpty) {
+      _showComingSoon('Phòng chưa có thông tin địa chỉ.');
+      return;
+    }
+
+    final destination = '$fullAddress, Việt Nam';
+    final uri = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': destination,
+    });
+
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        _showComingSoon('Không thể mở Google Maps lúc này.');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showComingSoon('Không thể mở Google Maps lúc này.');
+      }
+    }
   }
 
   // ============================================================
@@ -803,22 +851,30 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   }
 
   Widget _buildLocationCard() {
+    final fullSearchAddress = address;
+
+    debugPrint('DỮ LIỆU PHÒNG: $room');
+    debugPrint('ĐỊA CHỈ HIỂN THỊ: $address');
+    debugPrint('ĐỊA CHỈ GỬI BẢN ĐỒ: $fullSearchAddress');
+
     return _HoverCard(
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 230,
-            width: double.infinity,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-              child: _FakeMap(address: address),
+          // 1. Gọi widget bản đồ tách riêng
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: OpenStreetMapWidget(
+              address: address,
+              latitude: double.tryParse(room['latitude']?.toString() ?? ''),
+              longitude: double.tryParse(room['longitude']?.toString() ?? ''),
             ),
           ),
 
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+
+          // 2. Phần hiển thị chữ địa chỉ
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
             child: Row(
@@ -866,58 +922,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
               ],
             ),
           ),
-
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 17),
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () {
-                  _showComingSoon(
-                    'Chức năng mở Google Maps sẽ được bổ sung sau.',
-                  );
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightGreen,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.primaryGreen.withOpacity(0.12),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.map_outlined,
-                        color: AppColors.primaryGreen,
-                        size: 19,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Mở bằng Google Maps',
-                        style: TextStyle(
-                          color: AppColors.primaryGreen,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
-
-  // ============================================================
-  // BOTTOM ACTION
-  // ============================================================
 
   // ============================================================
   // BOTTOM ACTION
@@ -944,9 +952,6 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           ),
           child: Row(
             children: [
-              // =================================================
-              // XEM DANH SÁCH YÊU THÍCH
-              // =================================================
               SizedBox(
                 width: 150,
                 height: 54,
@@ -998,17 +1003,12 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
 
               const SizedBox(width: 12),
 
-              // =================================================
-              // ĐẶT LỊCH XEM PHÒNG
-              // =================================================
               Expanded(
                 child: _PrimaryHoverButton(
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const booking_screen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const booking_screen()),
                     );
                   },
                   child: const Row(
@@ -1041,7 +1041,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
 }
 
 // ============================================================
-// CIRCLE ACTION BUTTON
+// SUPPORTING WIDGETS
 // ============================================================
 
 class _CircleActionButton extends StatefulWidget {
@@ -1066,16 +1066,8 @@ class _CircleActionButtonState extends State<_CircleActionButton> {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) {
-        setState(() {
-          _hovered = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          _hovered = false;
-        });
-      },
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
@@ -1099,10 +1091,6 @@ class _CircleActionButtonState extends State<_CircleActionButton> {
     );
   }
 }
-
-// ============================================================
-// QUICK INFO ITEM
-// ============================================================
 
 class _QuickInfoItem extends StatelessWidget {
   final IconData icon;
@@ -1145,10 +1133,6 @@ class _QuickInfoItem extends StatelessWidget {
     );
   }
 }
-
-// ============================================================
-// INFO ROW
-// ============================================================
 
 class _InfoRow extends StatelessWidget {
   final IconData icon;
@@ -1201,543 +1185,6 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-// ============================================================
-// FAKE MAP
-// ============================================================
-
-class _FakeMap extends StatefulWidget {
-  final String address;
-
-  const _FakeMap({required this.address});
-
-  @override
-  State<_FakeMap> createState() => _FakeMapState();
-}
-
-class _FakeMapState extends State<_FakeMap> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.grab,
-      onEnter: (_) {
-        setState(() {
-          _hovered = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          _hovered = false;
-        });
-      },
-      child: AnimatedScale(
-        scale: _hovered ? 1.015 : 1,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-        child: Stack(
-          children: [
-            Positioned.fill(child: CustomPaint(painter: _FakeMapPainter())),
-
-            const Positioned(
-              left: 24,
-              top: 30,
-              child: _MapStreetLabel(text: 'NGUYỄN VĂN QUÁ', angle: -0.04),
-            ),
-
-            const Positioned(
-              right: 30,
-              top: 78,
-              child: _MapStreetLabel(text: 'QUANG TRUNG', angle: 1.52),
-            ),
-
-            const Positioned(
-              left: 100,
-              bottom: 34,
-              child: _MapStreetLabel(text: 'TÂN SƠN NHÌ', angle: -0.02),
-            ),
-
-            const Positioned(
-              right: 22,
-              bottom: 28,
-              child: _MapStreetLabel(text: 'LÊ VĂN KHƯƠNG', angle: 0.02),
-            ),
-
-            Positioned(
-              left: 22,
-              top: 72,
-              child: _MapBuilding(width: 65, height: 43),
-            ),
-
-            Positioned(
-              right: 34,
-              top: 22,
-              child: _MapBuilding(width: 70, height: 45),
-            ),
-
-            Positioned(
-              left: 36,
-              bottom: 28,
-              child: _MapBuilding(width: 58, height: 42),
-            ),
-
-            Positioned(
-              right: 25,
-              bottom: 62,
-              child: _MapBuilding(width: 75, height: 46),
-            ),
-
-            Positioned(
-              left: 125,
-              top: 26,
-              child: Container(
-                width: 74,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCFE5C7),
-                  borderRadius: BorderRadius.circular(13),
-                  border: Border.all(color: const Color(0xFFB9D5AF)),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.park_rounded,
-                    color: Color(0xFF6B9B63),
-                    size: 25,
-                  ),
-                ),
-              ),
-            ),
-
-            Center(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 850),
-                curve: Curves.elasticOut,
-                builder: (context, value, child) {
-                  return Transform.translate(
-                    offset: Offset(0, -18 * (1 - value)),
-                    child: child,
-                  );
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.16),
-                            blurRadius: 14,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.home_work_rounded,
-                            color: AppColors.primaryGreen,
-                            size: 16,
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Phòng trọ',
-                            style: TextStyle(
-                              color: AppColors.primaryGreen,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryGreen.withOpacity(0.35),
-                            blurRadius: 18,
-                            spreadRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.location_on_rounded,
-                        color: Colors.white,
-                        size: 27,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            Positioned(
-              right: 12,
-              top: 12,
-              child: Column(
-                children: [
-                  _MapControlButton(icon: Icons.add_rounded, onTap: () {}),
-                  const SizedBox(height: 6),
-                  _MapControlButton(icon: Icons.remove_rounded, onTap: () {}),
-                ],
-              ),
-            ),
-
-            Positioned(
-              right: 12,
-              bottom: 12,
-              child: _MapControlButton(
-                icon: Icons.my_location_rounded,
-                onTap: () {},
-              ),
-            ),
-
-            Positioned(
-              left: 12,
-              bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.94),
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Trọ Ơi Map',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// MAP STREET LABEL
-// ============================================================
-
-class _MapStreetLabel extends StatelessWidget {
-  final String text;
-  final double angle;
-
-  const _MapStreetLabel({required this.text, required this.angle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.rotate(
-      angle: angle,
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0xFF718071),
-          fontSize: 8,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// MAP BUILDING
-// ============================================================
-
-class _MapBuilding extends StatelessWidget {
-  final double width;
-  final double height;
-
-  const _MapBuilding({required this.width, required this.height});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE5E1D7),
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: const Color(0xFFD2CDC0)),
-      ),
-      child: Center(
-        child: Wrap(
-          spacing: 5,
-          runSpacing: 4,
-          children: List.generate(
-            6,
-            (index) => Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                color: const Color(0xFFB9B4A7),
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// MAP CONTROL
-// ============================================================
-
-class _MapControlButton extends StatefulWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _MapControlButton({required this.icon, required this.onTap});
-
-  @override
-  State<_MapControlButton> createState() => _MapControlButtonState();
-}
-
-class _MapControlButtonState extends State<_MapControlButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) {
-        setState(() {
-          _hovered = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          _hovered = false;
-        });
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: _hovered
-                ? AppColors.primaryGreen
-                : Colors.white.withOpacity(0.94),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.12),
-                blurRadius: 9,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Icon(
-            widget.icon,
-            size: 19,
-            color: _hovered ? Colors.white : AppColors.textPrimary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// MAP PAINTER
-// ============================================================
-
-class _FakeMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final backgroundPaint = Paint()..color = const Color(0xFFF1F0E8);
-
-    canvas.drawRect(Offset.zero & size, backgroundPaint);
-
-    final greenPaint = Paint()..color = const Color(0xFFDDEBD5);
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(-20, size.height * 0.58, 115, 85),
-        const Radius.circular(22),
-      ),
-      greenPaint,
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width - 105, size.height * 0.30, 130, 95),
-        const Radius.circular(22),
-      ),
-      greenPaint,
-    );
-
-    final smallRoad = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 13
-      ..strokeCap = StrokeCap.round;
-
-    final road1 = Path()
-      ..moveTo(-20, size.height * 0.46)
-      ..cubicTo(
-        size.width * 0.25,
-        size.height * 0.40,
-        size.width * 0.65,
-        size.height * 0.53,
-        size.width + 20,
-        size.height * 0.44,
-      );
-
-    canvas.drawPath(road1, smallRoad);
-
-    final road2 = Path()
-      ..moveTo(size.width * 0.72, -20)
-      ..cubicTo(
-        size.width * 0.67,
-        size.height * 0.25,
-        size.width * 0.47,
-        size.height * 0.62,
-        size.width * 0.35,
-        size.height + 20,
-      );
-
-    canvas.drawPath(road2, smallRoad);
-
-    final mainRoad = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 27
-      ..strokeCap = StrokeCap.round;
-
-    final mainRoadPath = Path()
-      ..moveTo(-20, size.height * 0.78)
-      ..cubicTo(
-        size.width * 0.20,
-        size.height * 0.69,
-        size.width * 0.62,
-        size.height * 0.83,
-        size.width + 20,
-        size.height * 0.68,
-      );
-
-    canvas.drawPath(mainRoadPath, mainRoad);
-
-    final edgePaint = Paint()
-      ..color = const Color(0xFFE0DED4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-
-    canvas.drawPath(road1, edgePaint);
-
-    canvas.drawPath(road2, edgePaint);
-
-    canvas.drawPath(mainRoadPath, edgePaint);
-
-    final centerPaint = Paint()
-      ..color = const Color(0xFFD8D3A8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    _drawDashedPath(canvas, mainRoadPath, centerPaint);
-
-    final thinRoad = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8;
-
-    final paths = [
-      Path()
-        ..moveTo(-10, size.height * 0.17)
-        ..lineTo(size.width + 10, size.height * 0.25),
-      Path()
-        ..moveTo(-10, size.height * 0.61)
-        ..lineTo(size.width + 10, size.height * 0.56),
-      Path()
-        ..moveTo(size.width * 0.15, -10)
-        ..lineTo(size.width * 0.22, size.height + 10),
-      Path()
-        ..moveTo(size.width * 0.88, -10)
-        ..lineTo(size.width * 0.77, size.height + 10),
-    ];
-
-    for (final path in paths) {
-      canvas.drawPath(path, thinRoad);
-    }
-
-    final waterPaint = Paint()..color = const Color(0xFFD6E9EA);
-
-    final waterPath = Path()
-      ..moveTo(size.width * 0.72, size.height)
-      ..cubicTo(
-        size.width * 0.78,
-        size.height * 0.82,
-        size.width * 0.92,
-        size.height * 0.76,
-        size.width,
-        size.height * 0.80,
-      )
-      ..lineTo(size.width, size.height)
-      ..close();
-
-    canvas.drawPath(waterPath, waterPaint);
-  }
-
-  void _drawDashedPath(Canvas canvas, Path path, Paint paint) {
-    final metrics = path.computeMetrics();
-
-    for (final metric in metrics) {
-      double distance = 0;
-
-      while (distance < metric.length) {
-        final next = distance + 9;
-
-        final segment = metric.extractPath(
-          distance,
-          next.clamp(0, metric.length),
-        );
-
-        canvas.drawPath(segment, paint);
-
-        distance += 18;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
-  }
-}
-
-// ============================================================
-// HOVER CARD
-// ============================================================
-
 class _HoverCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -1758,16 +1205,8 @@ class _HoverCardState extends State<_HoverCard> {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.basic,
-      onEnter: (_) {
-        setState(() {
-          _hovered = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          _hovered = false;
-        });
-      },
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
@@ -1795,10 +1234,6 @@ class _HoverCardState extends State<_HoverCard> {
   }
 }
 
-// ============================================================
-// AMENITY CHIP
-// ============================================================
-
 class _AmenityChip extends StatefulWidget {
   final String label;
   final IconData icon;
@@ -1816,16 +1251,8 @@ class _AmenityChipState extends State<_AmenityChip> {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) {
-        setState(() {
-          _hovered = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          _hovered = false;
-        });
-      },
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
@@ -1871,10 +1298,6 @@ class _AmenityChipState extends State<_AmenityChip> {
   }
 }
 
-// ============================================================
-// PRIMARY BUTTON
-// ============================================================
-
 class _PrimaryHoverButton extends StatefulWidget {
   final VoidCallback onTap;
   final Widget child;
@@ -1893,32 +1316,12 @@ class _PrimaryHoverButtonState extends State<_PrimaryHoverButton> {
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
-      onEnter: (_) {
-        setState(() {
-          _hovered = true;
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          _hovered = false;
-        });
-      },
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
-        onTapDown: (_) {
-          setState(() {
-            _pressed = true;
-          });
-        },
-        onTapUp: (_) {
-          setState(() {
-            _pressed = false;
-          });
-        },
-        onTapCancel: () {
-          setState(() {
-            _pressed = false;
-          });
-        },
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
         onTap: widget.onTap,
         child: AnimatedScale(
           scale: _pressed
