@@ -5,8 +5,6 @@ import '../../widgets/tenant/room_card.dart';
 import 'search_filter_screen.dart';
 import 'room_detail_screen.dart';
 
-
-
 import 'booking_history_screen.dart';
 import 'favorites_screen.dart';
 import 'my_invoices_screen.dart';
@@ -29,12 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Danh sách các màn hình tương ứng với từng Tab
   final List<Widget> _screens = [
-    const _HomeContent(),         // 0: Nội dung trang chủ gốc
-    const MyInvoicesScreen(),     // 1: Hóa đơn
-    const booking_history_screen(),       // 2: Đặt lịch
-    const MyContractsScreen(),    // 3: Hợp đồng
-    const FavoritesScreen(),      // 4: Yêu thích
-    const ProfileScreen(),        // 5: Cá nhân
+    const _HomeContent(), // 0: Nội dung trang chủ gốc
+    const MyInvoicesScreen(), // 1: Hóa đơn
+    const booking_history_screen(), // 2: Đặt lịch
+    const MyContractsScreen(), // 3: Hợp đồng
+    const FavoritesScreen(), // 4: Yêu thích
+    const ProfileScreen(), // 5: Cá nhân
   ];
 
   void _onItemTapped(int index) {
@@ -83,10 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       // Dùng IndexedStack để chuyển tab mà không cần dùng Router
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: SafeArea(
         top: false,
         child: SizedBox(
@@ -97,12 +92,36 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: EdgeInsets.zero,
             child: Row(
               children: [
-                _buildBottomNavItem(icon: Icons.home_rounded, label: 'Trang chủ', index: 0),
-                _buildBottomNavItem(icon: Icons.receipt_long_rounded, label: 'Hóa đơn', index: 1),
-                _buildBottomNavItem(icon: Icons.event_note_rounded, label: 'Đặt lịch', index: 2),
-                _buildBottomNavItem(icon: Icons.description_outlined, label: 'Hợp đồng', index: 3),
-                _buildBottomNavItem(icon: Icons.favorite_border_rounded, label: 'Yêu thích', index: 4),
-                _buildBottomNavItem(icon: Icons.person_outline_rounded, label: 'Cá nhân', index: 5),
+                _buildBottomNavItem(
+                  icon: Icons.home_rounded,
+                  label: 'Trang chủ',
+                  index: 0,
+                ),
+                _buildBottomNavItem(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Hóa đơn',
+                  index: 1,
+                ),
+                _buildBottomNavItem(
+                  icon: Icons.event_note_rounded,
+                  label: 'Đặt lịch',
+                  index: 2,
+                ),
+                _buildBottomNavItem(
+                  icon: Icons.description_outlined,
+                  label: 'Hợp đồng',
+                  index: 3,
+                ),
+                _buildBottomNavItem(
+                  icon: Icons.favorite_border_rounded,
+                  label: 'Yêu thích',
+                  index: 4,
+                ),
+                _buildBottomNavItem(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Cá nhân',
+                  index: 5,
+                ),
               ],
             ),
           ),
@@ -133,6 +152,7 @@ class _HomeContentState extends State<_HomeContent> {
       'propertyId': 'PROP001',
       'propertyName': 'Khu trọ Nguyễn Văn Quá',
       'title': 'Phòng đầy đủ nội thất gần Đại học Công Thương',
+      'street': 'Số 12, đường Nguyễn Văn Quá',
       'district': 'Quận 12',
       'ward': 'Đông Hưng Thuận',
       'area': 22,
@@ -141,13 +161,15 @@ class _HomeContentState extends State<_HomeContent> {
       'maxPeople': 2,
       'status': 'available',
       'amenities': ['Máy lạnh', 'Wifi', 'Tủ lạnh', 'WC riêng'],
-      'image': 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+      'image':
+          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
     },
     {
       'id': 'ROOM002',
       'propertyId': 'PROP002',
       'propertyName': 'An Phú Residence',
       'title': 'Căn hộ mini cao cấp, ban công thoáng',
+      'street': 'Số 20, đường Song Hành',
       'district': 'TP. Thủ Đức',
       'ward': 'An Phú',
       'area': 35,
@@ -156,13 +178,15 @@ class _HomeContentState extends State<_HomeContent> {
       'maxPeople': 3,
       'status': 'available',
       'amenities': ['Máy lạnh', 'Ban công', 'Thang máy', 'Wifi'],
-      'image': 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+      'image':
+          'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
     },
     {
       'id': 'ROOM003',
       'propertyId': 'PROP003',
       'propertyName': 'Khu trọ Tân Phú',
       'title': 'Phòng mới xây, an ninh tốt, giờ giấc tự do',
+      'street': 'Số 15, đường Tân Sơn Nhì',
       'district': 'Tân Phú',
       'ward': 'Tân Sơn Nhì',
       'area': 24,
@@ -171,13 +195,15 @@ class _HomeContentState extends State<_HomeContent> {
       'maxPeople': 2,
       'status': 'available',
       'amenities': ['Wifi', 'Camera', 'WC riêng', 'Chỗ để xe'],
-      'image': 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
+      'image':
+          'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
     },
     {
       'id': 'ROOM004',
       'propertyId': 'PROP004',
       'propertyName': 'Saigon Green House',
       'title': 'Phòng rộng, gần chợ và tuyến Metro',
+      'street': 'Số 10, đường D5',
       'district': 'Bình Thạnh',
       'ward': 'Phường 25',
       'area': 28,
@@ -186,7 +212,8 @@ class _HomeContentState extends State<_HomeContent> {
       'maxPeople': 2,
       'status': 'available',
       'amenities': ['Máy lạnh', 'Wifi', 'Máy giặt', 'Camera'],
-      'image': 'https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=1200&q=80',
+      'image':
+          'https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=1200&q=80',
     },
   ];
 
@@ -206,12 +233,73 @@ class _HomeContentState extends State<_HomeContent> {
 
   String _removeVietnameseDiacritics(String value) {
     const replacements = {
-      'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a', 'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
-      'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
-      'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
-      'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o', 'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o', 'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
-      'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u', 'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
-      'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y', 'đ': 'd',
+      'à': 'a',
+      'á': 'a',
+      'ạ': 'a',
+      'ả': 'a',
+      'ã': 'a',
+      'â': 'a',
+      'ầ': 'a',
+      'ấ': 'a',
+      'ậ': 'a',
+      'ẩ': 'a',
+      'ẫ': 'a',
+      'ă': 'a',
+      'ằ': 'a',
+      'ắ': 'a',
+      'ặ': 'a',
+      'ẳ': 'a',
+      'ẵ': 'a',
+      'è': 'e',
+      'é': 'e',
+      'ẹ': 'e',
+      'ẻ': 'e',
+      'ẽ': 'e',
+      'ê': 'e',
+      'ề': 'e',
+      'ế': 'e',
+      'ệ': 'e',
+      'ể': 'e',
+      'ễ': 'e',
+      'ì': 'i',
+      'í': 'i',
+      'ị': 'i',
+      'ỉ': 'i',
+      'ĩ': 'i',
+      'ò': 'o',
+      'ó': 'o',
+      'ọ': 'o',
+      'ỏ': 'o',
+      'õ': 'o',
+      'ô': 'o',
+      'ồ': 'o',
+      'ố': 'o',
+      'ộ': 'o',
+      'ổ': 'o',
+      'ỗ': 'o',
+      'ơ': 'o',
+      'ờ': 'o',
+      'ớ': 'o',
+      'ợ': 'o',
+      'ở': 'o',
+      'ỡ': 'o',
+      'ù': 'u',
+      'ú': 'u',
+      'ụ': 'u',
+      'ủ': 'u',
+      'ũ': 'u',
+      'ư': 'u',
+      'ừ': 'u',
+      'ứ': 'u',
+      'ự': 'u',
+      'ử': 'u',
+      'ữ': 'u',
+      'ỳ': 'y',
+      'ý': 'y',
+      'ỵ': 'y',
+      'ỷ': 'y',
+      'ỹ': 'y',
+      'đ': 'd',
     };
     String result = value.toLowerCase();
     replacements.forEach((key, replacement) {
@@ -232,11 +320,16 @@ class _HomeContentState extends State<_HomeContent> {
       final propertyName = _normalize(room['propertyName']?.toString() ?? '');
       final district = _normalize(room['district']?.toString() ?? '');
       final ward = _normalize(room['ward']?.toString() ?? '');
-      return title.contains(keyword) || propertyName.contains(keyword) || district.contains(keyword) || ward.contains(keyword);
+      return title.contains(keyword) ||
+          propertyName.contains(keyword) ||
+          district.contains(keyword) ||
+          ward.contains(keyword);
     }).toList();
   }
 
-  List<Map<String, dynamic>> _applyQuickFilters(List<Map<String, dynamic>> source) {
+  List<Map<String, dynamic>> _applyQuickFilters(
+    List<Map<String, dynamic>> source,
+  ) {
     List<Map<String, dynamic>> result = source;
     if (_selectedQuickFilters.contains('price')) {
       result = result.where((room) {
@@ -247,13 +340,20 @@ class _HomeContentState extends State<_HomeContent> {
     if (_selectedQuickFilters.contains('school')) {
       result = result.where((room) {
         final title = _normalize(room['title']?.toString() ?? '');
-        return title.contains('dai hoc') || title.contains('truong') || title.contains('gan');
+        return title.contains('dai hoc') ||
+            title.contains('truong') ||
+            title.contains('gan');
       }).toList();
     }
     if (_selectedQuickFilters.contains('furniture')) {
       result = result.where((room) {
-        final amenities = List<String>.from(room['amenities'] ?? const <String>[]);
-        return amenities.contains('Máy lạnh') || amenities.contains('Tủ lạnh') || amenities.contains('Máy giặt') || amenities.contains('Ban công');
+        final amenities = List<String>.from(
+          room['amenities'] ?? const <String>[],
+        );
+        return amenities.contains('Máy lạnh') ||
+            amenities.contains('Tủ lạnh') ||
+            amenities.contains('Máy giặt') ||
+            amenities.contains('Ban công');
       }).toList();
     }
     if (_selectedQuickFilters.contains('new')) {
@@ -266,10 +366,14 @@ class _HomeContentState extends State<_HomeContent> {
   }
 
   void _searchFromHome() {
-    List<Map<String, dynamic>> result = List<Map<String, dynamic>>.from(_allRooms);
+    List<Map<String, dynamic>> result = List<Map<String, dynamic>>.from(
+      _allRooms,
+    );
     result = _applyKeyword(result);
     result = _applyQuickFilters(result);
-    final hasSearch = _searchController.text.trim().isNotEmpty || _selectedQuickFilters.isNotEmpty;
+    final hasSearch =
+        _searchController.text.trim().isNotEmpty ||
+        _selectedQuickFilters.isNotEmpty;
     setState(() {
       rooms = result;
       _isSearching = hasSearch;
@@ -363,7 +467,11 @@ class _HomeContentState extends State<_HomeContent> {
                       room: room,
                       onTap: () {
                         // Vẫn dùng Router để chuyển sang Chi tiết phòng đè lên toàn bộ màn hình
-                        Navigator.pushNamed(context, '/room-detail', arguments: room);
+                        Navigator.pushNamed(
+                          context,
+                          '/room-detail',
+                          arguments: room,
+                        );
                       },
                       onFavorite: () {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -399,7 +507,11 @@ class _HomeContentState extends State<_HomeContent> {
             width: double.infinity,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF005D4B), Color(0xFF157762), Color(0xFF2D8D73)],
+                colors: [
+                  Color(0xFF005D4B),
+                  Color(0xFF157762),
+                  Color(0xFF2D8D73),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -533,7 +645,9 @@ class _HomeContentState extends State<_HomeContent> {
           Icons.home_work_rounded,
           color: Colors.white,
           size: 29,
-          shadows: [Shadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 3))],
+          shadows: [
+            Shadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 3)),
+          ],
         ),
         SizedBox(width: 9),
         Text(
@@ -543,7 +657,13 @@ class _HomeContentState extends State<_HomeContent> {
             fontSize: 25,
             fontWeight: FontWeight.w900,
             letterSpacing: 1.8,
-            shadows: [Shadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 3))],
+            shadows: [
+              Shadow(
+                color: Colors.black54,
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
         ),
       ],
@@ -686,10 +806,34 @@ class _HomeContentState extends State<_HomeContent> {
 
   Widget _buildQuickFilters() {
     final filters = [
-      {'key': 'price', 'title': 'Giá tốt', 'subtitle': '≤ 3.5 triệu', 'icon': Icons.local_offer_outlined, 'color': const Color(0xFFE7A900)},
-      {'key': 'school', 'title': 'Gần trường', 'subtitle': 'Tiện đi học', 'icon': Icons.school_outlined, 'color': const Color(0xFF356D9E)},
-      {'key': 'furniture', 'title': 'Có nội thất', 'subtitle': 'Dọn vào ngay', 'icon': Icons.weekend_outlined, 'color': const Color(0xFF8059A9)},
-      {'key': 'new', 'title': 'Phòng mới', 'subtitle': 'Mới xây', 'icon': Icons.auto_awesome_outlined, 'color': const Color(0xFF27856F)},
+      {
+        'key': 'price',
+        'title': 'Giá tốt',
+        'subtitle': '≤ 3.5 triệu',
+        'icon': Icons.local_offer_outlined,
+        'color': const Color(0xFFE7A900),
+      },
+      {
+        'key': 'school',
+        'title': 'Gần trường',
+        'subtitle': 'Tiện đi học',
+        'icon': Icons.school_outlined,
+        'color': const Color(0xFF356D9E),
+      },
+      {
+        'key': 'furniture',
+        'title': 'Có nội thất',
+        'subtitle': 'Dọn vào ngay',
+        'icon': Icons.weekend_outlined,
+        'color': const Color(0xFF8059A9),
+      },
+      {
+        'key': 'new',
+        'title': 'Phòng mới',
+        'subtitle': 'Mới xây',
+        'icon': Icons.auto_awesome_outlined,
+        'color': const Color(0xFF27856F),
+      },
     ];
 
     return Column(
@@ -749,14 +893,20 @@ class _HomeContentState extends State<_HomeContent> {
                   width: 150,
                   padding: const EdgeInsets.all(13),
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.primaryGreen : AppColors.cardSurface,
+                    color: selected
+                        ? AppColors.primaryGreen
+                        : AppColors.cardSurface,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: selected ? AppColors.primaryGreen : const Color(0xFFE5E7EB),
+                      color: selected
+                          ? AppColors.primaryGreen
+                          : const Color(0xFFE5E7EB),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(selected ? 0.08 : 0.025),
+                        color: Colors.black.withOpacity(
+                          selected ? 0.08 : 0.025,
+                        ),
                         blurRadius: selected ? 12 : 7,
                         offset: const Offset(0, 4),
                       ),
@@ -771,7 +921,9 @@ class _HomeContentState extends State<_HomeContent> {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: selected ? Colors.white.withOpacity(0.14) : color.withOpacity(0.10),
+                              color: selected
+                                  ? Colors.white.withOpacity(0.14)
+                                  : color.withOpacity(0.10),
                               borderRadius: BorderRadius.circular(11),
                             ),
                             child: Icon(
@@ -786,18 +938,22 @@ class _HomeContentState extends State<_HomeContent> {
                             height: 21,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: selected ? AppColors.accentYellow : Colors.transparent,
+                              color: selected
+                                  ? AppColors.accentYellow
+                                  : Colors.transparent,
                               border: Border.all(
-                                color: selected ? AppColors.accentYellow : const Color(0xFFD1D5DB),
+                                color: selected
+                                    ? AppColors.accentYellow
+                                    : const Color(0xFFD1D5DB),
                                 width: 1.5,
                               ),
                             ),
                             child: selected
                                 ? const Icon(
-                              Icons.check_rounded,
-                              size: 14,
-                              color: AppColors.textPrimary,
-                            )
+                                    Icons.check_rounded,
+                                    size: 14,
+                                    color: AppColors.textPrimary,
+                                  )
                                 : null,
                           ),
                         ],
@@ -806,7 +962,9 @@ class _HomeContentState extends State<_HomeContent> {
                       Text(
                         item['title'] as String,
                         style: TextStyle(
-                          color: selected ? Colors.white : AppColors.textPrimary,
+                          color: selected
+                              ? Colors.white
+                              : AppColors.textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
                         ),
@@ -815,7 +973,9 @@ class _HomeContentState extends State<_HomeContent> {
                       Text(
                         item['subtitle'] as String,
                         style: TextStyle(
-                          color: selected ? Colors.white70 : AppColors.textSecondary,
+                          color: selected
+                              ? Colors.white70
+                              : AppColors.textSecondary,
                           fontSize: 10.5,
                         ),
                       ),
@@ -832,7 +992,9 @@ class _HomeContentState extends State<_HomeContent> {
 
   Widget _buildSearchStatus() {
     final keyword = _searchController.text.trim();
-    final String text = keyword.isNotEmpty ? '${rooms.length} phòng cho "$keyword"' : '${rooms.length} phòng phù hợp';
+    final String text = keyword.isNotEmpty
+        ? '${rooms.length} phòng cho "$keyword"'
+        : '${rooms.length} phòng phù hợp';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
       decoration: BoxDecoration(
@@ -1035,7 +1197,12 @@ class _HomeHousePainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.28, size.height * 0.51, size.width * 0.17, size.height * 0.17),
+        Rect.fromLTWH(
+          size.width * 0.28,
+          size.height * 0.51,
+          size.width * 0.17,
+          size.height * 0.17,
+        ),
         const Radius.circular(2),
       ),
       windowPaint,
@@ -1043,7 +1210,12 @@ class _HomeHousePainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.55, size.height * 0.51, size.width * 0.17, size.height * 0.17),
+        Rect.fromLTWH(
+          size.width * 0.55,
+          size.height * 0.51,
+          size.width * 0.17,
+          size.height * 0.17,
+        ),
         const Radius.circular(2),
       ),
       windowPaint,
@@ -1051,7 +1223,12 @@ class _HomeHousePainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(size.width * 0.41, size.height * 0.68, size.width * 0.18, size.height * 0.18),
+        Rect.fromLTWH(
+          size.width * 0.41,
+          size.height * 0.68,
+          size.width * 0.18,
+          size.height * 0.18,
+        ),
         const Radius.circular(2),
       ),
       doorPaint,
