@@ -78,7 +78,7 @@ class TenantManagementScreen extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomActionBar(),
+      bottomNavigationBar: _buildBottomActionBar(context),
     );
   }
 
@@ -584,9 +584,9 @@ class TenantManagementScreen extends StatelessWidget {
   }
 
   //thanh nút thao tác ở đáy màn hình
-  Widget _buildBottomActionBar() {
+  Widget _buildBottomActionBar(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(22),
       decoration: const BoxDecoration(
         color: AppColors.cardSurface,
         border: Border(top: BorderSide(color: AppColors.borderLight)),
@@ -596,7 +596,9 @@ class TenantManagementScreen extends StatelessWidget {
           Expanded(
             flex: 2,
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.pop(context);
+              },
               icon: const Icon(Icons.arrow_back, size: 14, color: AppColors.textPrimary),
               label: const Text('Hợp đồng', style: TextStyle(color: AppColors.textPrimary, fontSize: 12)),
               style: OutlinedButton.styleFrom(
@@ -609,10 +611,18 @@ class TenantManagementScreen extends StatelessWidget {
           Expanded(
             flex: 3,
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Chức năng thêm người ở ghép đang được cập nhật!'),
+                    backgroundColor: AppColors.primaryGreen,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
               icon: const Icon(Icons.person_add, size: 14, color: AppColors.textPrimary),
               label: const Text(
-                '+ Thêm người ở ghép',
+                'Thêm người ở ghép',
                 style: TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(

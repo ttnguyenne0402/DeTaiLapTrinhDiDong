@@ -46,8 +46,8 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
   // Dữ liệu biểu đồ vành khuyên: Tỷ lệ phân bổ tài khoản
   List<_SystemUserShareData> _userShareData = [
-    _SystemUserShareData('Khách thuê (Tenant)', 75, Colors.blue),
-    _SystemUserShareData('Chủ trọ (Landlord)', 25, AppColors.primaryGreen),
+    _SystemUserShareData('Khách thuê', 75, Colors.blue),
+    _SystemUserShareData('Chủ trọ ', 25, AppColors.primaryGreen),
   ];
 
   late TooltipBehavior _tooltipBehavior;
@@ -80,11 +80,11 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
   @override
   void initState() {
     super.initState();
-    _currentRevenueData = _dataNam2026; // Mặc định ban đầu là Năm 2026
-    _tooltipBehavior = TooltipBehavior(enable: true);
+    _currentRevenueData = _dataNam2026; //mặc định ban đầu là Năm 2026
+    _tooltipBehavior = TooltipBehavior(enable: true);// cho hiển thị hộp
   }
 
-  // Hàm xử lý đổi dữ liệu khi chọn Dropdown
+  //hàm xử lý đổi dữ liệu khi chọn Dropdown
   void _updateReportData(String selectedType) {
     setState(() {
       _selectedReportType = selectedType;
@@ -144,9 +144,9 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                 color: Colors.white24,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: DropdownButtonHideUnderline(
+              child: DropdownButtonHideUnderline(// cái phần loc xuống để chọn
                 child: DropdownButton<String>(
-                  value: _selectedReportType,
+                  value: _selectedReportType,//năm 2026
                   dropdownColor: Colors.white,
                   icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
                   style: const TextStyle(
@@ -154,7 +154,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
-                  items: _reportTypes.map((String type) {
+                  items: _reportTypes.map((String type) { // các ngày tháng
                     return DropdownMenuItem<String>(
                       value: type,
                       child: Text(
@@ -326,7 +326,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
                 const SizedBox(height: 20),
 
-                // --- 3. BIỂU ĐỒ TRÒN VÀNH KHUYÊN: PHÂN BỔ NGƯỜI DÙNG ---
+                //biểu đồ hình tròn vành khuyên
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -348,9 +348,9 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                       SizedBox(
                         height: 210,
                         child: SfCircularChart(
-                          tooltipBehavior: _tooltipBehavior,
+                          tooltipBehavior: _tooltipBehavior,// hiển thị hộp thoại
                           legend: const Legend(
-                            isVisible: true,
+                            isVisible:true,
                             position: LegendPosition.bottom,
                             overflowMode: LegendItemOverflowMode.wrap,
                           ),
@@ -359,13 +359,13 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
                               dataSource: _userShareData,
                               xValueMapper: (_SystemUserShareData data, _) => data.x,
                               yValueMapper: (_SystemUserShareData data, _) => data.y,
-                              pointColorMapper: (_SystemUserShareData data, _) => data.color,
+                              pointColorMapper: (_SystemUserShareData data, _) => data.color, // đọc dữ liệu màu
                               name: 'Tỷ lệ',
                               dataLabelSettings: const DataLabelSettings(
-                                isVisible: true,
-                                labelPosition: ChartDataLabelPosition.outside,
+                                isVisible: true,// cho phép hiện thị số
+                                labelPosition: ChartDataLabelPosition.outside,// đưa các con số bên ngoài
                               ),
-                              innerRadius: '60%',
+                              innerRadius: '60%',//tạo lỗ rỗng ở giữa tâm biểu đồ
                             ),
                           ],
                         ),
@@ -376,7 +376,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
 
                 const SizedBox(height: 20),
 
-                // --- 4. BẢNG TOP KHU TRỌ ĐÓNG GÓP HOA HỒNG CAO ---
+                //top hoa hồng
                 const Text(
                   'Top khu trọ đóng góp hoa hồng cao nhất',
                   style: TextStyle(
@@ -479,7 +479,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
         ),
       ),
 
-      // --- BOTTOM NAVIGATION BAR CHO ADMIN ---
+      //bottom admin
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 2,
         type: BottomNavigationBarType.fixed,
@@ -490,7 +490,7 @@ class _AdminStatsScreenState extends State<AdminStatsScreen> {
         onTap: (index) {
           switch (index) {
             case 0:
-              Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+              Navigator.pushNamed(context, AppRoutes.adminDashboard);
               break;
             case 1:
               Navigator.pushNamed(context, AppRoutes.rewview);

@@ -173,10 +173,69 @@ class HopDongMoi extends State<Contract_form> {
   }
 
   Future<void> _completeContract() async {
-    if (!_agreeTerms) {
-      _showMessage('Vui lòng xác nhận đã phổ biến nội quy.');
+    //1.kiểm tra họ tên
+    if (_tenantNameController.text.trim().isEmpty) {
+      _showMessage('Vui lòng nhập họ và tên khách thuê.');
       return;
     }
+
+    //2.kiểm tra số điện thoại (10 chữ số, bắt đầu bằng 0)
+    final phone = _tenantPhoneController.text.trim();
+    final phoneRegex = RegExp(r'^0[0-9]{9}$');
+    if (!phoneRegex.hasMatch(phone)) {
+      _showMessage('Số điện thoại không hợp lệ (phải gồm 10 chữ số bắt đầu bằng 0).');
+      return;
+    }
+
+    //3.kiểm tra CCCD (chuẩn 12 chữ số)
+    final cccd = _cccdController.text.trim();
+    if (cccd.length != 12 || int.tryParse(cccd) == null) {
+      _showMessage('Số CCCD không hợp lệ (phải đủ 12 chữ số).');
+      return;
+    }
+
+    //4.kiểm tra ngày cấp & nơi cấp
+    if (_issueDateController.text.trim().isEmpty) {
+      _showMessage('Vui lòng nhập ngày cấp CCCD.');
+      return;
+    }
+    if (_issuePlaceController.text.trim().isEmpty) {
+      _showMessage('Vui lòng nhập nơi cấp CCCD.');
+      return;
+    }
+
+    //5.kiểm tra giá thuê và tiền cọc
+    final rentPrice = double.tryParse(_rentPriceController.text.replaceAll('.', '').trim()) ?? 0;
+    if (rentPrice <= 0) {
+      _showMessage('Giá thuê hàng tháng phải lớn hơn 0đ.');
+      return;
+    }
+
+    final depositPrice = double.tryParse(_depositPriceController.text.replaceAll('.', '').trim()) ?? 0;
+    if (depositPrice <= 0) {
+      _showMessage('Tiền đặt cọc phải lớn hơn 0đ.');
+      return;
+    }
+
+    //6.kiểm tra chỉ số điện nước ban đầu
+    if (_electricIndexController.text.trim().isEmpty || int.tryParse(_electricIndexController.text.trim()) == null) {
+      _showMessage('Chỉ số điện ban đầu không hợp lệ.');
+      return;
+    }
+    if (_waterIndexController.text.trim().isEmpty || int.tryParse(_waterIndexController.text.trim()) == null) {
+      _showMessage('Chỉ số nước ban đầu không hợp lệ.');
+      return;
+    }
+
+    //7.iểm tra xác nhận nội quy
+    if (!_agreeTerms) {
+      _showMessage('Vui lòng xác nhận đã phổ biến nội quy cho khách thuê.');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã gửi liên kết ký hợp đồng tới email khách thuê!')),
+    );
 
     final result = _contractData('Chờ ký');
     Navigator.pop(context, result);
@@ -214,10 +273,12 @@ class HopDongMoi extends State<Contract_form> {
             child: const Text(
               'Xác nhận',
               style: TextStyle(color: Colors.white),
+
             ),
           ),
         ],
       ),
+
     );
 
     if (confirmed != true || !mounted) return;
@@ -1193,6 +1254,7 @@ class HopDongMoi extends State<Contract_form> {
     );
   }
 
+  // hàm thiết kế ô ký
   Widget _buildSignatureBox({
     required String title,
     required SignatureController controller,

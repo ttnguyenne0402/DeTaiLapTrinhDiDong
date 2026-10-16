@@ -218,7 +218,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ],
                   ),
                   const Divider(),
-                  Flexible(
+                  Flexible( //  có thể co lại nhỏ hơn nếu màn hình bị thiếu không gian,
                     child: ListView.builder(
                       shrinkWrap: true,
                       itemCount: _notifications.length,
@@ -245,7 +245,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             ),
                           ),
                           subtitle: Text('${item['subtitle']}\n${item['time']}'),
-                          isThreeLine: true,
+                          isThreeLine: true,//  dùng để tối ưu khi có nội dung dài
                           onTap: () {
                             setState(() {
                               item['isRead'] = true;
@@ -599,20 +599,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               height: 200,
                               child: SfCartesianChart(
                                 margin: EdgeInsets.zero,
-                                plotAreaBorderWidth: 0,
-                                tooltipBehavior: TooltipBehavior(enable: true),
-                                legend: const Legend(
+                                plotAreaBorderWidth: 0, //tắt đường viền bao quanh khu vực vẽ đồ thị
+                                tooltipBehavior: TooltipBehavior(enable: true),// hiển thị hộp thoại
+                                legend: const Legend(  // chú thích
                                   isVisible: true,
                                   position: LegendPosition.top,
-                                  overflowMode: LegendItemOverflowMode.wrap,
-                                  toggleSeriesVisibility: true,
+                                  overflowMode: LegendItemOverflowMode.wrap,//tự động xuống dòng nếu tên các mục chú giải quá dài
+                                  toggleSeriesVisibility: true,// tính năng tương tác
                                 ),
                                 primaryXAxis: const CategoryAxis(
-                                  majorGridLines: MajorGridLines(width: 0),
+                                  majorGridLines: MajorGridLines(width: 0),// ẩn các đường lưới dọc
                                 ),
                                 primaryYAxis: const NumericAxis(
-                                  axisLine: AxisLine(width: 0),
-                                  majorTickLines: MajorTickLines(
+                                  axisLine: AxisLine(width: 0),// ẩn đường trục y
+                                  majorTickLines: MajorTickLines( //  Ẩn các vạch chia nhỏ trên trục Y
                                     color: Colors.transparent,
                                   ),
                                 ),
@@ -627,8 +627,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                     data.views,
                                     color: AppColors.primaryGreen,
                                     width: 3,
-                                    enableTooltip: true,
-                                    markerSettings: const MarkerSettings(
+                                    enableTooltip: true,// cho phép kích hoạt hiển thị hộp thoại
+                                    markerSettings: const MarkerSettings( // vẽ các chấm tròn
                                       isVisible: true,
                                     ),
                                   ),

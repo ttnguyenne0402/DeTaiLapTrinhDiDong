@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_colors.dart';
 import 'utility_readings.dart';
+import 'owner_profile_screen.dart';
 
 class LandlordUtilityScreen extends StatefulWidget {
   const LandlordUtilityScreen({super.key});
@@ -38,17 +39,20 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
             icon: const Icon(Icons.notifications, color: AppColors.cardSurface),
             onPressed: () {},
           ),
-          Container(
-            margin: const EdgeInsets.only(right: 16, left: 4),
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: AppColors.lightGreen,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.person,
-              color: AppColors.primaryGreen,
-              size: 20,
+          CircleAvatar(
+            backgroundColor: Colors.white24,
+            radius: 16,
+            child: IconButton(
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: const Icon(Icons.person, color: Colors.white,size: 20,),
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => const OwnerProfileScreen(),
+                ),
+                );
+              },
             ),
           ),
         ],
@@ -316,9 +320,9 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
               height: 280,
               child: BarChart(
                 BarChartData(
-                  maxY: 20,
-                  barTouchData: BarTouchData(
-                    touchTooltipData: BarTouchTooltipData(
+                  maxY:20,
+                  barTouchData: BarTouchData( // tương tác khi người nhấn vào cột
+                    touchTooltipData: BarTouchTooltipData( // hiển thị nội dung hộp thoại gợi í
                       getTooltipColor: (_) => Colors.grey.shade700,
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         String type = rodIndex == 0 ? 'Điện' : 'Nước';
@@ -329,20 +333,20 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
                       },
                     ),
                   ),
-                  titlesData: FlTitlesData(
+                  titlesData: FlTitlesData( // hiển thị tiêu để ở các trục biểu đồ
                     show: true,
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),// ẩn nhãn trục bên phải
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),// ẩn nhãn trục ở trên
+                    bottomTitles: AxisTitles( // biểu diễn cái trục
                       sideTitles: SideTitles(
                         showTitles: true,
-                        getTitlesWidget: (value, meta) {
+                        getTitlesWidget: (value, meta) { // meta:toàn bộ thông tin ngữ cảnh và vị trí của vạch chia
                           int month = value.toInt() + 1;
                           if (month < 1 || month > 12) return const SizedBox();
                           bool isHighlight = (month == 8);
-                          return SideTitleWidget(
+                          return SideTitleWidget( // dùng để bọc và xác định cái nhãn trữ
                             meta: meta,
-                            space: 8,
+                            space: 8,// khoảng cách của Tháng so với cột
                             child: Text(
                               'T${month < 10 ? '0$month' : '$month'}',
                               style: TextStyle(
@@ -357,13 +361,13 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
                         interval: 1,
                       ),
                     ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
+                    leftTitles: AxisTitles(// khung bọc ngoài toàn trục
+                      sideTitles: SideTitles( // định cấu hình theo một trục
                         showTitles: true,
                         reservedSize: 28,
                         interval: 5,
                         getTitlesWidget: (value, meta) {
-                          return SideTitleWidget(
+                          return SideTitleWidget( // để hiển thị số nguyên
                             meta: meta,
                             space: 0,
                             child: Text('${value.toInt()}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
@@ -372,7 +376,7 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
                       ),
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
+                  borderData: FlBorderData(show: false),// tắt khung viền
                   barGroups: [
                     _makeGroupData(0, 5, 4),
                     _makeGroupData(1, 6, 4.5),
@@ -387,7 +391,7 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
                     _makeGroupData(10, 8, 4.8),
                     _makeGroupData(11, 9.5, 6),
                   ],
-                  gridData: const FlGridData(show: false),
+                  gridData: const FlGridData(show: false), //Tắt các đường kẻ sọc ngang/dọc
                 ),
               ),
             ),
@@ -489,6 +493,7 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
     );
   }
 
+  // miêu t mấy tháng
   Widget _buildPastPeriodCard(String code, String month, String amount, String date, String creator) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -511,6 +516,7 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
       ),
     );
   }
+
 
   Widget _buildLandlordBottomActions() {
     return Container(
