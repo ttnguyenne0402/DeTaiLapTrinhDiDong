@@ -73,7 +73,7 @@ class _BookingScreenState extends State<booking_screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         title: const Text(
@@ -99,143 +99,154 @@ class _BookingScreenState extends State<booking_screen> {
         ),
         elevation: 0,
       ),
-      body: Form(
-        key: _formKey, // Gắn key vào Form
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // CARD THÔNG TIN PHÒNG
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                    color: AppColors.cardSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4)
-                      )
-                    ]
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+      body:Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: Form(
+            key: _formKey, // Gắn key vào Form
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // CARD THÔNG TIN PHÒNG
+                  Container(
+                    padding: const EdgeInsets.all(16.0),
+                    decoration: BoxDecoration(
+                        color: AppColors.cardSurface,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4)
+                          )
+                        ]
+                    ),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.location_on, color: AppColors.primaryGreen, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                            child: Text(
-                              "Địa chỉ: $mockAddress",
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.location_on, color: AppColors.primaryGreen, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(
+                                  "Địa chỉ: $mockAddress",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
+                                    height: 1.4,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                            )
+                          ],
+                        ),
+                        const Divider(height: 24, thickness: 1, color: Color(0xFFE5E7EB)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Mã Phòng: $mockRoomName",
                               style: const TextStyle(
                                 fontSize: 14,
+                                fontWeight: FontWeight.w600,
                                 color: AppColors.textPrimary,
-                                height: 1.4,
                               ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            )
+                            ),
+                            Text(
+                              "$mockPrice đ/ tháng",
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          ],
                         )
                       ],
                     ),
-                    const Divider(height: 24, thickness: 1, color: Color(0xFFE5E7EB)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Mã Phòng: $mockRoomName",
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          "$mockPrice đ/ tháng",
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+                  ),
+                  const SizedBox(height: 24),
 
-              // CHỌN NGÀY GIỜ
-              CalendarWidget(
-                selectedDate: _selectedDate,
-                selectedTime: _selectedTime,
-                onDateSelected: (date) {
-                  setState(() => _selectedDate = date);
-                },
-                onTimeSelected: (time) {
-                  setState(() => _selectedTime = time);
-                },
-              ),
-              const SizedBox(height: 24),
+                  // CHỌN NGÀY GIỜ
+                  CalendarWidget(
+                    selectedDate: _selectedDate,
+                    selectedTime: _selectedTime,
+                    onDateSelected: (date) {
+                      setState(() => _selectedDate = date);
+                    },
+                    onTimeSelected: (time) {
+                      setState(() => _selectedTime = time);
+                    },
+                  ),
+                  const SizedBox(height: 24),
 
-              // SỐ ĐIỆN THOẠI
-              const Text(
-                "Số điện thoại liên hệ *",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                decoration: _buildInputDecoration(
-                    hint: "Nhập số điện thoại của bạn",
-                    icon: Icons.phone_outlined
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập số điện thoại';
-                  }
+                  // SỐ ĐIỆN THOẠI
+                  const Text(
+                    "Số điện thoại liên hệ *",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    decoration: _buildInputDecoration(
+                        hint: "Nhập số điện thoại của bạn",
+                        icon: Icons.phone_outlined
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Vui lòng nhập số điện thoại';
+                      }
 
-                  final phoneRegex = RegExp(r'^0[0-9]{9}$');
-                  if (!phoneRegex.hasMatch(value.trim())) {
-                    return 'Số điện thoại không hợp lệ (gồm 10 số, bắt đầu bằng 0)';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
+                      final phoneRegex = RegExp(r'^0[0-9]{9}$');
+                      if (!phoneRegex.hasMatch(value.trim())) {
+                        return 'Số điện thoại không hợp lệ (gồm 10 số, bắt đầu bằng 0)';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
 
-              //GHI CHÚ
-              const Text(
-                "Ghi chú cho chủ nhà: ",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  //GHI CHÚ
+                  const Text(
+                    "Ghi chú cho chủ nhà: ",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _noteController,
+                    maxLines: 4,
+                    maxLength: 500,
+                    decoration: _buildInputDecoration(
+                        hint: "VD: Mình đi làm về muộn, chủ nhà hỗ trợ giúp nhé...",
+                        icon: null
+                    ),
+                    validator: (value) {
+                      if (value != null && value.length > 500) {
+                        return 'Ghi chú không được vượt quá 500 ký tự';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _noteController,
-                maxLines: 4,
-                maxLength: 500,
-                decoration: _buildInputDecoration(
-                    hint: "VD: Mình đi làm về muộn, chủ nhà hỗ trợ giúp nhé...",
-                    icon: null
-                ),
-                validator: (value) {
-                  if (value != null && value.length > 500) {
-                    return 'Ghi chú không được vượt quá 500 ký tự';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
         ),
       ),
+
       bottomNavigationBar: SafeArea(
         child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

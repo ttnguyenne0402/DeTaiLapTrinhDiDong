@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 
-//DỮ LIỆU GIẢ
+// DỮ LIỆU GIẢ
 class InvoiceMock {
   final String invoiceCode;
   final String billingMonth;
@@ -33,7 +33,6 @@ class MyInvoicesScreen extends StatefulWidget {
 }
 
 class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
-
   final List<InvoiceMock> dummyInvoices = [
     InvoiceMock(
       invoiceCode: 'INV-202610-001',
@@ -75,7 +74,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
         .fold(0, (sum, item) => sum + item.total);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
@@ -84,16 +83,14 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
           'Hóa đơn & Thanh toán',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-
       ),
-
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // THẺ DƯ NỢ
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             color: AppColors.primaryGreen,
             child: Card(
               color: AppColors.cardSurface,
@@ -113,8 +110,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
                       style: const TextStyle(
                           color: Colors.redAccent,
                           fontSize: 28,
-                          fontWeight: FontWeight.bold
-                      ),
+                          fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -122,22 +118,39 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
             ),
           ),
 
-          //  DANH SÁCH LỊCH SỬ HÓA ĐƠN
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 8.0),
-            child: const Text(
-              'LỊCH SỬ HÓA ĐƠN',
-              style: TextStyle(color: AppColors.primaryGreen, fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
+          // LỊCH SỬ HÓA ĐƠN
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 20),
-              itemCount: dummyInvoices.length,
-              itemBuilder: (context, index) {
-                final invoice = dummyInvoices[index];
-                return _buildInvoiceCard(invoice);
-              },
+            child: Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 8.0),
+                      child: Text(
+                        'LỊCH SỬ HÓA ĐƠN',
+                        style: TextStyle(color: AppColors.primaryGreen, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        itemCount: dummyInvoices.length,
+                        itemBuilder: (context, index) {
+                          final invoice = dummyInvoices[index];
+                          return _buildInvoiceCard(invoice);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -145,9 +158,8 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
     );
   }
 
-  //HÀM BUILD TỪNG CARD HÓA ĐƠN
+  // HÀM BUILD TỪNG CARD HÓA ĐƠN
   Widget _buildInvoiceCard(InvoiceMock invoice) {
-
     final statusUI = _getStatusUI(invoice.status);
 
     return Card(
@@ -158,7 +170,6 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // CHUYỂN SANG MÀN HÌNH CHI TIẾT HÓA ĐƠN
           Navigator.pushNamed(context, '/tenant/invoices/detail');
         },
         child: Padding(
@@ -237,7 +248,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
     );
   }
 
-  //HÀM ĐỔI E SANG VI
+  // HÀM ĐỔI E SANG VI
   Map<String, dynamic> _getStatusUI(String status) {
     switch (status) {
       case 'paid':
@@ -257,7 +268,6 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
 
   // HÀM ĐỔI TIỀN CHO ĐẸP
   String _formatCurrency(double amount) {
-
     String result = amount.toInt().toString();
     result = result.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
     return result;

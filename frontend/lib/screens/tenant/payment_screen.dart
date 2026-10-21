@@ -16,16 +16,16 @@ class PaymentScreen extends StatefulWidget {
 }
 
 class _PaymentScreenState extends State<PaymentScreen> {
-
   String _selectedMethod = 'qr';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
+        centerTitle: true,
         title: const Text(
           'THANH TOÁN HÓA ĐƠN',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
@@ -38,114 +38,124 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
       // NÚT XÁC NHẬN
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () {
-                _showSuccessDialog();
-              },
-              child: const Text(
-                'XÁC NHẬN ĐÃ THANH TOÁN',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+        child: Container(
+          color: AppColors.background,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  _showSuccessDialog();
+                },
+                child: const Text(
+                  'XÁC NHẬN ĐÃ THANH TOÁN',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ),
         ),
       ),
 
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // THẺ SỐ TIỀN CẦN THANH TOÁN
-            Container(
-              color: AppColors.primaryGreen,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // THẺ SỐ TIỀN CẦN THANH TOÁN
+          Container(
+            color: AppColors.primaryGreen,
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            child: Card(
+              color: AppColors.cardSurface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
+                child: Column(
+                  children: [
+                    Text(
+                      'SỐ TIỀN CẦN THANH TOÁN (${widget.invoiceCode})',
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${_formatCurrency(widget.amountToPay)} đ',
+                      style: const TextStyle(
+                        color: AppColors.primaryGreen,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // PHẦN CHỌN PHƯƠNG THỨC THANH TOÁN
+          Expanded(
+            child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              child: Card(
-                color: AppColors.cardSurface,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'SỐ TIỀN CẦN THANH TOÁN (${widget.invoiceCode})',
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+                      const Text(
+                        'CHỌN PHƯƠNG THỨC THANH TOÁN',
+                        style: TextStyle(color: AppColors.primaryGreen, fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        '${_formatCurrency(widget.amountToPay)} đ',
-                        style: const TextStyle(
-                          color: AppColors.primaryGreen,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
+
+                      // QUÉT MÃ VÀ TIỀN MẶT
+                      Card(
+                        color: AppColors.cardSurface,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 1,
+                        child: Column(
+                          children: [
+                            _buildPaymentOption('qr', 'Quét mã QR Pay', Icons.qr_code_scanner),
+                            const Divider(height: 1, indent: 50),
+                            _buildPaymentOption('cash', 'Tiền mặt (Đưa trực tiếp)', Icons.money),
+                          ],
                         ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // HIỂN THỊ THÔNG TIN CHI TIẾT THEO PHƯƠNG THỨC
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: _buildPaymentDetails(),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-
-            // CHỌN PHƯƠNG THỨC THANH TOÁN
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'CHỌN PHƯƠNG THỨC THANH TOÁN',
-                    style: TextStyle(color: AppColors.primaryGreen, fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // QUÉT MÃ VÀ TIỀN MẶT
-                  Card(
-                    color: AppColors.cardSurface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 1,
-                    child: Column(
-                      children: [
-                        _buildPaymentOption('qr', 'Quét mã QR Pay', Icons.qr_code_scanner),
-                        const Divider(height: 1, indent: 50),
-                        _buildPaymentOption('cash', 'Tiền mặt (Đưa trực tiếp)', Icons.money),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // HIỂN THỊ THÔNG TIN CHI TIẾT THEO PHƯƠNG THỨC
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: _buildPaymentDetails(),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-
   // RADIO CHỌN PHƯƠNG THỨC
   Widget _buildPaymentOption(String methodValue, String title, IconData icon) {
-
     bool isSelected = _selectedMethod == methodValue;
 
     return ListTile(
-
       onTap: () {
         setState(() {
           _selectedMethod = methodValue;
@@ -163,7 +173,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
           color: isSelected ? AppColors.primaryGreen : AppColors.textPrimary,
         ),
       ),
-
       trailing: isSelected
           ? const Icon(Icons.radio_button_checked, color: AppColors.primaryGreen)
           : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
@@ -206,7 +215,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
   }
 
-
   Widget _buildInfoCard({required Key key, required String title, required List<Widget> children}) {
     return Card(
       key: key,
@@ -229,7 +237,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
       ),
     );
   }
-
 
   Widget _buildDetailRow(String label, String value, {bool isHighlight = false}) {
     return Padding(
@@ -255,7 +262,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
       ),
     );
   }
-
 
   void _showSuccessDialog() {
     showDialog(

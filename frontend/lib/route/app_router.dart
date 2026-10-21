@@ -33,6 +33,7 @@ import '../screens/tenant/payment_screen.dart' as tenant_payment;
 import '../screens/tenant/notifications_screen.dart' as tenant_notifications;
 import '../screens/tenant/home_screen.dart' as tv1_home;
 import '../screens/tenant/room_detail_screen.dart' as tv1_room_detail;
+import '../screens/tenant/tenant_maintenance_request_screen.dart';
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final args = settings.arguments;
@@ -96,6 +97,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const tenant_notifications.NotificationsScreen());// --- ROUTE CỦA TV1 ---
       case AppRoutes.home:
         return MaterialPageRoute(builder: (_) => const tv1_home.HomeScreen());
+      case AppRoutes.tenantMaintenanceRequest:
+        return MaterialPageRoute(builder: (_) => const TenantMaintenanceRequestScreen());
       case AppRoutes.roomDetail:
         final roomData = (args as Map<String, dynamic>?) ?? {};
         return MaterialPageRoute(builder: (_) => tv1_room_detail.RoomDetailScreen(room: roomData));

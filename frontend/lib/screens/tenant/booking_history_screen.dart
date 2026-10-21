@@ -57,7 +57,7 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         title: const Text(
@@ -68,14 +68,27 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
 
         elevation: 0,
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16.0),
-        itemCount: mockAppointments.length,
-        itemBuilder: (context, index) {
-          final appointment = mockAppointments[index];
-          return _buildAppointmentCard(appointment);
-        },
-      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(24),
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(24),
+          ),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16.0),
+            itemCount: mockAppointments.length,
+            itemBuilder: (context, index) {
+              final appointment = mockAppointments[index];
+              return _buildAppointmentCard(appointment);
+            },
+          ),
+        ),
+      )
     );
   }
 
