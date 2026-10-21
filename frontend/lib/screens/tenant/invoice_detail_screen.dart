@@ -94,7 +94,7 @@ class InvoiceDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
@@ -114,6 +114,7 @@ class InvoiceDetailScreen extends StatelessWidget {
             color: AppColors.primaryGreen,
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+
             child: Card(
               color: AppColors.cardSurface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -141,44 +142,58 @@ class InvoiceDetailScreen extends StatelessWidget {
           // CHI TIẾT CÁC KHOẢN THU
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'CHI TIẾT CÁC KHOẢN THU',
-                    style: TextStyle(
-                      color: AppColors.primaryGreen,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+              child: Container(
+                  padding: const EdgeInsets.all(16.0),
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                   ),
-                  const SizedBox(height: 12),
+
+                  child:ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 20,),
+                        const Text(
+                          'CHI TIẾT CÁC KHOẢN THU',
+                          style: TextStyle(
+                            color: AppColors.primaryGreen,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
 
 
-                  Card(
-                    color: AppColors.cardSurface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 1,
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: invoiceDetail.items.length,
-                      separatorBuilder: (context, index) => const Divider(
-                        height: 1,
-                        color: AppColors.lightGreen,
-                        indent: 16,
-                        endIndent: 16,
-                      ),
-                      itemBuilder: (context, index) {
-                        final item = invoiceDetail.items[index];
-                        return _buildInvoiceItem(item);
-                      },
+                        Card(
+                          color: AppColors.cardSurface,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 1,
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: invoiceDetail.items.length,
+                            separatorBuilder: (context, index) => const Divider(
+                              height: 1,
+                              color: AppColors.lightGreen,
+                              indent: 16,
+                              endIndent: 16,
+                            ),
+                            itemBuilder: (context, index) {
+                              final item = invoiceDetail.items[index];
+                              return _buildInvoiceItem(item);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                  )
+
               ),
             ),
+
           ),
 
           // NÚT THANH TOÁN

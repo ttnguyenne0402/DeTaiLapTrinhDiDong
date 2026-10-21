@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
 
 class ContractDetailScreen extends StatelessWidget {
   const ContractDetailScreen({super.key});
@@ -137,35 +138,59 @@ class ContractDetailScreen extends StatelessWidget {
             ),
             const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
 
-            // LIÊN HỆ
+            // LIÊN HỆ & SỬA CHỮA
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('LIÊN HỆ CHỦ NHÀ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                  const Text('HỖ TRỢ & LIÊN HỆ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
                   const SizedBox(height: 12),
+
+                  // Thông tin chủ nhà
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const CircleAvatar(backgroundColor: AppColors.lightGreen, child: Icon(Icons.support_agent, color: AppColors.primaryGreen)),
-                    title: Text(ownerName, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                    subtitle: Text(ownerPhone, style: const TextStyle(color: AppColors.textSecondary)),
+                    title: const Text(ownerName, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                    subtitle: const Text(ownerPhone, style: TextStyle(color: AppColors.textSecondary)),
                     trailing: IconButton(
                       icon: const Icon(Icons.phone, color: AppColors.primaryGreen),
                       onPressed: () { /* GỌI CHỦ NHÀ */ },
                     ),
                   ),
                   const SizedBox(height: 16),
+
+                  // NÚT MỚI: GỬI YÊU CẦU SỬA CHỮA
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryGreen,
+                        backgroundColor: AppColors.warningOrange, // Dùng màu cam cảnh báo cho nổi bật
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.build_circle, color: Colors.white),
+                      label: const Text('GỬI YÊU CẦU SỬA CHỮA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        // Điều hướng sang trang Gửi yêu cầu sửa chữa
+                        Navigator.pushNamed(context, AppRoutes.tenantMaintenanceRequest);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Nút xem PDF cũ
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primaryGreen),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-                      label: const Text('XEM FILE HỢP ĐỒNG (PDF)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      icon: const Icon(Icons.picture_as_pdf, color: AppColors.primaryGreen),
+                      label: const Text('XEM FILE HỢP ĐỒNG (PDF)', style: TextStyle(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
                       onPressed: () { /* Xem PDF */ },
                     ),
                   ),

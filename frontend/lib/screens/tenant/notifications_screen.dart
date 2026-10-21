@@ -50,7 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
@@ -88,52 +88,63 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ],
       ),
-      body: dummyNotifications.isEmpty
-          ? const Center(
-        child: Text(
-          'Bạn không có thông báo nào.',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-      )
-          : ListView.separated(
-        itemCount: dummyNotifications.length,
-        separatorBuilder: (context, index) => const Divider(
-          height: 1,
-          color: AppColors.lightGreen,
-        ),
-        itemBuilder: (context, index) {
-          final notif = dummyNotifications[index];
-          return NotificationItem(
-            notificationData: notif,
-            onTap: () {
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: dummyNotifications.isEmpty
+              ? const Center(
+            child: Text(
+              'Bạn không có thông báo nào.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+            ),
+          )
+              : ListView.separated(
+            itemCount: dummyNotifications.length,
+            separatorBuilder: (context, index) => const Divider(
+              height: 1,
+              color: AppColors.lightGreen,
+            ),
+            itemBuilder: (context, index) {
+              final notif = dummyNotifications[index];
+              return NotificationItem(
+                notificationData: notif,
+                onTap: () {
 
-              if (notif['read_at'] == null) {
-                setState(() {
-                  notif['read_at'] = DateTime.now().toString();
-                });
-              }
+                  if (notif['read_at'] == null) {
+                    setState(() {
+                      notif['read_at'] = DateTime.now().toString();
+                    });
+                  }
 
 
-              switch (notif['type']) {
-                case 'invoice':
-                  Navigator.pushNamed(context, '/tenant/invoices/detail');
-                  break;
-                case 'viewing_appointment':
-                  Navigator.pushNamed(context, '/tenant/booking-history');
-                  break;
-                case 'contract':
-                  Navigator.pushNamed(context, '/tenant/contracts/detail');
-                  break;
+                  switch (notif['type']) {
+                    case 'invoice':
+                      Navigator.pushNamed(context, '/tenant/invoices/detail');
+                      break;
+                    case 'viewing_appointment':
+                      Navigator.pushNamed(context, '/tenant/booking-history');
+                      break;
+                    case 'contract':
+                      Navigator.pushNamed(context, '/tenant/contracts/detail');
+                      break;
 
-              // MAINTENANCE SẼ DO TV4 LÀM NÊN TẠM THỜI CHƯA CÓ ROUTE CỤ THỂ CỦA TENANT
-              }
+                  // MAINTENANCE SẼ DO TV4 LÀM NÊN TẠM THỜI CHƯA CÓ ROUTE CỤ THỂ CỦA TENANT
+                  }
 
-              // TUẦN 7 VIẾT LỆNH ĐIỀU HƯỚNG
+                  // TUẦN 7 VIẾT LỆNH ĐIỀU HƯỚNG
 
+                },
+              );
             },
-          );
-        },
+          ),
+        ),
       ),
+
     );
   }
 }
