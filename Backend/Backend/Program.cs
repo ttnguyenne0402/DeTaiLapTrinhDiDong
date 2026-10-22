@@ -1,8 +1,7 @@
 
-var builder = WebApplication.CreateBuilder(args);
 ﻿using Microsoft.EntityFrameworkCore;
-using Backend.Models; // Namespace chứa QuanLyPhongTroContext
-
+using Backend.Models;// Namespace chứa QuanLyPhongTroContext
+var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddDbContext<QuanLyPhongTroContext>(options =>
@@ -18,13 +17,21 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<Backend.Models.QuanLyPhongTroContext>();
 
 
-// 2. Đăng ký Repositories
+// 2. Đăng ký Repositories Đặt lịch và hợp đồng
 builder.Services.AddScoped<Backend.Repositories.IViewingAppointmentRepository, Backend.Repositories.ViewingAppointmentRepository>();
 builder.Services.AddScoped<Backend.Repositories.IContractRepository, Backend.Repositories.ContractRepository>();
 
-// 3. Đăng ký Services
+// 3. Đăng ký Services Đặt lịch và hợp đồng
 builder.Services.AddScoped<Backend.Services.IViewingAppointmentService, Backend.Services.ViewingAppointmentService>();
 builder.Services.AddScoped<Backend.Services.IContractService, Backend.Services.ContractService>();
+
+// Đăng ký Repositories Hóa đơn và thanh toán
+builder.Services.AddScoped<Backend.Repositories.IInvoiceRepository, Backend.Repositories.InvoiceRepository>();
+builder.Services.AddScoped<Backend.Repositories.IPaymentRepository, Backend.Repositories.PaymentRepository>();
+
+// Đăng ký Services Hóa đơn và thanh toán
+builder.Services.AddScoped<Backend.Services.IInvoiceService, Backend.Services.InvoiceService>();
+builder.Services.AddScoped<Backend.Services.IPaymentService, Backend.Services.PaymentService>();
 
 var app = builder.Build();
 
