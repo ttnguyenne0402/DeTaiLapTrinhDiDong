@@ -1,4 +1,5 @@
 
+var builder = WebApplication.CreateBuilder(args);
 ﻿using Microsoft.EntityFrameworkCore;
 using Backend.Models; // Namespace chứa QuanLyPhongTroContext
 
