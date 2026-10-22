@@ -33,6 +33,14 @@ builder.Services.AddScoped<Backend.Repositories.IPaymentRepository, Backend.Repo
 builder.Services.AddScoped<Backend.Services.IInvoiceService, Backend.Services.InvoiceService>();
 builder.Services.AddScoped<Backend.Services.IPaymentService, Backend.Services.PaymentService>();
 
+// Đăng ký Repositories Thông báo và và Sửa chữa. 
+builder.Services.AddScoped<Backend.Repositories.INotificationRepository, Backend.Repositories.NotificationRepository>();
+builder.Services.AddScoped<Backend.Repositories.IMaintenanceRequestRepository, Backend.Repositories.MaintenanceRequestRepository>();
+
+// Đăng ký Services Thông báo và Sửa chữa.
+builder.Services.AddScoped<Backend.Services.INotificationService, Backend.Services.NotificationService>();
+builder.Services.AddScoped<Backend.Services.IMaintenanceService, Backend.Services.MaintenanceService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
