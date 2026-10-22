@@ -1,7 +1,13 @@
-﻿
+
 var builder = WebApplication.CreateBuilder(args);
+﻿using Microsoft.EntityFrameworkCore;
+using Backend.Models; // Namespace chứa QuanLyPhongTroContext
 
 // Add services to the container.
+
+builder.Services.AddDbContext<QuanLyPhongTroContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// ----------------------------------------
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -22,14 +28,13 @@ builder.Services.AddScoped<Backend.Services.IContractService, Backend.Services.C
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseAuthorization();
 

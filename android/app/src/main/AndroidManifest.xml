@@ -3,7 +3,8 @@
     <application
         android:label="doanlaptrinhdidong"
         android:name=".MainApplication"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <meta-data
     android:name="com.zing.zalo.zalosdk.appID"
     android:value="@string/appID" />

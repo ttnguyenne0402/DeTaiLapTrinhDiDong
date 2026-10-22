@@ -3,6 +3,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../tenant/profile_screen.dart';
+import '../../services/admin/admin_dashboard_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -12,9 +13,13 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  // 1. State quản lý bộ lọc thời gian và khoảng ngày tùy chọn
+  // 1. Quản lý bộ lọc thời gian
   String _selectedPeriod = 'Tháng này';
   DateTimeRange? _customDateRange;
+
+  // Dữ liệu hứng từ Backend API
+  AdminDashboardData? _dashboardData;
+  bool _isLoading = false;
 
   final List<String> _periods = [
     'Hôm nay',
@@ -26,7 +31,59 @@ class _AdminDashboardState extends State<AdminDashboard> {
     'Tùy chọn ngày...',
   ];
 
-  // 2. State quản lý danh sách thông báo nhanh cho Admin
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData(); // Gọi API ngay khi mở màn hình
+  }
+
+  // Chuyển chuỗi lựa chọn thành khoảng ngày (start, end) gửi về Backend
+  (DateTime, DateTime) _resolveDateRange() {
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case 'Hôm nay':
+        return (DateTime(now.year, now.month, now.day), now);
+      case '7 ngày qua':
+        return (now.subtract(const Duration(days: 7)), now);
+      case 'Tháng trước':
+        final prevMonth = DateTime(now.year, now.month - 1, 1);
+        final endOfPrevMonth = DateTime(now.year, now.month, 0, 23, 59, 59);
+        return (prevMonth, endOfPrevMonth);
+      case 'Quý này (Q4)':
+        return (DateTime(now.year, 10, 1), DateTime(now.year, 12, 31, 23, 59, 59));
+      case 'Năm nay':
+        return (DateTime(now.year, 1, 1), DateTime(now.year, 12, 31, 23, 59, 59));
+      case 'Tùy chọn ngày...':
+        if (_customDateRange != null) {
+          return (_customDateRange!.start, _customDateRange!.end);
+        }
+        return (DateTime(now.year, now.month, 1), now);
+      case 'Tháng này':
+      default:
+        return (DateTime(now.year, now.month, 1), now);
+    }
+  }
+
+  // Hàm gọi API lấy dữ liệu thực tế
+  Future<void> _loadDashboardData() async {
+    setState(() => _isLoading = true);
+    try {
+      final (start, end) = _resolveDateRange();
+      final data = await AdminDashboardService.fetchStats(
+        startDate: start,
+        endDate: end,
+      );
+      setState(() {
+        _dashboardData = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint("Lỗi tải API Dashboard: $e");
+    }
+  }
+
+  // 2. Danh sách thông báo nhanh
   final List<Map<String, dynamic>> _notifications = [
     {
       'title': 'Tin đăng mới chờ duyệt',
@@ -48,11 +105,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     },
   ];
 
-  // Đếm số lượng thông báo chưa đọc
   int get _unreadCount =>
       _notifications.where((item) => item['isRead'] == false).length;
 
-  // Nhãn hiển thị trên nút chọn thời gian (Hiện ngày cụ thể nếu chọn lịch)
   String get _displayPeriodLabel {
     if (_selectedPeriod == 'Tùy chọn ngày...' && _customDateRange != null) {
       final start = _customDateRange!.start;
@@ -62,7 +117,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return _selectedPeriod;
   }
 
-  // Hàm định dạng số có dấu chấm phân cách hàng nghìn (VD: 1256 -> 1.256)
   String _formatNumber(int number) {
     final str = number.toString();
     final buffer = StringBuffer();
@@ -75,111 +129,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return buffer.toString();
   }
 
-  // 3. Tự động tính số liệu 4 thẻ StarCard theo mọi mốc thời gian
-  Map<String, String> get _currentStats {
-    int multiplier = 30;
-    switch (_selectedPeriod) {
-      case 'Hôm nay':
-        multiplier = 1;
-        break;
-      case '7 ngày qua':
-        multiplier = 7;
-        break;
-      case 'Tháng này':
-        multiplier = 30;
-        break;
-      case 'Tháng trước':
-        multiplier = 28;
-        break;
-      case 'Quý này (Q4)':
-        multiplier = 90;
-        break;
-      case 'Năm nay':
-        multiplier = 365;
-        break;
-      case 'Tùy chọn ngày...':
-        multiplier = (_customDateRange?.duration.inDays ?? 5) + 1;
-        break;
-    }
-
-    return {
-      'users': _formatNumber(42 * multiplier),
-      'rooms': _formatNumber(78 * multiplier),
-      'approved': _formatNumber(63 * multiplier),
-      'reports': _formatNumber(15 * multiplier),
-    };
-  }
-
-  // 4. Tự động sinh dữ liệu Biểu đồ theo mốc thời gian hoặc khoảng ngày trên lịch
-  List<_ChartData> get _currentChartData {
-    switch (_selectedPeriod) {
-      case 'Hôm nay':
-        return [
-          _ChartData('08h', 15, 8),
-          _ChartData('12h', 42, 29),
-          _ChartData('16h', 38, 25),
-          _ChartData('20h', 85, 64),
-          _ChartData('23h', 50, 35),
-        ];
-      case '7 ngày qua':
-        return [
-          _ChartData('T2', 120, 80),
-          _ChartData('T3', 190, 130),
-          _ChartData('T4', 150, 110),
-          _ChartData('T5', 240, 180),
-          _ChartData('T6', 200, 160),
-          _ChartData('T7', 310, 250),
-          _ChartData('CN', 280, 210),
-        ];
-      case 'Tháng trước':
-        return [
-          _ChartData('Tuần 1', 420, 310),
-          _ChartData('Tuần 2', 510, 390),
-          _ChartData('Tuần 3', 480, 350),
-          _ChartData('Tuần 4', 620, 490),
-        ];
-      case 'Quý này (Q4)':
-        return [
-          _ChartData('Tháng 10', 2100, 1650),
-          _ChartData('Tháng 11', 2450, 1900),
-          _ChartData('Tháng 12', 2900, 2300),
-        ];
-      case 'Năm nay':
-        return [
-          _ChartData('Q1', 5200, 3850),
-          _ChartData('Q2', 6850, 5400),
-          _ChartData('Q3', 8400, 6950),
-          _ChartData('Q4', 9100, 7600),
-        ];
-      case 'Tùy chọn ngày...':
-        if (_customDateRange == null) return [];
-        final int totalDays = _customDateRange!.duration.inDays + 1;
-        // Nếu chọn quá nhiều ngày thì gom bước nhảy để biểu đồ không bị dày đặc chữ
-        final int step = totalDays > 7 ? (totalDays / 6).ceil() : 1;
-        List<_ChartData> customPoints = [];
-
-        for (int i = 0; i < totalDays; i += step) {
-          final date = _customDateRange!.start.add(Duration(days: i));
-          final label = '${date.day}/${date.month}';
-          final double views = 80.0 + ((date.day * 17 + i * 23) % 150);
-          final double searches = views * 0.72;
-          customPoints.add(
-            _ChartData(label, views.roundToDouble(), searches.roundToDouble()),
-          );
-        }
-        return customPoints;
-      case 'Tháng này':
-      default:
-        return [
-          _ChartData('Tuần 1', 480, 340),
-          _ChartData('Tuần 2', 620, 470),
-          _ChartData('Tuần 3', 550, 410),
-          _ChartData('Tuần 4', 790, 630),
-        ];
-    }
-  }
-
-  // Hàm mở hộp thoại Thông báo khi bấm vào quả chuông
   void _showNotificationsSheet() {
     showModalBottomSheet(
       context: context,
@@ -218,7 +167,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ],
                   ),
                   const Divider(),
-                  Flexible( //  có thể co lại nhỏ hơn nếu màn hình bị thiếu không gian,
+                  Flexible(
                     child: ListView.builder(
                       shrinkWrap: true,
                       itemCount: _notifications.length,
@@ -245,7 +194,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             ),
                           ),
                           subtitle: Text('${item['subtitle']}\n${item['time']}'),
-                          isThreeLine: true,//  dùng để tối ưu khi có nội dung dài
+                          isThreeLine: true,
                           onTap: () {
                             setState(() {
                               item['isRead'] = true;
@@ -268,9 +217,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final currentStats = _currentStats;
-    final currentChartData = _currentChartData;
-
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
       body: SafeArea(
@@ -296,7 +242,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                   Row(
                     children: [
-                      // Nút chuông thông báo kèm số lượng chưa đọc
                       Stack(
                         alignment: Alignment.topRight,
                         children: [
@@ -330,7 +275,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ],
                       ),
                       const SizedBox(width: 8),
-                      // Avatar mở trang Profile
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -381,7 +325,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Tiêu đề Dashboard + Nút chọn thời gian / Lịch
+                      // Tiêu đề Dashboard + Dropdown chọn thời gian
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -406,7 +350,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               child: DropdownButton<String>(
                                 value: _selectedPeriod,
                                 isDense: true,
-                                isExpanded: false, // Giữ nguyên hoặc đặt false để rộng vừa đủ nội dung
+                                isExpanded: false,
                                 icon: const Icon(
                                   Icons.calendar_month_outlined,
                                   color: Colors.grey,
@@ -430,7 +374,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 items: _periods.map((String period) {
                                   return DropdownMenuItem<String>(
                                     value: period,
-                                    // Bọc trong SizedBox để kiểm soát chính xác chiều rộng của từng item khi mở dropdown
                                     child: SizedBox(
                                       width: 150,
                                       child: Row(
@@ -490,11 +433,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                         _customDateRange = pickedRange;
                                         _selectedPeriod = newValue;
                                       });
+                                      _loadDashboardData(); // Gọi lại API sau khi chọn ngày
                                     }
                                   } else {
                                     setState(() {
                                       _selectedPeriod = newValue;
                                     });
+                                    _loadDashboardData(); // Gọi lại API khi đổi mốc thời gian
                                   }
                                 },
                               ),
@@ -505,7 +450,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                       const SizedBox(height: 12),
 
-                      // 4 Thẻ thống kê chia 2 dòng
+                      // 4 Thẻ thống kê lấy số liệu từ API
                       GridView.count(
                         crossAxisCount: 2,
                         shrinkWrap: true,
@@ -516,7 +461,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         children: [
                           StarCard(
                             title: 'Tổng người dùng',
-                            value: currentStats['users']!,
+                            value: _isLoading
+                                ? '...'
+                                : _formatNumber(_dashboardData?.totalUsers ?? 0),
                             icon: Icons.person_outline,
                             iconColor: Colors.green,
                             onTap: () => Navigator.pushNamed(
@@ -526,7 +473,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                           StarCard(
                             title: 'Phòng đăng',
-                            value: currentStats['rooms']!,
+                            value: _isLoading
+                                ? '...'
+                                : _formatNumber(_dashboardData?.totalRooms ?? 0),
                             icon: Icons.home_outlined,
                             iconColor: Colors.amber,
                             onTap: () => Navigator.pushNamed(
@@ -536,7 +485,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                           StarCard(
                             title: 'Tin đã duyệt',
-                            value: currentStats['approved']!,
+                            value: _isLoading
+                                ? '...'
+                                : _formatNumber(_dashboardData?.approvedPosts ?? 0),
                             icon: Icons.description_outlined,
                             iconColor: Colors.blue,
                             onTap: () => Navigator.pushNamed(
@@ -546,14 +497,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                           StarCard(
                             title: 'Báo cáo',
-                            value: currentStats['reports']!,
+                            value: _isLoading
+                                ? '...'
+                                : _formatNumber(_dashboardData?.reports ?? 0),
                             icon: Icons.assignment_outlined,
                             iconColor: Colors.deepOrange,
                             onTap: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    'Đang có ${currentStats['reports']} báo cáo trong kỳ ($_displayPeriodLabel)',
+                                    'Đang có ${_dashboardData?.reports ?? 0} báo cáo trong kỳ ($_displayPeriodLabel)',
                                   ),
                                   duration: const Duration(seconds: 2),
                                 ),
@@ -577,7 +530,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Biểu đồ đường tương tác
+                      // Biểu đồ đường lấy điểm từ API
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -597,49 +550,51 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             const SizedBox(height: 10),
                             SizedBox(
                               height: 200,
-                              child: SfCartesianChart(
+                              child: _isLoading
+                                  ? const Center(child: CircularProgressIndicator())
+                                  : SfCartesianChart(
                                 margin: EdgeInsets.zero,
-                                plotAreaBorderWidth: 0, //tắt đường viền bao quanh khu vực vẽ đồ thị
-                                tooltipBehavior: TooltipBehavior(enable: true),// hiển thị hộp thoại
-                                legend: const Legend(  // chú thích
+                                plotAreaBorderWidth: 0,
+                                tooltipBehavior: TooltipBehavior(enable: true),
+                                legend: const Legend(
                                   isVisible: true,
                                   position: LegendPosition.top,
-                                  overflowMode: LegendItemOverflowMode.wrap,//tự động xuống dòng nếu tên các mục chú giải quá dài
-                                  toggleSeriesVisibility: true,// tính năng tương tác
+                                  overflowMode: LegendItemOverflowMode.wrap,
+                                  toggleSeriesVisibility: true,
                                 ),
                                 primaryXAxis: const CategoryAxis(
-                                  majorGridLines: MajorGridLines(width: 0),// ẩn các đường lưới dọc
+                                  majorGridLines: MajorGridLines(width: 0),
                                 ),
                                 primaryYAxis: const NumericAxis(
-                                  axisLine: AxisLine(width: 0),// ẩn đường trục y
-                                  majorTickLines: MajorTickLines( //  Ẩn các vạch chia nhỏ trên trục Y
+                                  axisLine: AxisLine(width: 0),
+                                  majorTickLines: MajorTickLines(
                                     color: Colors.transparent,
                                   ),
                                 ),
-                                series: <CartesianSeries<_ChartData, String>>[
+                                series: <CartesianSeries<DashboardChartPoint, String>>[
                                   // Đường 1: Lượt truy cập
-                                  LineSeries<_ChartData, String>(
+                                  LineSeries<DashboardChartPoint, String>(
                                     name: 'Lượt truy cập',
-                                    dataSource: currentChartData,
-                                    xValueMapper: (_ChartData data, _) =>
+                                    dataSource: _dashboardData?.chartData ?? [],
+                                    xValueMapper: (DashboardChartPoint data, _) =>
                                     data.day,
-                                    yValueMapper: (_ChartData data, _) =>
+                                    yValueMapper: (DashboardChartPoint data, _) =>
                                     data.views,
                                     color: AppColors.primaryGreen,
                                     width: 3,
-                                    enableTooltip: true,// cho phép kích hoạt hiển thị hộp thoại
-                                    markerSettings: const MarkerSettings( // vẽ các chấm tròn
+                                    enableTooltip: true,
+                                    markerSettings: const MarkerSettings(
                                       isVisible: true,
                                     ),
                                   ),
 
                                   // Đường 2: Lượt tìm phòng
-                                  LineSeries<_ChartData, String>(
+                                  LineSeries<DashboardChartPoint, String>(
                                     name: 'Lượt tìm phòng',
-                                    dataSource: currentChartData,
-                                    xValueMapper: (_ChartData data, _) =>
+                                    dataSource: _dashboardData?.chartData ?? [],
+                                    xValueMapper: (DashboardChartPoint data, _) =>
                                     data.day,
-                                    yValueMapper: (_ChartData data, _) =>
+                                    yValueMapper: (DashboardChartPoint data, _) =>
                                     data.searches,
                                     color: Colors.amber,
                                     width: 3,
@@ -708,14 +663,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
     );
   }
-}
-
-// Dữ liệu biểu đồ
-class _ChartData {
-  _ChartData(this.day, this.views, this.searches);
-  final String day;
-  final double views;
-  final double searches;
 }
 
 // Sub-widget Thẻ Thống kê
