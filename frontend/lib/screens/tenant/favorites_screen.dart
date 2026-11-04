@@ -7,6 +7,7 @@ import 'booking_screen.dart';
 import 'my_invoices_screen.dart';
 import 'my_contracts_screen.dart';
 import 'profile_screen.dart';
+import '../../services/tenant/favorite_service.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -32,59 +33,14 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 
   final List<String> _sorts = ['Mới lưu', 'Giá thấp', 'Giá cao', 'Diện tích'];
 
-  // =========================
-  // DỮ LIỆU PHÒNG YÊU THÍCH
-  // =========================
-  final List<Map<String, dynamic>> _favorites = [
-    {
-      'id': 'ROOM001',
-      'propertyName': 'Khu trọ Nguyễn Văn Quá',
-      'title': 'Phòng đầy đủ nội thất gần Đại học Công Thương',
-      'district': 'Quận 12',
-      'ward': 'Đông Hưng Thuận',
-      'area': 22,
-      'price': 2800000,
-      'maxPeople': 2,
-      'isNew': true,
-      'nearSchool': true,
-      'goodPrice': true,
-      'amenities': ['Máy lạnh', 'Wifi', 'Tủ lạnh', 'WC riêng'],
-      'image':
-          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      'id': 'ROOM003',
-      'propertyName': 'Khu trọ Tân Phú',
-      'title': 'Phòng mới xây, an ninh tốt, giờ giấc tự do',
-      'district': 'Tân Phú',
-      'ward': 'Tân Sơn Nhì',
-      'area': 24,
-      'price': 3200000,
-      'maxPeople': 2,
-      'isNew': true,
-      'nearSchool': false,
-      'goodPrice': true,
-      'amenities': ['Wifi', 'Camera', 'WC riêng', 'Chỗ để xe'],
-      'image':
-          'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      'id': 'ROOM004',
-      'propertyName': 'Saigon Green House',
-      'title': 'Phòng rộng, gần chợ và tuyến Metro',
-      'district': 'Bình Thạnh',
-      'ward': 'Phường 25',
-      'area': 28,
-      'price': 4500000,
-      'maxPeople': 2,
-      'isNew': false,
-      'nearSchool': true,
-      'goodPrice': false,
-      'amenities': ['Máy lạnh', 'Wifi', 'Máy giặt', 'Camera'],
-      'image':
-          'https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=1200&q=80',
-    },
-  ];
+  final FavoriteService _favoriteService = FavoriteService.instance;
+  void _onFavoritesChanged() {
+    _loadFavorites();
+  }
+
+  List<Map<String, dynamic>> _favorites = [];
+
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -96,10 +52,17 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     );
 
     _animationController.forward();
+
+    // Lắng nghe khi danh sách yêu thích thay đổi
+    _favoriteService.favoritesChanged.addListener(_onFavoritesChanged);
+
+    // Tải danh sách yêu thích từ SQLite
+    _loadFavorites();
   }
 
   @override
   void dispose() {
+    _favoriteService.favoritesChanged.removeListener(_onFavoritesChanged);
     _animationController.dispose();
     super.dispose();
   }
@@ -111,57 +74,37 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   List<Map<String, dynamic>> get _filteredFavorites {
     List<Map<String, dynamic>> result = List.from(_favorites);
 
-    // ----------------------------------------------------------
     // LỌC THEO GIÁ
-    // ----------------------------------------------------------
-
     if (_selectedPriceFilter == 'Dưới 3 triệu') {
       result = result.where((room) {
-        return (room['price'] as int) < 3000000;
+        return (room['price'] as num) < 3000000;
       }).toList();
     }
 
     if (_selectedPriceFilter == '3 - 4 triệu') {
       result = result.where((room) {
-        final price = room['price'] as int;
-
+        final price = room['price'] as num;
         return price >= 3000000 && price <= 4000000;
       }).toList();
     }
 
     if (_selectedPriceFilter == '4 - 5 triệu') {
       result = result.where((room) {
-        final price = room['price'] as int;
-
+        final price = room['price'] as num;
         return price > 4000000 && price <= 5000000;
       }).toList();
     }
 
     if (_selectedPriceFilter == 'Trên 5 triệu') {
       result = result.where((room) {
-        return (room['price'] as int) > 5000000;
+        return (room['price'] as num) > 5000000;
       }).toList();
     }
 
-    // ----------------------------------------------------------
-    // LỌC THEO ĐẶC ĐIỂM
-    // ----------------------------------------------------------
-
-    if (_selectedFeatureFilter == 'Giá tốt') {
-      result = result.where((room) {
-        return room['goodPrice'] == true;
-      }).toList();
-    }
-
-    if (_selectedFeatureFilter == 'Gần trường') {
-      result = result.where((room) {
-        return room['nearSchool'] == true;
-      }).toList();
-    }
-
+    // LỌC THEO TIỆN ÍCH
     if (_selectedFeatureFilter == 'Có nội thất') {
       result = result.where((room) {
-        final amenities = List<String>.from(room['amenities']);
+        final amenities = List<String>.from(room['amenities'] ?? []);
 
         return amenities.any(
           (item) =>
@@ -170,20 +113,17 @@ class _FavoritesScreenState extends State<FavoritesScreen>
       }).toList();
     }
 
-    // ----------------------------------------------------------
     // SẮP XẾP
-    // ----------------------------------------------------------
-
     if (_selectedSort == 'Giá thấp') {
-      result.sort((a, b) => (a['price'] as int).compareTo(b['price'] as int));
+      result.sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
     }
 
     if (_selectedSort == 'Giá cao') {
-      result.sort((a, b) => (b['price'] as int).compareTo(a['price'] as int));
+      result.sort((a, b) => (b['price'] as num).compareTo(a['price'] as num));
     }
 
     if (_selectedSort == 'Diện tích') {
-      result.sort((a, b) => (b['area'] as int).compareTo(a['area'] as int));
+      result.sort((a, b) => (b['area'] as num).compareTo(a['area'] as num));
     }
 
     return result;
@@ -193,38 +133,54 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   // FORMAT GIÁ
   // ============================================================
 
-  String _formatPrice(int price) {
-    final value = price ~/ 100000;
-    final million = value ~/ 10;
-    final hundred = value % 10;
+  String _formatPrice(num price) {
+    final value = price / 1000000;
 
-    if (hundred == 0) {
-      return '$million triệu';
+    if (value == value.roundToDouble()) {
+      return '${value.toStringAsFixed(0)} triệu';
     }
 
-    return '$million.$hundred triệu';
+    return '${value.toStringAsFixed(1)} triệu';
   }
 
   // ============================================================
   // BỎ YÊU THÍCH
   // ============================================================
 
-  void _removeFavorite(Map<String, dynamic> room) {
-    setState(() {
-      _favorites.remove(room);
-    });
+  Future<void> _removeFavorite(Map<String, dynamic> room) async {
+    try {
+      // Xóa phòng trong SQLite
+      await _favoriteService.removeFavorite(room['id'].toString());
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        content: const Text(
-          'Đã bỏ phòng khỏi danh sách yêu thích',
-          style: TextStyle(fontWeight: FontWeight.w600),
+      if (!mounted) return;
+
+      // Cập nhật giao diện
+      setState(() {
+        _favorites.removeWhere(
+          (item) => item['id'].toString() == room['id'].toString(),
+        );
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.primaryGreen,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          content: const Text(
+            'Đã bỏ phòng khỏi danh sách yêu thích',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Không thể bỏ yêu thích: $e')));
+    }
   }
 
   // ============================================================
@@ -292,7 +248,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     );
   }
 
-
   // ============================================================
   // BUILD
   // ============================================================
@@ -303,8 +258,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
 
     return Scaffold(
       backgroundColor: AppColors.background,
-
-
 
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
@@ -319,7 +272,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
             backgroundColor: AppColors.primaryGreen,
             foregroundColor: Colors.white,
             automaticallyImplyLeading: false,
-
 
             flexibleSpace: FlexibleSpaceBar(
               background: _FavoriteHeader(total: _favorites.length),
@@ -376,7 +328,14 @@ class _FavoritesScreenState extends State<FavoritesScreen>
           // ======================================================
           // DANH SÁCH PHÒNG
           // ======================================================
-          if (rooms.isEmpty)
+          if (_isLoading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primaryGreen),
+              ),
+            )
+          else if (rooms.isEmpty)
             SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
           else
             SliverPadding(
@@ -409,9 +368,11 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       padding: const EdgeInsets.only(bottom: 18),
                       child: _FavoriteRoomCard(
                         room: room,
-                        priceText: _formatPrice(room['price']),
+                        priceText: _formatPrice(room['price'] as num),
                         onTap: () => _openRoom(room),
-                        onRemove: () => _removeFavorite(room),
+                        onRemove: () {
+                          _removeFavorite(room);
+                        },
                       ),
                     ),
                   );
@@ -428,11 +389,18 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   // ============================================================
 
   Widget _buildSummary() {
-    final goodPriceCount = _favorites
-        .where((room) => room['goodPrice'] == true)
-        .length;
+    final furnishedCount = _favorites.where((room) {
+      final amenities = List<String>.from(room['amenities'] ?? []);
 
-    final newCount = _favorites.where((room) => room['isNew'] == true).length;
+      return amenities.any(
+        (item) => item == 'Máy lạnh' || item == 'Tủ lạnh' || item == 'Máy giặt',
+      );
+    }).length;
+
+    final amenityCount = _favorites.where((room) {
+      final amenities = room['amenities'] as List? ?? [];
+      return amenities.isNotEmpty;
+    }).length;
 
     return Row(
       children: [
@@ -446,17 +414,17 @@ class _FavoritesScreenState extends State<FavoritesScreen>
         const SizedBox(width: 10),
         Expanded(
           child: _SummaryBox(
-            icon: Icons.local_offer_rounded,
-            value: '$goodPriceCount',
-            label: 'Giá tốt',
+            icon: Icons.weekend_rounded,
+            value: '$furnishedCount',
+            label: 'Có nội thất',
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: _SummaryBox(
-            icon: Icons.auto_awesome_rounded,
-            value: '$newCount',
-            label: 'Phòng mới',
+            icon: Icons.home_repair_service_rounded,
+            value: '$amenityCount',
+            label: 'Có tiện ích',
           ),
         ),
       ],
@@ -698,28 +666,6 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                       ),
 
                       _FilterOption(
-                        icon: Icons.local_offer_rounded,
-                        title: 'Giá tốt',
-                        selected: tempFeatureFilter == 'Giá tốt',
-                        onTap: () {
-                          setModalState(() {
-                            tempFeatureFilter = 'Giá tốt';
-                          });
-                        },
-                      ),
-
-                      _FilterOption(
-                        icon: Icons.school_rounded,
-                        title: 'Gần trường',
-                        selected: tempFeatureFilter == 'Gần trường',
-                        onTap: () {
-                          setModalState(() {
-                            tempFeatureFilter = 'Gần trường';
-                          });
-                        },
-                      ),
-
-                      _FilterOption(
                         icon: Icons.weekend_rounded,
                         title: 'Có nội thất',
                         selected: tempFeatureFilter == 'Có nội thất',
@@ -939,6 +885,33 @@ class _FavoritesScreenState extends State<FavoritesScreen>
         );
       },
     );
+  }
+
+  // ============================================================
+  // TẢI DANH SÁCH YÊU THÍCH TỪ SQLITE
+  // ============================================================
+
+  Future<void> _loadFavorites() async {
+    try {
+      final data = await _favoriteService.getFavorites();
+
+      if (!mounted) return;
+
+      setState(() {
+        _favorites = data;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể tải danh sách yêu thích: $e')),
+      );
+    }
   }
 }
 
@@ -1239,7 +1212,7 @@ class _FavoriteRoomCardState extends State<_FavoriteRoomCard> {
   @override
   Widget build(BuildContext context) {
     final room = widget.room;
-    final amenities = List<String>.from(room['amenities']);
+    final amenities = List<String>.from(room['amenities'] ?? []);
 
     return MouseRegion(
       onEnter: (_) {
@@ -1461,28 +1434,41 @@ class _FavoriteRoomCardState extends State<_FavoriteRoomCard> {
   }
 
   Widget _buildImage(Map<String, dynamic> room) {
+    final imageUrl = (room['image'] ?? '').toString();
+
     return Stack(
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(19),
-          child: Image.network(
-            room['image'],
-            width: 118,
-            height: 190,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) {
-              return Container(
-                width: 118,
-                height: 190,
-                color: AppColors.lightGreen,
-                child: const Icon(
-                  Icons.home_rounded,
-                  color: AppColors.primaryGreen,
-                  size: 40,
+          child: imageUrl.isEmpty
+              ? Container(
+                  width: 118,
+                  height: 190,
+                  color: AppColors.lightGreen,
+                  child: const Icon(
+                    Icons.home_rounded,
+                    color: AppColors.primaryGreen,
+                    size: 40,
+                  ),
+                )
+              : Image.network(
+                  imageUrl,
+                  width: 118,
+                  height: 190,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) {
+                    return Container(
+                      width: 118,
+                      height: 190,
+                      color: AppColors.lightGreen,
+                      child: const Icon(
+                        Icons.home_rounded,
+                        color: AppColors.primaryGreen,
+                        size: 40,
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
         Positioned(
           left: 8,

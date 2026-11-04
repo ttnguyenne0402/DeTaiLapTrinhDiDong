@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -7,6 +8,8 @@ import 'reviews_screen.dart';
 import 'booking_screen.dart';
 import '../../widgets/tenant/open_street_map_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../services/tenant/room_service.dart';
+import '../../services/tenant/review_service.dart';
 
 class RoomDetailScreen extends StatefulWidget {
   final Map<String, dynamic> room;
@@ -21,13 +24,27 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     with SingleTickerProviderStateMixin {
   bool _isFavorite = false;
 
+  final RoomService _roomService = RoomService();
+
+  late Map<String, dynamic> _roomData;
+
+  bool _isDetailLoading = true;
+  String? _detailError;
+
+  // Thống kê đánh giá phòng
+  double _averageRating = 0;
+  int _reviewCount = 0;
+  bool _isReviewSummaryLoading = true;
+  String? _reviewSummaryError;
+
+  Map<String, dynamic> get room => _roomData;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  Map<String, dynamic> get room => widget.room;
-
-  String get roomTitle => room['title']?.toString() ?? 'Phòng trọ chưa có tên';
+  String get roomTitle =>
+      room['title']?.toString() ?? 'Phòng trọ chưa có tên';
 
   String get propertyName =>
       room['propertyName']?.toString() ?? 'Khu trọ Trọ Ơi';
@@ -43,19 +60,23 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
         .trim();
 
     final parts = <String>[
-      if (street.isNotEmpty) street else if (rawAddress.isNotEmpty) rawAddress,
+      if (street.isNotEmpty)
+        street
+      else if (rawAddress.isNotEmpty)
+        rawAddress,
       if (ward.isNotEmpty) ward,
       if (district.isNotEmpty) district,
       'TP. Hồ Chí Minh',
       'Việt Nam',
     ];
 
-    // Loại bỏ các phần địa chỉ bị trùng, không phân biệt chữ hoa/thường.
+    // Loại bỏ các phần địa chỉ bị trùng.
     final uniqueParts = <String>[];
     final seen = <String>{};
 
     for (final part in parts) {
       final normalized = part.toLowerCase().trim();
+
       if (normalized.isNotEmpty && seen.add(normalized)) {
         uniqueParts.add(part);
       }
@@ -63,6 +84,112 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
 
     return uniqueParts.join(', ');
   }
+
+  // ============================================================
+  // LOAD ROOM DETAIL
+  // ============================================================
+
+  Future<void> _loadRoomDetail() async {
+    final roomId = _roomData['id']?.toString();
+
+    if (roomId == null || roomId.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _isDetailLoading = false;
+        _detailError = 'Không tìm thấy mã phòng';
+      });
+      return;
+    }
+
+    try {
+      final result = await _roomService.getRoomById(roomId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _roomData = {..._roomData, ...result};
+        _isDetailLoading = false;
+        _detailError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isDetailLoading = false;
+        _detailError = e.toString();
+      });
+    }
+  }
+
+  // ============================================================
+  // LOAD REVIEW SUMMARY FROM BACKEND
+  // ============================================================
+
+  Future<void> _loadReviewSummary() async {
+    final roomId =
+        room['roomId']?.toString() ??
+        room['id']?.toString() ??
+        '';
+
+    if (roomId.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _isReviewSummaryLoading = false;
+        _reviewSummaryError = 'Không tìm thấy mã phòng.';
+      });
+      return;
+    }
+
+    try {
+      final summary =
+          await ReviewService.getRoomReviewSummary(roomId);
+
+      if (!mounted) return;
+
+      final averageValue = summary['averageRating'];
+      final countValue = summary['totalReviews'];
+
+      setState(() {
+        _averageRating = averageValue is num
+            ? averageValue.toDouble()
+            : double.tryParse(averageValue?.toString() ?? '') ?? 0;
+
+        _reviewCount = countValue is num
+            ? countValue.toInt()
+            : int.tryParse(countValue?.toString() ?? '') ?? 0;
+
+        _isReviewSummaryLoading = false;
+        _reviewSummaryError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isReviewSummaryLoading = false;
+        _reviewSummaryError = e.toString();
+      });
+    }
+  }
+
+  // ============================================================
+  // RATING LABEL
+  // ============================================================
+
+  String _getRatingLabel(double rating) {
+    if (_reviewCount == 0) return 'Chưa có đánh giá';
+    if (rating >= 4.5) return 'Xuất sắc';
+    if (rating >= 4.0) return 'Rất tốt';
+    if (rating >= 3.0) return 'Tốt';
+    if (rating >= 2.0) return 'Trung bình';
+
+    return 'Cần cải thiện';
+  }
+
+  // ============================================================
+  // ROOM DATA
+  // ============================================================
 
   int get price => (room['price'] as num?)?.toInt() ?? 0;
 
@@ -98,9 +225,15 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     return [];
   }
 
+  // ============================================================
+  // INIT STATE
+  // ============================================================
+
   @override
   void initState() {
     super.initState();
+
+    _roomData = Map<String, dynamic>.from(widget.room);
 
     _animationController = AnimationController(
       vsync: this,
@@ -113,7 +246,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     );
 
     _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(
+        Tween<Offset>(
+          begin: const Offset(0, 0.04),
+          end: Offset.zero,
+        ).animate(
           CurvedAnimation(
             parent: _animationController,
             curve: Curves.easeOutCubic,
@@ -121,6 +257,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
         );
 
     _animationController.forward();
+
+    _loadRoomDetail();
+    _loadReviewSummary();
   }
 
   @override
@@ -128,6 +267,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     _animationController.dispose();
     super.dispose();
   }
+
+  // ============================================================
+  // FORMAT PRICE
+  // ============================================================
 
   String _formatPrice(int value) {
     if (value <= 0) {
@@ -147,6 +290,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
 
     return '${buffer.toString()}đ';
   }
+
+  // ============================================================
+  // AMENITY ICON
+  // ============================================================
 
   IconData _amenityIcon(String amenity) {
     final value = amenity.toLowerCase();
@@ -190,6 +337,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     return Icons.check_circle_outline_rounded;
   }
 
+  // ============================================================
+  // FAVORITE
+  // ============================================================
+
   void _toggleFavorite() {
     setState(() {
       _isFavorite = !_isFavorite;
@@ -202,18 +353,24 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
         duration: const Duration(milliseconds: 1300),
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
         content: Row(
           children: [
             Icon(
               _isFavorite
                   ? Icons.favorite_rounded
                   : Icons.favorite_border_rounded,
-              color: _isFavorite ? AppColors.accentYellow : Colors.white,
+              color: _isFavorite
+                  ? AppColors.accentYellow
+                  : Colors.white,
             ),
             const SizedBox(width: 10),
             Text(
-              _isFavorite ? 'Đã thêm vào yêu thích' : 'Đã bỏ khỏi yêu thích',
+              _isFavorite
+                  ? 'Đã thêm vào yêu thích'
+                  : 'Đã bỏ khỏi yêu thích',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ],
@@ -222,12 +379,22 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     );
   }
 
+  // ============================================================
+  // OPEN REVIEWS
+  // ============================================================
+
   void _openReviews() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ReviewsScreen(room: room)),
+      MaterialPageRoute(
+        builder: (_) => ReviewsScreen(room: room),
+      ),
     );
   }
+
+  // ============================================================
+  // SHOW MESSAGE
+  // ============================================================
 
   void _showComingSoon(String message) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -236,7 +403,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
         content: Text(
           message,
           style: const TextStyle(fontWeight: FontWeight.w600),
@@ -244,6 +413,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       ),
     );
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -267,11 +440,8 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildRoomHeader(),
-
                           const SizedBox(height: 20),
-
                           _buildQuickInfo(),
-
                           const SizedBox(height: 24),
 
                           _buildSectionTitle(
@@ -280,9 +450,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                           ),
 
                           const SizedBox(height: 12),
-
                           _buildRoomInfoCard(),
-
                           const SizedBox(height: 24),
 
                           _buildSectionTitle(
@@ -291,9 +459,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                           ),
 
                           const SizedBox(height: 12),
-
                           _buildAmenities(),
-
                           const SizedBox(height: 24),
 
                           _buildSectionTitle(
@@ -302,13 +468,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                           ),
 
                           const SizedBox(height: 12),
-
                           _buildDescription(),
-
                           const SizedBox(height: 24),
 
                           _buildReviewsSection(),
-
                           const SizedBox(height: 24),
 
                           _buildLocationSection(),
@@ -327,10 +490,15 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     );
   }
 
+  // ============================================================
+  // GOOGLE MAPS
+  // ============================================================
+
   Future<void> _openGoogleMapsFallback() async {
-    final fullAddress = (room['address'] ?? room['fullAddress'] ?? address)
-        .toString()
-        .trim();
+    final fullAddress =
+        (room['address'] ?? room['fullAddress'] ?? address)
+            .toString()
+            .trim();
 
     if (fullAddress.isEmpty) {
       _showComingSoon('Phòng chưa có thông tin địa chỉ.');
@@ -338,13 +506,22 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     }
 
     final destination = '$fullAddress, Việt Nam';
-    final uri = Uri.https('www.google.com', '/maps/dir/', {
-      'api': '1',
-      'destination': destination,
-    });
+
+    final uri = Uri.https(
+      'www.google.com',
+      '/maps/dir/',
+      {
+        'api': '1',
+        'destination': destination,
+      },
+    );
 
     try {
-      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
       if (!opened && mounted) {
         _showComingSoon('Không thể mở Google Maps lúc này.');
       }
@@ -366,6 +543,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       elevation: 0,
       backgroundColor: AppColors.primaryGreen,
       automaticallyImplyLeading: false,
+
       leading: Padding(
         padding: const EdgeInsets.only(left: 14),
         child: _CircleActionButton(
@@ -373,6 +551,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           onTap: () => Navigator.pop(context),
         ),
       ),
+
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 14),
@@ -380,11 +559,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             icon: _isFavorite
                 ? Icons.favorite_rounded
                 : Icons.favorite_border_rounded,
-            iconColor: _isFavorite ? AppColors.accentYellow : Colors.white,
+            iconColor: _isFavorite
+                ? AppColors.accentYellow
+                : Colors.white,
             onTap: _toggleFavorite,
           ),
         ),
       ],
+
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -444,7 +626,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                         shape: BoxShape.circle,
                       ),
                     ),
+
                     const SizedBox(width: 7),
+
                     Text(
                       status == 'available'
                           ? 'Đang còn phòng'
@@ -482,7 +666,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             letterSpacing: 1.1,
           ),
         ),
+
         const SizedBox(height: 7),
+
         Text(
           roomTitle,
           style: const TextStyle(
@@ -492,7 +678,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             fontWeight: FontWeight.w900,
           ),
         ),
+
         const SizedBox(height: 12),
+
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -501,7 +689,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
               color: AppColors.primaryGreen,
               size: 20,
             ),
+
             const SizedBox(width: 6),
+
             Expanded(
               child: Text(
                 address,
@@ -529,7 +719,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryGreen.withOpacity(0.07),
@@ -548,7 +740,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
               highlight: true,
             ),
           ),
+
           _verticalDivider(),
+
           Expanded(
             child: _QuickInfoItem(
               icon: Icons.square_foot_rounded,
@@ -556,7 +750,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
               value: '$area m²',
             ),
           ),
+
           _verticalDivider(),
+
           Expanded(
             child: _QuickInfoItem(
               icon: Icons.people_alt_rounded,
@@ -570,14 +766,21 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   }
 
   Widget _verticalDivider() {
-    return Container(width: 1, height: 48, color: const Color(0xFFE5E7EB));
+    return Container(
+      width: 1,
+      height: 48,
+      color: const Color(0xFFE5E7EB),
+    );
   }
 
   // ============================================================
   // SECTION TITLE
   // ============================================================
 
-  Widget _buildSectionTitle({required IconData icon, required String title}) {
+  Widget _buildSectionTitle({
+    required IconData icon,
+    required String title,
+  }) {
     return Row(
       children: [
         Container(
@@ -587,9 +790,15 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             color: AppColors.lightGreen,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: AppColors.primaryGreen, size: 20),
+          child: Icon(
+            icon,
+            color: AppColors.primaryGreen,
+            size: 20,
+          ),
         ),
+
         const SizedBox(width: 11),
+
         Text(
           title,
           style: const TextStyle(
@@ -615,23 +824,31 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
             title: 'Mã phòng',
             value: room['id']?.toString() ?? 'Chưa cập nhật',
           ),
+
           const Divider(height: 22),
+
           _InfoRow(
             icon: Icons.home_work_outlined,
             title: 'Khu trọ',
             value: propertyName,
           ),
+
           const Divider(height: 22),
+
           _InfoRow(
             icon: Icons.people_outline_rounded,
             title: 'Số người tối đa',
             value: '$maxPeople người',
           ),
+
           const Divider(height: 22),
+
           _InfoRow(
             icon: Icons.account_balance_wallet_outlined,
             title: 'Tiền cọc',
-            value: _formatPrice((room['deposit'] as num?)?.toInt() ?? price),
+            value: _formatPrice(
+              (room['deposit'] as num?)?.toInt() ?? price,
+            ),
           ),
         ],
       ),
@@ -647,8 +864,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       return _HoverCard(
         child: const Row(
           children: [
-            Icon(Icons.info_outline_rounded, color: AppColors.primaryGreen),
+            Icon(
+              Icons.info_outline_rounded,
+              color: AppColors.primaryGreen,
+            ),
+
             SizedBox(width: 10),
+
             Text(
               'Chưa có thông tin tiện nghi',
               style: TextStyle(
@@ -665,7 +887,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       spacing: 10,
       runSpacing: 10,
       children: amenities.map((amenity) {
-        return _AmenityChip(label: amenity, icon: _amenityIcon(amenity));
+        return _AmenityChip(
+          label: amenity,
+          icon: _amenityIcon(amenity),
+        );
       }).toList(),
     );
   }
@@ -677,11 +902,12 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   Widget _buildDescription() {
     final rawDescription = room['description']?.toString().trim();
 
-    final description = rawDescription != null && rawDescription.isNotEmpty
-        ? rawDescription
-        : 'Phòng được thiết kế phù hợp cho sinh viên và người đi làm, '
-              'không gian thoải mái, tiện nghi và thuận tiện cho sinh hoạt '
-              'hằng ngày.';
+    final description =
+        rawDescription != null && rawDescription.isNotEmpty
+            ? rawDescription
+            : 'Phòng được thiết kế phù hợp cho sinh viên và người đi làm, '
+                'không gian thoải mái, tiện nghi và thuận tiện cho sinh hoạt '
+                'hằng ngày.';
 
     return _HoverCard(
       child: Text(
@@ -721,7 +947,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                   size: 21,
                 ),
               ),
+
               const SizedBox(width: 11),
+
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,7 +962,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                         fontWeight: FontWeight.w900,
                       ),
                     ),
+
                     SizedBox(height: 3),
+
                     Text(
                       'Xem trải nghiệm từ những người thuê trước',
                       style: TextStyle(
@@ -752,49 +982,72 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           const SizedBox(height: 16),
 
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
             decoration: BoxDecoration(
               color: AppColors.lightGreen.withOpacity(.55),
               borderRadius: BorderRadius.circular(15),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Text(
-                  '4.5',
-                  style: TextStyle(
-                    color: AppColors.primaryGreen,
+                  _isReviewSummaryLoading
+                      ? '...'
+                      : _averageRating.toStringAsFixed(1),
+                  style: const TextStyle(
                     fontSize: 25,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryGreen,
                   ),
                 ),
-                SizedBox(width: 8),
-                Icon(
+
+                const Icon(
                   Icons.star_rounded,
-                  color: AppColors.accentYellow,
+                  color: Colors.amber,
                   size: 22,
                 ),
-                SizedBox(width: 5),
+
+                const SizedBox(width: 5),
+
                 Expanded(
                   child: Text(
-                    '• 12 đánh giá',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                    _isReviewSummaryLoading
+                        ? 'Đang tải đánh giá...'
+                        : '• $_reviewCount đánh giá',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black54,
                     ),
                   ),
                 ),
+
                 Text(
-                  'Rất tốt',
-                  style: TextStyle(
-                    color: AppColors.primaryGreen,
+                  _isReviewSummaryLoading
+                      ? ''
+                      : _getRatingLabel(_averageRating),
+                  style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryGreen,
                   ),
                 ),
               ],
             ),
           ),
+
+          if (_reviewSummaryError != null) ...[
+            const SizedBox(height: 8),
+
+            const Text(
+              'Không thể tải thống kê đánh giá.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red,
+              ),
+            ),
+          ],
 
           const SizedBox(height: 13),
 
@@ -815,14 +1068,27 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.rate_review_outlined, size: 18),
+                  Icon(
+                    Icons.rate_review_outlined,
+                    size: 18,
+                  ),
+
                   SizedBox(width: 8),
+
                   Text(
                     'Xem tất cả đánh giá',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
+
                   SizedBox(width: 5),
-                  Icon(Icons.arrow_forward_rounded, size: 17),
+
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 17,
+                  ),
                 ],
               ),
             ),
@@ -844,7 +1110,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           icon: Icons.location_on_rounded,
           title: 'Vị trí phòng',
         ),
+
         const SizedBox(height: 12),
+
         _buildLocationCard(),
       ],
     );
@@ -862,19 +1130,24 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Gọi widget bản đồ tách riêng
           Padding(
             padding: const EdgeInsets.all(16),
             child: OpenStreetMapWidget(
               address: address,
-              latitude: double.tryParse(room['latitude']?.toString() ?? ''),
-              longitude: double.tryParse(room['longitude']?.toString() ?? ''),
+              latitude: double.tryParse(
+                room['latitude']?.toString() ?? '',
+              ),
+              longitude: double.tryParse(
+                room['longitude']?.toString() ?? '',
+              ),
             ),
           ),
 
-          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          const Divider(
+            height: 1,
+            color: Color(0xFFE5E7EB),
+          ),
 
-          // 2. Phần hiển thị chữ địa chỉ
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
             child: Row(
@@ -893,7 +1166,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                     size: 22,
                   ),
                 ),
+
                 const SizedBox(width: 12),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -906,7 +1181,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                           fontWeight: FontWeight.w900,
                         ),
                       ),
+
                       const SizedBox(height: 4),
+
                       Text(
                         address,
                         style: const TextStyle(
@@ -984,7 +1261,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                         size: 20,
                         color: AppColors.primaryGreen,
                       ),
+
                       SizedBox(width: 7),
+
                       Flexible(
                         child: Text(
                           'Xem yêu thích',
@@ -1008,7 +1287,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const booking_screen()),
+                      MaterialPageRoute(
+                        builder: (_) => const booking_screen(),
+                      ),
                     );
                   },
                   child: const Row(
@@ -1019,7 +1300,9 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                         color: Colors.white,
                         size: 21,
                       ),
+
                       SizedBox(width: 9),
+
                       Text(
                         'Đặt lịch xem phòng',
                         style: TextStyle(
@@ -1056,7 +1339,8 @@ class _CircleActionButton extends StatefulWidget {
   });
 
   @override
-  State<_CircleActionButton> createState() => _CircleActionButtonState();
+  State<_CircleActionButton> createState() =>
+      _CircleActionButtonState();
 }
 
 class _CircleActionButtonState extends State<_CircleActionButton> {
@@ -1079,12 +1363,18 @@ class _CircleActionButtonState extends State<_CircleActionButton> {
                 ? Colors.white.withOpacity(0.30)
                 : Colors.black.withOpacity(0.25),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.25)),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.25),
+            ),
           ),
           child: AnimatedScale(
             scale: _hovered ? 1.12 : 1,
             duration: const Duration(milliseconds: 180),
-            child: Icon(widget.icon, color: widget.iconColor, size: 21),
+            child: Icon(
+              widget.icon,
+              color: widget.iconColor,
+              size: 21,
+            ),
           ),
         ),
       ),
@@ -1109,8 +1399,14 @@ class _QuickInfoItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, size: 21, color: AppColors.primaryGreen),
+        Icon(
+          icon,
+          size: 21,
+          color: AppColors.primaryGreen,
+        ),
+
         const SizedBox(height: 7),
+
         Text(
           label,
           style: const TextStyle(
@@ -1119,12 +1415,16 @@ class _QuickInfoItem extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+
         const SizedBox(height: 3),
+
         Text(
           value,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: highlight ? AppColors.primaryGreen : AppColors.textPrimary,
+            color: highlight
+                ? AppColors.primaryGreen
+                : AppColors.textPrimary,
             fontSize: 14,
             fontWeight: FontWeight.w900,
           ),
@@ -1156,9 +1456,15 @@ class _InfoRow extends StatelessWidget {
             color: AppColors.lightGreen,
             borderRadius: BorderRadius.circular(11),
           ),
-          child: Icon(icon, color: AppColors.primaryGreen, size: 19),
+          child: Icon(
+            icon,
+            color: AppColors.primaryGreen,
+            size: 19,
+          ),
         ),
+
         const SizedBox(width: 12),
+
         Expanded(
           child: Text(
             title,
@@ -1169,6 +1475,7 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ),
+
         Flexible(
           child: Text(
             value,
@@ -1210,7 +1517,11 @@ class _HoverCardState extends State<_HoverCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
-        transform: Matrix4.translationValues(0, _hovered ? -4 : 0, 0),
+        transform: Matrix4.translationValues(
+          0,
+          _hovered ? -4 : 0,
+          0,
+        ),
         padding: widget.padding,
         decoration: BoxDecoration(
           color: AppColors.cardSurface,
@@ -1222,9 +1533,14 @@ class _HoverCardState extends State<_HoverCard> {
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryGreen.withOpacity(_hovered ? 0.12 : 0.05),
+              color: AppColors.primaryGreen.withOpacity(
+                _hovered ? 0.12 : 0.05,
+              ),
               blurRadius: _hovered ? 28 : 16,
-              offset: Offset(0, _hovered ? 12 : 6),
+              offset: Offset(
+                0,
+                _hovered ? 12 : 6,
+              ),
             ),
           ],
         ),
@@ -1238,7 +1554,10 @@ class _AmenityChip extends StatefulWidget {
   final String label;
   final IconData icon;
 
-  const _AmenityChip({required this.label, required this.icon});
+  const _AmenityChip({
+    required this.label,
+    required this.icon,
+  });
 
   @override
   State<_AmenityChip> createState() => _AmenityChipState();
@@ -1255,9 +1574,14 @@ class _AmenityChipState extends State<_AmenityChip> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 13,
+          vertical: 10,
+        ),
         decoration: BoxDecoration(
-          color: _hovered ? AppColors.primaryGreen : AppColors.lightGreen,
+          color: _hovered
+              ? AppColors.primaryGreen
+              : AppColors.lightGreen,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: _hovered
@@ -1280,13 +1604,19 @@ class _AmenityChipState extends State<_AmenityChip> {
             Icon(
               widget.icon,
               size: 17,
-              color: _hovered ? Colors.white : AppColors.primaryGreen,
+              color: _hovered
+                  ? Colors.white
+                  : AppColors.primaryGreen,
             ),
+
             const SizedBox(width: 7),
+
             Text(
               widget.label,
               style: TextStyle(
-                color: _hovered ? Colors.white : AppColors.primaryGreen,
+                color: _hovered
+                    ? Colors.white
+                    : AppColors.primaryGreen,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -1302,10 +1632,14 @@ class _PrimaryHoverButton extends StatefulWidget {
   final VoidCallback onTap;
   final Widget child;
 
-  const _PrimaryHoverButton({required this.onTap, required this.child});
+  const _PrimaryHoverButton({
+    required this.onTap,
+    required this.child,
+  });
 
   @override
-  State<_PrimaryHoverButton> createState() => _PrimaryHoverButtonState();
+  State<_PrimaryHoverButton> createState() =>
+      _PrimaryHoverButtonState();
 }
 
 class _PrimaryHoverButtonState extends State<_PrimaryHoverButton> {
@@ -1327,8 +1661,8 @@ class _PrimaryHoverButtonState extends State<_PrimaryHoverButton> {
           scale: _pressed
               ? 0.97
               : _hovered
-              ? 1.015
-              : 1,
+                  ? 1.015
+                  : 1,
           duration: const Duration(milliseconds: 150),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
