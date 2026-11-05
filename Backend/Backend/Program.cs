@@ -1,4 +1,3 @@
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -13,14 +12,14 @@ builder.Services.AddDbContext<QuanLyPhongTroContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Đăng ký Repositories
+// 2. Đăng ký Repositories (Đặt lịch & Hợp đồng)
 builder.Services.AddScoped<Backend.Repositories.IViewingAppointmentRepository,
     Backend.Repositories.ViewingAppointmentRepository>();
 
 builder.Services.AddScoped<Backend.Repositories.IContractRepository,
     Backend.Repositories.ContractRepository>();
 
-// 3. Đăng ký Services
+// 3. Đăng ký Services (Đặt lịch & Hợp đồng)
 builder.Services.AddScoped<Backend.Services.IViewingAppointmentService,
     Backend.Services.ViewingAppointmentService>();
 
@@ -69,7 +68,7 @@ builder.Services
 // 6. Đăng ký Authorization
 builder.Services.AddAuthorization();
 
-// 7. Đăng ký Controllers và Swagger
+// 7. Đăng ký Controllers và Swagger (Có tích hợp nút Authorize JWT)
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -99,6 +98,22 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
+
+// Đăng ký Repositories Hóa đơn và thanh toán
+builder.Services.AddScoped<Backend.Repositories.IInvoiceRepository, Backend.Repositories.InvoiceRepository>();
+builder.Services.AddScoped<Backend.Repositories.IPaymentRepository, Backend.Repositories.PaymentRepository>();
+
+// Đăng ký Services Hóa đơn và thanh toán
+builder.Services.AddScoped<Backend.Services.IInvoiceService, Backend.Services.InvoiceService>();
+builder.Services.AddScoped<Backend.Services.IPaymentService, Backend.Services.PaymentService>();
+
+// Đăng ký Repositories Thông báo và Sửa chữa 
+builder.Services.AddScoped<Backend.Repositories.INotificationRepository, Backend.Repositories.NotificationRepository>();
+builder.Services.AddScoped<Backend.Repositories.IMaintenanceRequestRepository, Backend.Repositories.MaintenanceRequestRepository>();
+
+// Đăng ký Services Thông báo và Sửa chữa
+builder.Services.AddScoped<Backend.Services.INotificationService, Backend.Services.NotificationService>();
+builder.Services.AddScoped<Backend.Services.IMaintenanceService, Backend.Services.MaintenanceService>();
 
 var app = builder.Build();
 
