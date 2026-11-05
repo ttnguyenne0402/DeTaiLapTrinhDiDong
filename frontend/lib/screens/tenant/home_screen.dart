@@ -10,7 +10,9 @@ import 'favorites_screen.dart';
 import 'my_invoices_screen.dart';
 import 'notifications_screen.dart';
 import 'my_contracts_screen.dart';
-import 'profile_screen.dart'; // Đảm bảo bạn đã có file này
+import 'profile_screen.dart';
+import '../../services/tenant/room_service.dart';
+import '../../services/tenant/favorite_service.dart';
 
 // ============================================================
 // KHUNG CHỨA THANH ĐIỀU HƯỚNG CỐ ĐỊNH
@@ -146,83 +148,117 @@ class _HomeContentState extends State<_HomeContent> {
   bool _isSearching = false;
   final Set<String> _selectedQuickFilters = {};
 
-  final List<Map<String, dynamic>> _allRooms = [
-    {
-      'id': 'ROOM001',
-      'propertyId': 'PROP001',
-      'propertyName': 'Khu trọ Nguyễn Văn Quá',
-      'title': 'Phòng đầy đủ nội thất gần Đại học Công Thương',
-      'street': 'Số 12, đường Nguyễn Văn Quá',
-      'district': 'Quận 12',
-      'ward': 'Đông Hưng Thuận',
-      'area': 22,
-      'price': 2800000,
-      'deposit': 2800000,
-      'maxPeople': 2,
-      'status': 'available',
-      'amenities': ['Máy lạnh', 'Wifi', 'Tủ lạnh', 'WC riêng'],
-      'image':
-          'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      'id': 'ROOM002',
-      'propertyId': 'PROP002',
-      'propertyName': 'An Phú Residence',
-      'title': 'Căn hộ mini cao cấp, ban công thoáng',
-      'street': 'Số 20, đường Song Hành',
-      'district': 'TP. Thủ Đức',
-      'ward': 'An Phú',
-      'area': 35,
-      'price': 6800000,
-      'deposit': 6800000,
-      'maxPeople': 3,
-      'status': 'available',
-      'amenities': ['Máy lạnh', 'Ban công', 'Thang máy', 'Wifi'],
-      'image':
-          'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      'id': 'ROOM003',
-      'propertyId': 'PROP003',
-      'propertyName': 'Khu trọ Tân Phú',
-      'title': 'Phòng mới xây, an ninh tốt, giờ giấc tự do',
-      'street': 'Số 15, đường Tân Sơn Nhì',
-      'district': 'Tân Phú',
-      'ward': 'Tân Sơn Nhì',
-      'area': 24,
-      'price': 3200000,
-      'deposit': 3200000,
-      'maxPeople': 2,
-      'status': 'available',
-      'amenities': ['Wifi', 'Camera', 'WC riêng', 'Chỗ để xe'],
-      'image':
-          'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
-    },
-    {
-      'id': 'ROOM004',
-      'propertyId': 'PROP004',
-      'propertyName': 'Saigon Green House',
-      'title': 'Phòng rộng, gần chợ và tuyến Metro',
-      'street': 'Số 10, đường D5',
-      'district': 'Bình Thạnh',
-      'ward': 'Phường 25',
-      'area': 28,
-      'price': 4500000,
-      'deposit': 4500000,
-      'maxPeople': 2,
-      'status': 'available',
-      'amenities': ['Máy lạnh', 'Wifi', 'Máy giặt', 'Camera'],
-      'image':
-          'https://images.unsplash.com/photo-1560185008-b033106af5c3?auto=format&fit=crop&w=1200&q=80',
-    },
-  ];
+  final RoomService _roomService = RoomService();
+  final FavoriteService _favoriteService = FavoriteService.instance;
 
+  List<Map<String, dynamic>> _allRooms = [];
   List<Map<String, dynamic>> rooms = [];
+
+  Set<String> _favoriteIds = {};
+
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    rooms = List<Map<String, dynamic>>.from(_allRooms);
+    _loadRooms();
+    _loadFavoriteIds();
+  }
+
+  Future<void> _loadFavoriteIds() async {
+    try {
+      final ids = await _favoriteService.getFavoriteIds();
+
+      if (!mounted) return;
+
+      setState(() {
+        _favoriteIds = ids;
+      });
+    } catch (e) {
+      debugPrint('Lỗi tải danh sách yêu thích: $e');
+    }
+  }
+
+  Future<void> _loadRooms() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await _roomService.getRooms();
+
+      if (!mounted) return;
+
+      setState(() {
+        _allRooms = result;
+        rooms = List<Map<String, dynamic>>.from(result);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite(Map<String, dynamic> room) async {
+    final roomId = room['id']?.toString();
+
+    if (roomId == null || roomId.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Không tìm thấy mã phòng')));
+      return;
+    }
+
+    // Kiểm tra trạng thái hiện tại
+    final isFavorite = _favoriteIds.contains(roomId);
+
+    try {
+      if (isFavorite) {
+        await _favoriteService.removeFavorite(roomId);
+      } else {
+        await _favoriteService.addFavorite(room);
+      }
+
+      if (!mounted) return;
+
+      // Cập nhật giao diện ngay sau khi lưu SQLite thành công
+      setState(() {
+        if (isFavorite) {
+          _favoriteIds.remove(roomId);
+        } else {
+          _favoriteIds.add(roomId);
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.primaryGreen,
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            isFavorite
+                ? 'Đã bỏ phòng khỏi danh sách yêu thích'
+                : 'Đã thêm phòng vào yêu thích',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Lỗi xử lý yêu thích: $e')));
+    }
   }
 
   @override
@@ -424,14 +460,13 @@ class _HomeContentState extends State<_HomeContent> {
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
+          // HERO: Logo, lời chào, thông báo và hình ngôi nhà
           SliverToBoxAdapter(child: _buildHero()),
+
           SliverToBoxAdapter(
-            child: Transform.translate(
-              offset: const Offset(0, -20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildSearchBar(),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+              child: _buildSearchBar(),
             ),
           ),
           SliverToBoxAdapter(
@@ -447,13 +482,69 @@ class _HomeContentState extends State<_HomeContent> {
                 child: _buildSearchStatus(),
               ),
             ),
+
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
               child: _buildSectionTitle(),
             ),
           ),
-          if (rooms.isEmpty)
+
+          if (_isLoading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primaryGreen),
+              ),
+            )
+          else if (_errorMessage != null)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off_rounded,
+                        size: 48,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Không thể tải danh sách phòng',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _loadRooms,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Thử lại'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGreen,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (rooms.isEmpty)
             SliverToBoxAdapter(child: _buildEmptyState())
           else
             SliverPadding(
@@ -461,32 +552,25 @@ class _HomeContentState extends State<_HomeContent> {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final room = rooms[index];
+
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: RoomCard(
                       room: room,
+
+                      // Nếu ID phòng nằm trong danh sách yêu thích thì hiện tim đỏ
+                      isFavorite: _favoriteIds.contains(room['id']?.toString()),
+
                       onTap: () {
-                        // Vẫn dùng Router để chuyển sang Chi tiết phòng đè lên toàn bộ màn hình
                         Navigator.pushNamed(
                           context,
                           '/room-detail',
                           arguments: room,
                         );
                       },
+
                       onFavorite: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            backgroundColor: AppColors.accentYellow,
-                            behavior: SnackBarBehavior.floating,
-                            content: Text(
-                              'Đã thêm phòng vào yêu thích',
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        );
+                        _toggleFavorite(room);
                       },
                     ),
                   );

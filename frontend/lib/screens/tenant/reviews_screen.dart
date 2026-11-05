@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../services/tenant/review_service.dart';
 import 'review_form.dart';
 
 class ReviewsScreen extends StatefulWidget {
@@ -16,47 +18,16 @@ class ReviewsScreen extends StatefulWidget {
 }
 
 class _ReviewsScreenState extends State<ReviewsScreen> {
-  late List<Map<String, dynamic>> _reviews;
+  List<Map<String, dynamic>> _reviews = [];
 
-  final List<Map<String, dynamic>> _defaultReviews = [
-    {
-      'name': 'Nguyễn Minh Anh',
-      'rating': 5,
-      'date': '2 ngày trước',
-      'content':
-          'Phòng sạch sẽ, khá thoáng và đầy đủ tiện nghi. Chủ trọ nhiệt tình, hỗ trợ nhanh khi có vấn đề.',
-      'avatar': 'MA',
-    },
-    {
-      'name': 'Trần Quốc Bảo',
-      'rating': 4,
-      'date': '1 tuần trước',
-      'content':
-          'Vị trí khá thuận tiện, khu vực xung quanh yên tĩnh. Phòng đúng như hình đăng.',
-      'avatar': 'QB',
-    },
-    {
-      'name': 'Lê Hoàng Nam',
-      'rating': 5,
-      'date': '2 tuần trước',
-      'content':
-          'Mình đã ở được một thời gian và cảm thấy khá ổn. An ninh tốt, giờ giấc thoải mái.',
-      'avatar': 'HN',
-    },
-    {
-      'name': 'Phạm Ngọc Hà',
-      'rating': 4,
-      'date': '1 tháng trước',
-      'content':
-          'Phòng đẹp, giá hợp lý. Chủ nhà thân thiện và dễ trao đổi.',
-      'avatar': 'NH',
-    },
-  ];
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  @override
-  void initState() {
-    super.initState();
-    _reviews = List<Map<String, dynamic>>.from(_defaultReviews);
+  double _averageRating = 0;
+  int _totalReviews = 0;
+
+  String get _roomId {
+    return widget.room?['id']?.toString() ?? '';
   }
 
   String get _roomName {
@@ -64,15 +35,127 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
         'Phòng đầy đủ nội thất gần Đại học Công Thương';
   }
 
-  double get _averageRating {
-    if (_reviews.isEmpty) return 0;
+  @override
+  void initState() {
+    super.initState();
+    _loadReviews();
+  }
 
-    final total = _reviews.fold<int>(
-      0,
-      (sum, review) => sum + (review['rating'] as int),
-    );
+  // Lấy danh sách đánh giá và thống kê từ backend
+  Future<void> _loadReviews() async {
+    if (_roomId.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Không tìm thấy mã phòng.';
+      });
+      return;
+    }
 
-    return total / _reviews.length;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        ReviewService.getRoomReviews(_roomId),
+        ReviewService.getRoomReviewSummary(_roomId),
+      ]);
+
+      final reviewData = results[0] as List<Map<String, dynamic>>;
+      final summaryData = results[1] as Map<String, dynamic>;
+
+      final reviews = reviewData.map((item) {
+        final tenantName =
+            item['tenantName']?.toString() ?? 'Người dùng';
+
+        final rating = (item['rating'] as num?)?.toInt() ?? 0;
+
+        return {
+          'id': item['id'],
+          'name': tenantName,
+          'rating': rating,
+          'date': _formatDate(item['createdAt']),
+          'content': item['comment']?.toString() ?? '',
+          'avatar': _getAvatar(
+            item['tenantAvatar'],
+            tenantName,
+          ),
+        };
+      }).toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        _reviews = reviews;
+        _averageRating =
+            (summaryData['averageRating'] as num?)?.toDouble() ?? 0;
+        _totalReviews =
+            (summaryData['totalReviews'] as num?)?.toInt() ??
+                reviews.length;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  // Chuyển ngày từ backend thành định dạng dễ đọc
+  String _formatDate(dynamic value) {
+    if (value == null) return '';
+
+    final date = DateTime.tryParse(value.toString());
+
+    if (date == null) return '';
+
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inMinutes < 1) {
+      return 'Vừa xong';
+    }
+
+    if (difference.inHours < 1) {
+      return '${difference.inMinutes} phút trước';
+    }
+
+    if (difference.inDays < 1) {
+      return '${difference.inHours} giờ trước';
+    }
+
+    if (difference.inDays < 7) {
+      return '${difference.inDays} ngày trước';
+    }
+
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
+  }
+
+  // Lấy chữ viết tắt để hiển thị avatar
+  String _getAvatar(dynamic avatar, String name) {
+    if (avatar != null && avatar.toString().trim().isNotEmpty) {
+      return avatar.toString().trim();
+    }
+
+    final parts = name.trim().split(RegExp(r'\s+'));
+
+    if (parts.isEmpty || parts.first.isEmpty) {
+      return 'U';
+    }
+
+    if (parts.length == 1) {
+      return parts.first[0].toUpperCase();
+    }
+
+    return '${parts[parts.length - 2][0]}${parts.last[0]}'
+        .toUpperCase();
   }
 
   Map<int, int> get _ratingCounts {
@@ -85,20 +168,22 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     };
   }
 
-  void _openReviewForm() {
-    Navigator.push(
+  Future<void> _openReviewForm() async {
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => ReviewForm(
           room: widget.room,
-          onReviewSubmitted: (review) {
-            setState(() {
-              _reviews.insert(0, review);
-            });
-          },
         ),
       ),
     );
+
+    if (!mounted) return;
+
+    // Nếu gửi thành công thì tải lại dữ liệu từ backend
+    if (result == true) {
+      await _loadReviews();
+    }
   }
 
   @override
@@ -127,43 +212,56 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _reviews.isEmpty
-                ? _buildEmptyState()
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                    children: [
-                      _buildRoomHeader(),
-                      const SizedBox(height: 18),
-                      _buildRatingOverview(),
-                      const SizedBox(height: 22),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Tất cả đánh giá',
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primaryGreen,
+                    ),
+                  )
+                : _errorMessage != null
+                    ? _buildErrorState()
+                    : _reviews.isEmpty
+                        ? _buildEmptyState()
+                        : ListView(
+                            padding: const EdgeInsets.fromLTRB(
+                              20,
+                              8,
+                              20,
+                              110,
+                            ),
+                            children: [
+                              _buildRoomHeader(),
+                              const SizedBox(height: 18),
+                              _buildRatingOverview(),
+                              const SizedBox(height: 22),
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Tất cả đánh giá',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$_totalReviews đánh giá',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
+                              const SizedBox(height: 12),
+                              ..._reviews.map(
+                                (review) => _buildReviewCard(review),
+                              ),
+                            ],
                           ),
-                          Text(
-                            '${_reviews.length} đánh giá',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ..._reviews.map(
-                        (review) => _buildReviewCard(review),
-                      ),
-                    ],
-                  ),
           ),
         ],
       ),
@@ -276,7 +374,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  '${_reviews.length} lượt đánh giá',
+                  '$_totalReviews lượt đánh giá',
                   style: TextStyle(
                     color: Colors.white.withOpacity(.75),
                     fontSize: 11,
@@ -548,6 +646,51 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                 fontSize: 13,
                 height: 1.5,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: AppColors.textSecondary,
+              size: 45,
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              'Không thể tải đánh giá',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'Đã xảy ra lỗi.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 15),
+            ElevatedButton(
+              onPressed: _loadReviews,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Thử lại'),
             ),
           ],
         ),
