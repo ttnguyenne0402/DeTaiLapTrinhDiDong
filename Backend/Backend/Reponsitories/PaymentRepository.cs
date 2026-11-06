@@ -1,4 +1,5 @@
 ﻿using Backend.Models;
+using Microsoft.EntityFrameworkCore; 
 using System.Threading.Tasks;
 
 namespace Backend.Repositories
@@ -17,6 +18,18 @@ namespace Backend.Repositories
             await _context.Payments.AddAsync(payment);
             await _context.SaveChangesAsync();
             return payment;
+        }
+      
+        public async Task<Payment?> GetByPaymentCodeAsync(string paymentCode)
+        {
+            return await _context.Payments.FirstOrDefaultAsync(p => p.PaymentCode == paymentCode);
+        }
+
+       
+        public async Task UpdateAsync(Payment payment)
+        {
+            _context.Payments.Update(payment);
+            await _context.SaveChangesAsync();
         }
     }
 }

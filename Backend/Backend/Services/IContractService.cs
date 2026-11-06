@@ -7,5 +7,6 @@ namespace Backend.Services
     public interface IContractService
     {
         Task<IEnumerable<ContractResponseDTO>> GetTenantContractsAsync(string tenantId);
+        Task<object> GetContractDetailAsync(string contractId);
     }
 }
