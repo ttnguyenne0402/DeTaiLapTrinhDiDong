@@ -14,7 +14,7 @@ class NotificationItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-    final bool isRead = notificationData['read_at'] != null;
+    final bool isRead = notificationData['isRead'] != null;
 
 
     IconData getIcon() {
@@ -76,7 +76,7 @@ class NotificationItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    notificationData['created_at'],
+                    notificationData['createdAt'],
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,

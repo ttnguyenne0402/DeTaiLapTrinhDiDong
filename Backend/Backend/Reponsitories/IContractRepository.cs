@@ -8,5 +8,6 @@ namespace Backend.Repositories
     {
         // Hàm lấy danh sách hợp đồng của 1 người thuê
         Task<IEnumerable<Contract>> GetByTenantIdAsync(string tenantId);
+        Task<Contract> GetByIdAsync(string id);
     }
 }

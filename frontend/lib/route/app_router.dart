@@ -79,8 +79,9 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => InvoiceDetailScreen());// id
 
       // ROUTE CỦA TV2 (NGƯỜI THUÊ - Dùng bí danh)
-      case AppRoutes.tenantBooking:
-        return MaterialPageRoute(builder: (_) => const tenant_booking.booking_screen());
+      // case AppRoutes.tenantBooking:
+      //   return MaterialPageRoute(builder: (_) => const tenant_booking.booking_screen());
+
       case AppRoutes.tenantBookingHistory:
         return MaterialPageRoute(builder: (_) => const tenant_booking_history.booking_history_screen());
       case AppRoutes.tenantContracts:
@@ -91,14 +92,14 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const tenant_invoices.MyInvoicesScreen());
       case AppRoutes.tenantInvoiceDetail:
         return MaterialPageRoute(builder: (_) => tenant_invoice_detail.InvoiceDetailScreen());
-      case AppRoutes.tenantPayment:
-        return MaterialPageRoute(builder: (_) => const tenant_payment.PaymentScreen());
+      // case AppRoutes.tenantPayment:
+      //  return MaterialPageRoute(builder: (_) => const tenant_payment.PaymentScreen());
       case AppRoutes.tenantNotifications:
         return MaterialPageRoute(builder: (_) => const tenant_notifications.NotificationsScreen());// --- ROUTE CỦA TV1 ---
       case AppRoutes.home:
         return MaterialPageRoute(builder: (_) => const tv1_home.HomeScreen());
-      case AppRoutes.tenantMaintenanceRequest:
-        return MaterialPageRoute(builder: (_) => const TenantMaintenanceRequestScreen());
+      // case AppRoutes.tenantMaintenanceRequest:
+      //   return MaterialPageRoute(builder: (_) => const TenantMaintenanceRequestScreen());
       case AppRoutes.roomDetail:
         final roomData = (args as Map<String, dynamic>?) ?? {};
         return MaterialPageRoute(builder: (_) => tv1_room_detail.RoomDetailScreen(room: roomData));

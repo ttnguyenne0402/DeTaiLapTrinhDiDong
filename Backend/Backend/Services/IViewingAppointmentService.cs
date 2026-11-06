@@ -11,5 +11,10 @@ namespace Backend.Services
 
         // Hàm lấy và định dạng danh sách lịch sử để hiển thị trên app
         Task<IEnumerable<ViewingAppointmentResponseDTO>> GetTenantAppointmentsAsync(string tenantId);
+        // Hàm hủy lịch
+        Task<bool> CancelAppointmentAsync(string id);
+
+        // Hàm cập nhật trạng thái (Đồng ý/Từ chối dời lịch)
+        Task<bool> UpdateStatusAsync(string id, string status);
     }
 }

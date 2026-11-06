@@ -25,5 +25,14 @@ namespace Backend.Repositories
                 .OrderByDescending(c => c.StartDate)
                 .ToListAsync();
         }
+        public async Task<Contract> GetByIdAsync(string id)
+        {
+            return await _context.Contracts
+                .Include(c => c.Room)
+                .Include(c => c.Owner)
+                .Include(c => c.ContractServices)
+                    .ThenInclude(cs => cs.Service) 
+                .FirstOrDefaultAsync(c => c.Id == id);
+        }
     }
 }
