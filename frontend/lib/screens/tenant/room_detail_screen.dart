@@ -1288,7 +1288,12 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const booking_screen(),
+                        builder: (_) => booking_screen(
+                          roomId: room['id']?.toString() ?? 'Chưa rõ',
+                          roomName: roomTitle,
+                          address: address,
+                          price: _formatPrice(price),
+                        ),
                       ),
                     );
                   },
