@@ -1,30 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../../core/constants/app_colors.dart';
-import '../../route/app_routes.dart';
 
-// DỮ LIỆU GIẢ
-class InvoiceMock {
-  final String invoiceCode;
-  final String billingMonth;
-  final String issueDate;
-  final String dueDate;
-  final double subtotal;
-  final double discount;
-  final double total;
-  final String status;
-
-  InvoiceMock({
-    required this.invoiceCode,
-    required this.billingMonth,
-    required this.issueDate,
-    required this.dueDate,
-    required this.subtotal,
-    required this.discount,
-    required this.total,
-    required this.status,
-  });
-}
-
+import '../../utils/database_helper.dart';
+import 'invoice_detail_screen.dart';
 class MyInvoicesScreen extends StatefulWidget {
   const MyInvoicesScreen({super.key});
 
@@ -33,45 +15,70 @@ class MyInvoicesScreen extends StatefulWidget {
 }
 
 class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
-  final List<InvoiceMock> dummyInvoices = [
-    InvoiceMock(
-      invoiceCode: 'INV-202610-001',
-      billingMonth: '10/2026',
-      issueDate: '25/09/2026',
-      dueDate: '05/10/2026',
-      subtotal: 3500000,
-      discount: 0,
-      total: 3500000,
-      status: 'unpaid',
-    ),
-    InvoiceMock(
-      invoiceCode: 'INV-202609-001',
-      billingMonth: '09/2026',
-      issueDate: '25/08/2026',
-      dueDate: '05/09/2026',
-      subtotal: 3500000,
-      discount: 50000,
-      total: 3450000,
-      status: 'paid',
-    ),
-    InvoiceMock(
-      invoiceCode: 'INV-202608-001',
-      billingMonth: '08/2026',
-      issueDate: '25/07/2026',
-      dueDate: '05/08/2026',
-      subtotal: 3500000,
-      discount: 0,
-      total: 3500000,
-      status: 'overdue',
-    ),
-  ];
+  List _invoices = [];
+  bool _isLoading = true;
+
+  // URL API Backend (Sử dụng 10.0.2.2 cho máy ảo Android)
+  final String _apiUrl = 'https://10.0.2.2:7203/api/invoices/tenant/TENANT01';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  // Hàm tạo Client tùy chỉnh bỏ qua lỗi SSL
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
+  Future<void> _loadData() async {
+    // 1. Lấy dữ liệu từ SQLite
+    final localData = await DatabaseHelper.instance.getLocalInvoices();
+    if (localData.isNotEmpty) {
+      setState(() {
+        _invoices = List.from(localData);
+        _isLoading = false;
+      });
+    }
+
+    // 2. Gọi API để lấy dữ liệu mới nhất
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(Uri.parse(_apiUrl));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> apiData = json.decode(response.body);
+
+        // 3. Lưu đè dữ liệu mới vào SQLite
+        await DatabaseHelper.instance.insertInvoices(apiData);
+
+        // 4. Cập nhật lại UI
+        if (mounted) {
+          setState(() {
+            _invoices = List.from(apiData);
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("Lỗi khi lấy hóa đơn từ server: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } finally {
+      client.close();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // TÍNH TỔNG NỢ
-    double totalDebt = dummyInvoices
-        .where((inv) => inv.status == 'unpaid' || inv.status == 'overdue')
-        .fold(0, (sum, item) => sum + item.total);
+
+    double totalDebt = _invoices
+        .where((inv) => inv['status'] == 'unpaid' || inv['status'] == 'overdue'||inv['status']=='pending')
+        .fold(0, (sum, item) => sum + (item['total'] as num).toDouble());
 
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
@@ -139,11 +146,17 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
                       ),
                     ),
                     Expanded(
-                      child: ListView.builder(
+                      child: _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : _invoices.isEmpty
+                          ? const Center(
+                        child: Text('Không có hóa đơn nào.', style: TextStyle(color: AppColors.textSecondary)),
+                      )
+                          : ListView.builder(
                         padding: const EdgeInsets.only(bottom: 20),
-                        itemCount: dummyInvoices.length,
+                        itemCount: _invoices.length,
                         itemBuilder: (context, index) {
-                          final invoice = dummyInvoices[index];
+                          final invoice = _invoices[index];
                           return _buildInvoiceCard(invoice);
                         },
                       ),
@@ -159,8 +172,12 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
   }
 
   // HÀM BUILD TỪNG CARD HÓA ĐƠN
-  Widget _buildInvoiceCard(InvoiceMock invoice) {
-    final statusUI = _getStatusUI(invoice.status);
+  Widget _buildInvoiceCard(Map<String, dynamic> invoice) {
+    final statusUI = _getStatusUI(invoice['status']);
+
+    // Ép kiểu an toàn cho các số thập phân
+    final discount = (invoice['discount'] as num).toDouble();
+    final total = (invoice['total'] as num).toDouble();
 
     return Card(
       color: AppColors.cardSurface,
@@ -169,8 +186,19 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
       elevation: 2,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          Navigator.pushNamed(context, '/tenant/invoices/detail');
+        onTap: () async {
+
+        await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const InvoiceDetailScreen(),
+              settings: RouteSettings(arguments: invoice['id']),
+            ),
+          );
+        setState(() {
+          _isLoading = true;
+        });
+        await _loadData();
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -182,7 +210,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Kỳ ${invoice.billingMonth}',
+                    'Kỳ ${invoice['billingMonth']}',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   Container(
@@ -198,12 +226,12 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
               const Divider(height: 24, thickness: 1, color: AppColors.lightGreen),
 
               // THÔNG TIN
-              _buildRow('Mã hóa đơn:', invoice.invoiceCode),
-              _buildRow('Ngày phát hành:', invoice.issueDate),
-              _buildRow('Hạn thanh toán:', invoice.dueDate, isWarning: invoice.status == 'overdue'),
+              _buildRow('Mã hóa đơn:', invoice['invoiceCode']),
+              _buildRow('Ngày phát hành:', invoice['issueDate']),
+              _buildRow('Hạn thanh toán:', invoice['dueDate'], isWarning: invoice['status'] == 'overdue'),
 
-              if (invoice.discount > 0) // GIẢM GIÁ
-                _buildRow('Giảm giá:', '- ${_formatCurrency(invoice.discount)} đ', color: Colors.green),
+              if (discount > 0) // GIẢM GIÁ
+                _buildRow('Giảm giá:', '- ${_formatCurrency(discount)} đ', color: Colors.green),
 
               const SizedBox(height: 8),
               // TỔNG TIỀN THANH TOÁN
@@ -215,7 +243,7 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   Text(
-                    '${_formatCurrency(invoice.total)} đ',
+                    '${_formatCurrency(total)} đ',
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
                   ),
                 ],
@@ -227,7 +255,6 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
     );
   }
 
-  // HÀM TIỆN ÍCH DÙNG CHO THÔNG TIN TRÊN CARD
   Widget _buildRow(String label, String value, {bool isWarning = false, Color? color}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
@@ -248,7 +275,6 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
     );
   }
 
-  // HÀM ĐỔI E SANG VI
   Map<String, dynamic> _getStatusUI(String status) {
     switch (status) {
       case 'paid':
@@ -266,7 +292,6 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
     }
   }
 
-  // HÀM ĐỔI TIỀN CHO ĐẸP
   String _formatCurrency(double amount) {
     String result = amount.toInt().toString();
     result = result.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');

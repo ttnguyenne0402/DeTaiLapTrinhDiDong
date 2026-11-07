@@ -5,6 +5,10 @@ namespace Backend.Services
 {
     public interface IPaymentService
     {
-        Task<bool> SubmitPaymentAsync(PaymentRequestDTO request);
+        // Trả về Tuple gồm: Trạng thái, Thông báo, và URL thanh toán (nếu có)
+        Task<(bool Success, string Message, string? PaymentUrl)> SubmitPaymentAsync(PaymentRequestDTO request, string ipAddress);
+
+        // Hàm để VNPay gọi ngầm báo kết quả
+        Task<bool> ConfirmVnPayTransactionAsync(string txnRef, string responseCode);
     }
 }

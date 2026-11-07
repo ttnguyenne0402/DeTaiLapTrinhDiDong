@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../../core/constants/app_colors.dart';
 import 'package:flutter_zalo/flutter_zalo.dart';
-import 'otp_screen.dart';
-import 'emailjs_service.dart';
+
+import '../../core/constants/app_colors.dart';
+import '../../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,12 +13,6 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  @override
-  void initState() {
-    super.initState();
-    FlutterZalo().init();
-  }
-
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _fullNameController = TextEditingController();
@@ -27,14 +21,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+    serverClientId:
+        '843670435307-mngs2e74rvnfc3rb7044alb5m60fs2ea.apps.googleusercontent.com',
+  );
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _sendingOtp = false;
-  String _selectedRole =
-      'tenant'; // 'tenant' (Người thuê) hoặc 'landlord' (Chủ trọ)
+  bool _isLoading = false;
 
-  // Khai báo đối tượng GoogleSignIn
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  String _selectedRole = 'tenant';
+
+  @override
+  void initState() {
+    super.initState();
+    FlutterZalo().init();
+  }
 
   @override
   void dispose() {
@@ -45,151 +48,260 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _goToOtpScreen() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    final email = _emailOrPhoneController.text.trim();
-    final name = _fullNameController.text.trim();
-
-    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-
-    if (!emailRegex.hasMatch(email)) {
-      _showNotice('Vui lòng nhập địa chỉ email hợp lệ!');
-      return;
-    }
-
-    if (_sendingOtp) return;
-
-    setState(() => _sendingOtp = true);
-
-    try {
-      final otp = EmailJsService.generateOtp();
-      final expiresAt = DateTime.now().add(const Duration(minutes: 15));
-
-      await EmailJsService.sendOtp(
-        email: email,
-        name: name,
-        otp: otp,
-        expiresAt: expiresAt,
-      );
-
-      if (!mounted) return;
-
-      final verified = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OtpScreen(
-            email: email,
-            fullName: name,
-            initialOtp: otp,
-            initialExpiry: expiresAt,
-          ),
-        ),
-      );
-
-      if (!mounted) return;
-
-      if (verified == true) {
-        _showNotice('Xác thực email thành công!');
-      }
-    } catch (e, stackTrace) {
-      debugPrint('Send OTP error: $e');
-      debugPrintStack(stackTrace: stackTrace);
-
-      if (mounted) {
-        _showNotice('Lỗi gửi OTP: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _sendingOtp = false);
-      }
-    }
-  }
-
-  void _showNotice(String title) {
-    debugPrint('REGISTER BUTTON: $title');
-
+  void _showNotice(String message, {bool isError = false}) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(title),
+        content: Text(message),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primaryGreen,
-        duration: const Duration(seconds: 2),
+        backgroundColor: isError ? Colors.redAccent : AppColors.primaryGreen,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    debugPrint('Bat dau dang nhap Google');
+  // ĐĂNG KÝ BẰNG EMAIL HOẶC SỐ ĐIỆN THOẠI
+  Future<void> _handleRegister() async {
+    if (_isLoading) return;
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
 
     try {
+      final result = await AuthService.register(
+        fullName: _fullNameController.text.trim(),
+        emailOrPhone: _emailOrPhoneController.text.trim(),
+        password: _passwordController.text,
+        role: _selectedRole,
+      );
+
+      if (!mounted) return;
+
+      _showNotice(
+        result['message']?.toString() ?? 'Đăng ký tài khoản thành công!',
+      );
+
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (error) {
+      if (!mounted) return;
+
+      _showNotice(
+        error.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // ĐĂNG KÝ BẰNG GOOGLE
+  Future<void> _handleGoogleSignIn() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      // Đăng xuất phiên Google đang lưu để yêu cầu chọn tài khoản lại.
+      await _googleSignIn.signOut();
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (!mounted) return;
 
       if (googleUser == null) {
-        debugPrint('Nguoi dung huy dang nhap Google');
-        _showNotice('Bạn đã hủy đăng nhập Google.');
+        _showNotice('Bạn đã hủy đăng ký Google.');
         return;
       }
 
-      debugPrint('Google email: ${googleUser.email}');
-      debugPrint('Google name: ${googleUser.displayName}');
+      final GoogleSignInAuthentication authentication =
+          await googleUser.authentication;
 
-      _showNotice('Chọn tài khoản thành công: ${googleUser.email}');
+      final String? idToken = authentication.idToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        _showNotice(
+          'Không lấy được Google ID token. '
+          'Vui lòng kiểm tra cấu hình OAuth.',
+          isError: true,
+        );
+        return;
+      }
+
+      // Gọi API ĐĂNG KÝ riêng, không gọi API đăng nhập.
+      final result = await AuthService.googleRegister(
+        idToken: idToken,
+        role: _selectedRole,
+      );
+
+      if (!mounted) return;
+
+      final String message = result['message']?.toString() ?? '';
+
+      // Chỉ báo thành công khi backend xác nhận tạo tài khoản mới.
+      final bool isNewUser = result['isNewUser'] == true;
+
+      if (isNewUser) {
+        _showNotice(
+          message.isNotEmpty
+              ? message
+              : 'Đăng ký Google thành công! Vui lòng đăng nhập.',
+        );
+
+        await Future.delayed(const Duration(milliseconds: 900));
+
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } else {
+        _showNotice(
+          message.isNotEmpty
+              ? message
+              : 'Tài khoản Google đã tồn tại hoặc chưa được tạo mới. '
+                    'Vui lòng thử đăng nhập.',
+          isError: true,
+        );
+      }
     } catch (error, stackTrace) {
-      debugPrint('Google Sign-In error: $error');
+      debugPrint('Google register error: $error');
       debugPrintStack(stackTrace: stackTrace);
 
+      if (!mounted) return;
+
+      _showNotice(
+        'Đăng ký Google thất bại: '
+        '${error.toString().replaceFirst('Exception: ', '')}',
+        isError: true,
+      );
+    } finally {
       if (mounted) {
-        _showNotice('Đăng nhập Google thất bại: $error');
+        setState(() => _isLoading = false);
       }
     }
   }
 
+  // ĐĂNG KÝ BẰNG ZALO
   Future<void> _handleZaloSignIn() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+    debugPrint('[ZALO] 1. Bắt đầu đăng nhập');
+
     try {
       final zalo = FlutterZalo();
 
-      final bool? result = await zalo.logIn();
+      debugPrint('[ZALO] 2. Đang chờ kết quả từ Zalo');
+
+      final bool? result = await zalo.logIn().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw Exception('Quá thời gian chờ phản hồi từ Zalo');
+        },
+      );
+
+      debugPrint('[ZALO] 3. Kết quả đăng nhập: $result');
 
       if (!mounted) return;
 
       if (result != true) {
-        _showNotice('Đăng nhập Zalo thất bại hoặc đã bị hủy.');
+        _showNotice('Đăng nhập Zalo thất bại hoặc đã bị hủy.', isError: true);
         return;
       }
 
-      final profile = await zalo.getProfile();
+      debugPrint('[ZALO] 4. Đang lấy access token');
+
+      final String? accessToken = await zalo.getAccessToken().timeout(
+        const Duration(seconds: 20),
+      );
+
+      debugPrint(
+        '[ZALO] 5. Có access token: '
+        '${accessToken != null && accessToken.isNotEmpty}',
+      );
+
+      if (!mounted) return;
+
+      if (accessToken == null || accessToken.isEmpty) {
+        _showNotice(
+          'Đăng nhập Zalo thành công nhưng chưa lấy được token.',
+          isError: true,
+        );
+        return;
+      }
+
+      debugPrint('[ZALO] 6. Đang lấy hồ sơ');
+
+      final Map<String, dynamic>? profile = await zalo.getProfile().timeout(
+        const Duration(seconds: 20),
+      );
+
+      debugPrint('[ZALO] 7. Có hồ sơ: ${profile != null}');
 
       if (!mounted) return;
 
       if (profile == null) {
-        _showNotice('Đăng nhập thành công nhưng chưa lấy được hồ sơ.');
+        _showNotice('Chưa lấy được hồ sơ Zalo.', isError: true);
         return;
       }
 
-      final name = profile['name']?.toString() ?? 'người dùng Zalo';
+      debugPrint('[ZALO] 8. Đang gửi yêu cầu đăng ký đến backend');
 
-      debugPrint('Zalo profile: $profile');
-      _showNotice('Đăng nhập Zalo thành công: $name');
+      // Gửi access token và vai trò đã chọn đến ASP.NET Core.
+      final resultApi = await AuthService.zaloRegister(
+        accessToken: accessToken,
+        role: _selectedRole == 'landlord' ? 'owner' : 'tenant',
+      );
+
+      debugPrint('[ZALO] 9. Backend trả kết quả: $resultApi');
+
+      if (!mounted) return;
+
+      final bool isNewUser = resultApi['isNewUser'] == true;
+      final String message = resultApi['message']?.toString() ?? '';
+
+      if (isNewUser) {
+        _showNotice(
+          message.isNotEmpty
+              ? message
+              : 'Đăng ký Zalo thành công! Vui lòng đăng nhập.',
+        );
+
+        await Future.delayed(const Duration(milliseconds: 900));
+
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } else {
+        _showNotice(
+          message.isNotEmpty
+              ? message
+              : 'Tài khoản Zalo đã tồn tại. Vui lòng đăng nhập.',
+          isError: true,
+        );
+      }
     } catch (error, stackTrace) {
-      debugPrint('Zalo Sign-In error: $error');
+      debugPrint('[ZALO] LỖI: $error');
       debugPrintStack(stackTrace: stackTrace);
 
+      if (!mounted) return;
+
+      _showNotice(
+        'Đăng ký Zalo thất bại: '
+        '${error.toString().replaceFirst('Exception: ', '')}',
+        isError: true,
+      );
+    } finally {
       if (mounted) {
-        _showNotice('Đăng nhập Zalo thất bại: $error');
+        setState(() => _isLoading = false);
       }
     }
-  }
-
-  void _handleRegister() {
-    _showNotice('Vui lòng xác thực email trước khi hoàn tất đăng ký.');
   }
 
   @override
@@ -216,9 +328,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // HEADER
                 const Text(
-                  'Tạo tài khoản mới ',
+                  'Tạo tài khoản mới',
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
@@ -236,7 +347,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // CHỌN VAI TRÒ (Sinh viên / Chủ trọ)
                 const Text(
                   'Bạn là:',
                   style: TextStyle(
@@ -246,6 +356,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
+
                 Row(
                   children: [
                     Expanded(
@@ -253,7 +364,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         title: 'Người thuê trọ',
                         icon: Icons.person_search_rounded,
                         isSelected: _selectedRole == 'tenant',
-                        onTap: () => setState(() => _selectedRole = 'tenant'),
+                        onTap: () {
+                          if (!_isLoading) {
+                            setState(() {
+                              _selectedRole = 'tenant';
+                            });
+                          }
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -262,44 +379,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         title: 'Chủ cho thuê',
                         icon: Icons.home_work_rounded,
                         isSelected: _selectedRole == 'landlord',
-                        onTap: () => setState(() => _selectedRole = 'landlord'),
+                        onTap: () {
+                          if (!_isLoading) {
+                            setState(() {
+                              _selectedRole = 'landlord';
+                            });
+                          }
+                        },
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
 
-                // INPUT HỌ VÀ TÊN
                 _CustomInputField(
                   controller: _fullNameController,
                   label: 'Họ và tên',
                   hint: 'Nhập họ và tên của bạn',
                   icon: Icons.person_outline_rounded,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập họ và tên';
-                    }
-                    return null;
-                  },
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Vui lòng nhập họ và tên'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
-                // INPUT EMAIL / SỐ ĐIỆN THOẠI
                 _CustomInputField(
                   controller: _emailOrPhoneController,
                   label: 'Email hoặc Số điện thoại',
                   hint: 'nhanvien@gmail.com hoặc 0901234567',
                   icon: Icons.alternate_email_rounded,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập Email hoặc SĐT';
-                    }
-                    return null;
-                  },
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Vui lòng nhập Email hoặc SĐT'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
-                // INPUT MẬT KHẨU
                 _CustomInputField(
                   controller: _passwordController,
                   label: 'Mật khẩu',
@@ -308,7 +422,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   isPassword: true,
                   obscureText: _obscurePassword,
                   onToggleVisibility: () {
-                    setState(() => _obscurePassword = !_obscurePassword);
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
                   },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -322,7 +438,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // INPUT XÁC NHẬN MẬT KHẨU
                 _CustomInputField(
                   controller: _confirmPasswordController,
                   label: 'Xác nhận mật khẩu',
@@ -331,11 +446,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   isPassword: true,
                   obscureText: _obscureConfirmPassword,
                   onToggleVisibility: () {
-                    setState(
-                      () => _obscureConfirmPassword = !_obscureConfirmPassword,
-                    );
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
                   },
                   validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Vui lòng xác nhận mật khẩu';
+                    }
                     if (value != _passwordController.text) {
                       return 'Mật khẩu xác nhận không trùng khớp';
                     }
@@ -344,12 +462,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // NÚT ĐĂNG KÝ CHÍNH
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _sendingOtp ? null : _goToOtpScreen,
+                    onPressed: _isLoading ? null : _handleRegister,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryGreen,
                       foregroundColor: Colors.white,
@@ -358,18 +475,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Text(
-                      'Đăng ký tài khoản',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Đăng ký tài khoản',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 28),
 
-                // HOẶC ĐĂNG KÝ BẰNG
                 const Row(
                   children: [
                     Expanded(child: Divider(color: Color(0xFFE5E7EB))),
@@ -389,10 +514,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // NÚT MẠNG XÃ HỘI (Google, Zalo, SĐT OTP)
                 Row(
                   children: [
-                    // NÚT GOOGLE (Đã gắn hàm nảy tài khoản Google)
                     Expanded(
                       child: _SocialAuthButton(
                         label: 'Google',
@@ -401,13 +524,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           color: Colors.redAccent,
                           size: 30,
                         ),
-                        onTap:
-                            _handleGoogleSignIn, // <-- Gọi hàm Google Sign-In ở đây
+                        onTap: _handleGoogleSignIn,
                       ),
                     ),
                     const SizedBox(width: 10),
-
-                    // NÚT ZALO
                     Expanded(
                       child: _SocialAuthButton(
                         label: 'Zalo',
@@ -429,12 +549,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onTap: _handleZaloSignIn,
                       ),
                     ),
-                    const SizedBox(width: 10),
                   ],
                 ),
                 const SizedBox(height: 32),
 
-                // FOOTER: CHUYỂN SANG ĐĂNG NHẬP
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -446,7 +564,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: _isLoading ? null : () => Navigator.pop(context),
                       child: const Text(
                         'Đăng nhập ngay',
                         style: TextStyle(
@@ -468,7 +586,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-// WIDGET CHỌN VAI TRÒ
 class _RoleCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -510,14 +627,17 @@ class _RoleCard extends StatelessWidget {
                   : AppColors.textSecondary,
             ),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected
-                    ? AppColors.primaryGreen
-                    : AppColors.textSecondary,
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected
+                      ? AppColors.primaryGreen
+                      : AppColors.textSecondary,
+                ),
               ),
             ),
           ],
@@ -527,7 +647,6 @@ class _RoleCard extends StatelessWidget {
   }
 }
 
-// WIDGET Ô NHẬP LIỆU CHUẨN
 class _CustomInputField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -632,10 +751,7 @@ class _SocialAuthButton extends StatelessWidget {
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: () {
-          debugPrint('Da bam nut: $label');
-          onTap();
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
           height: 48,

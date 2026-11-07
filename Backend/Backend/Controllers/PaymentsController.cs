@@ -16,19 +16,30 @@ namespace Backend.Controllers
             _service = service;
         }
 
-        // POST: api/payments
         [HttpPost]
         public async Task<IActionResult> SubmitPayment([FromBody] PaymentRequestDTO request)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var success = await _service.SubmitPaymentAsync(request);
-            if (!success)
-            {
-                return BadRequest("Hóa đơn không hợp lệ hoặc đã được thanh toán.");
-            }
+            // Lấy IP giả lập gửi cho VNPay
+            string ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
 
-            return Ok(new { message = "Đã ghi nhận thanh toán. Chờ chủ nhà duyệt." });
+            var result = await _service.SubmitPaymentAsync(request, ip);
+            if (!result.Success) return BadRequest(result.Message);
+
+            return Ok(new { message = result.Message, paymentUrl = result.PaymentUrl });
+        }
+
+        // VNPay sẽ tự động gọi ngầm vào link này sau khi khách quẹt thẻ xong
+        [HttpGet("vnpay-return")]
+        public async Task<IActionResult> VnPayReturn([FromQuery] string vnp_TxnRef, [FromQuery] string vnp_ResponseCode)
+        {
+            bool isSuccess = await _service.ConfirmVnPayTransactionAsync(vnp_TxnRef, vnp_ResponseCode);
+
+            if (isSuccess)
+                return Ok("Thanh toán thành công. Đã gạch nợ hóa đơn!");
+            else
+                return BadRequest("Giao dịch bị hủy hoặc thất bại.");
         }
     }
 }
