@@ -9,6 +9,8 @@ import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import 'utility_history.dart';
 import 'utility_readings.dart';
+import '../tenant/profile_screen.dart';
+
 
 class PropertiesManageScreen extends StatelessWidget {
   const PropertiesManageScreen({super.key});
@@ -164,7 +166,22 @@ class PropertiesManageScreen extends StatelessWidget {
                     ),
                 );
               }),
-              _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
+              _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(
+                      user: {
+                        'Name': 'Nguyễn Văn A',
+                        'Email': '',
+                        'Phone': '',
+                        'Avatar': '',
+                        'Role': 'owner',
+                      },
+                    ),
+                  ),
+                );
+              }),
             ],
           ),
         ),
@@ -357,7 +374,10 @@ class PropertiesManageScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const InvoiceCreateScreen(),
+                              builder: (context) => InvoiceCreateScreen(
+                                propertyId: item['id']?.toString(),       // Mã khu trọ (ví dụ: 'p1', 'p2'...)
+                                propertyName: item['name']?.toString(),   // Tên khu trọ (ví dụ: 'Chung cư Mini Q7')
+                              ),
                             ),
                           );
                         },
@@ -386,8 +406,10 @@ class PropertiesManageScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  const LandlordUtilityScreen(),
+                              builder: (context) => LandlordUtilityScreen(
+                                propertyId: item['id']?.toString(),     // Truyền ID khu trọ sang
+                                propertyName: item['name']?.toString(), // Truyền Tên khu trọ sang
+                              ),
                             ),
                           );
                         },

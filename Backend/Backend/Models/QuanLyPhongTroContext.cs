@@ -61,11 +61,10 @@ public partial class QuanLyPhongTroContext : DbContext
 
     public virtual DbSet<ViewingAppointment> ViewingAppointments { get; set; }
 
-    protected override void OnConfiguring(
-    DbContextOptionsBuilder optionsBuilder)
-    {
-        // Connection string được cấu hình trong Program.cs
-    }
+protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+{
+    // Connection string được cấu hình trong Program.cs
+}
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

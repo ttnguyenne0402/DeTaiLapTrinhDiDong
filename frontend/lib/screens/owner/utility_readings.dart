@@ -2,10 +2,13 @@ import 'owner_profile_screen.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/utility_card_w.dart';
-import '../../widgets/owner/owner_drawer.dart';
+import '../../services/owner/invoice_service.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
-  const InvoiceCreateScreen({super.key});
+  final String? propertyId;
+  final String? propertyName;
+
+  const InvoiceCreateScreen({super.key, this.propertyId, this.propertyName});
 
   @override
   State<InvoiceCreateScreen> createState() => _InvoiceCreateScreenState();
@@ -13,21 +16,63 @@ class InvoiceCreateScreen extends StatefulWidget {
 
 class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   int _selectedFilterIndex = 0;
+  bool _isLoading = true;
 
-  final Map<String, RoomUtilityStatus> _roomStatuses = {
-    '201': RoomUtilityStatus.completed,
-    '302': RoomUtilityStatus.abnormal,
-    '102': RoomUtilityStatus.inputting,
-    '204': RoomUtilityStatus.pending,
-  };
+  List<_RoomInfo> _rooms = [];
+  final Map<String, RoomUtilityStatus> _roomStatuses = {};
+  final Map<String, String> _elecNewValues = {};
+  final Map<String, String> _waterNewValues = {};
 
-  final Map<String, String> _elecNewValues = {
-    '201': '1545',
-  };
+  @override
+  void initState() {
+    super.initState();
+    _fetchRoomsSummary();
+  }
 
-  final Map<String, String> _waterNewValues = {
-    '201': '91',
-  };
+  Future<void> _fetchRoomsSummary() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final res = await OwnerInvoiceService.getRoomsUtilitySummary(propertyId: widget.propertyId);
+
+      if (mounted && res is List) {
+        final List<_RoomInfo> loaded = [];
+
+        for (var item in res) {
+          final id = item['roomId']?.toString() ?? item['contractId']?.toString() ?? '';
+          final contractId = item['contractId']?.toString() ?? '';
+          final roomName = item['roomName']?.toString() ?? 'Phòng';
+          final tenant = item['tenantName']?.toString() ?? 'Khách thuê';
+          final phone = item['phone']?.toString() ?? '';
+          final elecOld = item['elecOld']?.toString() ?? '0';
+          final waterOld = item['waterOld']?.toString() ?? '0';
+
+          loaded.add(_RoomInfo(
+            id: id,
+            contractId: contractId,
+            roomName: roomName,
+            tenant: tenant,
+            phone: phone,
+            status: RoomUtilityStatus.pending,
+            elecOld: elecOld,
+            waterOld: waterOld,
+          ));
+
+          _roomStatuses[id] = RoomUtilityStatus.pending;
+        }
+
+        setState(() {
+          _rooms = loaded;
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('Lỗi nạp danh sách phòng: $e');
+    }
+
+    if (mounted) setState(() => _isLoading = false);
+  }
 
   void _enterInput(String room) {
     setState(() {
@@ -43,15 +88,14 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đã lưu chỉ số mẫu phòng $room.')),
+      SnackBar(content: Text('Đã ghi nhận chỉ số phòng $room.')),
     );
   }
 
   bool _matchesFilter(RoomUtilityStatus status) {
     switch (_selectedFilterIndex) {
       case 1:
-        return status == RoomUtilityStatus.pending ||
-            status == RoomUtilityStatus.inputting;
+        return status == RoomUtilityStatus.pending || status == RoomUtilityStatus.inputting;
       case 2:
         return status == RoomUtilityStatus.completed;
       case 3:
@@ -61,66 +105,64 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     }
   }
 
+  Future<void> _submitAllCompleted() async {
+    final completedRooms = _rooms.where((r) => _roomStatuses[r.id] == RoomUtilityStatus.completed).toList();
+
+    if (completedRooms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa có phòng nào được nhập chỉ số mới để chốt!')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    int successCount = 0;
+    final now = DateTime.now();
+
+    for (var r in completedRooms) {
+      final newEl = double.tryParse(_elecNewValues[r.id] ?? '') ?? double.tryParse(r.elecOld ?? '0') ?? 0;
+      final newWt = double.tryParse(_waterNewValues[r.id] ?? '') ?? double.tryParse(r.waterOld ?? '0') ?? 0;
+
+      final body = {
+        'contractId': r.contractId,
+        'month': now.month,
+        'year': now.year,
+        'newElectric': newEl,
+        'newWater': newWt,
+        'discountAmount': 0,
+        'status': 'unpaid',
+      };
+
+      final res = await OwnerInvoiceService.createInvoice(body);
+      if (res != null) successCount++;
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã chốt số và tạo thành công $successCount hóa đơn!')),
+      );
+      Navigator.pop(context, true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final rooms = [
-      _RoomInfo(
-        id: '201',
-        roomName: 'Phòng 201',
-        tenant: 'Hoàng Minh Trí (Tầng 2)',
-        status: RoomUtilityStatus.completed,
-        elecOld: '1420',
-        waterOld: '85',
-        totalAmount: '625.000đ',
-        elecCost: '475.000đ',
-        waterCost: '150.000đ',
-        proofCount: 2,
-      ),
-      _RoomInfo(
-        id: '302',
-        roomName: 'Phòng 302',
-        tenant: 'Trần Thị Bích',
-        phone: '0933 555 789',
-        status: RoomUtilityStatus.abnormal,
-        elecOld: '980',
-        waterOld: '42',
-        warningTag: 'Tăng đột biến +85%',
-        warningMessage:
-        'Số điện tháng này cao bất thường. Khuyến nghị đối chiếu lại ảnh đồng hồ trước khi lập hóa đơn.',
-      ),
-      _RoomInfo(
-        id: '102',
-        roomName: 'Phòng 102',
-        tenant: 'Lê Văn Cường (Tầng 1)',
-        status: RoomUtilityStatus.inputting,
-        elecOld: '650',
-        waterOld: '38',
-      ),
-      _RoomInfo(
-        id: '204',
-        roomName: 'Phòng 204',
-        tenant: 'Phạm Thị Duyên (Tầng 2)',
-        status: RoomUtilityStatus.pending,
-        elecOld: '810',
-        waterOld: '49',
-      ),
-    ];
-
-    final filteredRooms = rooms.where((room) {
+    final filteredRooms = _rooms.where((room) {
       return _matchesFilter(_roomStatuses[room.id] ?? room.status);
     }).toList();
 
-    final completedCount = _roomStatuses.values
-        .where((status) => status == RoomUtilityStatus.completed)
-        .length;
+    final completedCount = _roomStatuses.values.where((status) => status == RoomUtilityStatus.completed).length;
 
     final pendingCount = _roomStatuses.values
-        .where((status) =>
-    status == RoomUtilityStatus.pending ||
-        status == RoomUtilityStatus.inputting)
+        .where((status) => status == RoomUtilityStatus.pending || status == RoomUtilityStatus.inputting)
         .length;
 
-    final progress = completedCount / rooms.length;
+    final totalCount = _rooms.isEmpty ? 1 : _rooms.length;
+    final progress = (completedCount / totalCount).clamp(0.0, 1.0);
+
+    final now = DateTime.now();
 
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
@@ -134,36 +176,22 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: AppColors.background,
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                child: Column(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : Column(
                   children: [
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 16,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
                         child: Column(
                           children: [
-                            _buildGreenInfoCard(),
+                            _buildGreenInfoCard(now),
                             const SizedBox(height: 12),
-                            _buildProgressCard(
-                              completedCount,
-                              rooms.length,
-                              pendingCount,
-                              progress,
-                            ),
+                            _buildProgressCard(completedCount, _rooms.length, pendingCount, progress),
                             const SizedBox(height: 12),
-                            _buildOcrBanner(),
-                            const SizedBox(height: 12),
-                            _buildFilterTabs(
-                              rooms.length,
-                              pendingCount,
-                              completedCount,
-                            ),
+                            _buildFilterTabs(_rooms.length, pendingCount, completedCount),
                             const SizedBox(height: 12),
 
                             if (filteredRooms.isEmpty)
@@ -176,22 +204,16 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                                 ),
                                 child: const Column(
                                   children: [
-                                    Icon(
-                                      Icons.inbox_outlined,
-                                      size: 38,
-                                      color: Colors.grey,
-                                    ),
+                                    Icon(Icons.inbox_outlined, size: 38, color: Colors.grey),
                                     SizedBox(height: 8),
-                                    Text('Không có phòng phù hợp.'),
+                                    Text('Không có phòng nào cần hiển thị.'),
                                   ],
                                 ),
                               ),
 
                             for (final room in filteredRooms) ...[
                               RoomUtilityCard(
-                                key: ValueKey(
-                                  '${room.id}_${_roomStatuses[room.id]}',
-                                ),
+                                key: ValueKey('${room.id}_${_roomStatuses[room.id]}'),
                                 roomName: room.roomName,
                                 tenantName: room.tenant,
                                 phone: room.phone,
@@ -206,8 +228,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                                 warningMessage: room.warningMessage,
                                 proofImagesCount: room.proofCount,
                                 onEnterInput: () => _enterInput(room.id),
-                                onSave: (elec, water) =>
-                                    _saveReading(room.id, elec, water),
+                                onSave: (elec, water) => _saveReading(room.id, elec, water),
                               ),
                               const SizedBox(height: 12),
                             ],
@@ -234,47 +255,20 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         children: [
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
           ),
           const Expanded(
             child: Text(
-              'Ghi số điện nước',
+              'Ghi số điện nước đồng loạt',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ),
           IconButton(
-            icon: const Icon(
-              Icons.notifications_none,
-              color: Colors.white,
-            ),
-            onPressed: () {},
-          ),
-          CircleAvatar(
-            backgroundColor: Colors.white24,
-            radius: 16,
-            child: IconButton(
-              iconSize: 18,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              icon: const Icon(Icons.person, color: Colors.white,size: 20,),
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => const OwnerProfileScreen(),
-                ),
-                );
-              },
-            ),
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _fetchRoomsSummary,
           ),
           const SizedBox(width: 8),
         ],
@@ -282,14 +276,14 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
   }
 
-  Widget _buildGreenInfoCard() {
+  Widget _buildGreenInfoCard(DateTime now) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.primaryGreen,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -297,57 +291,29 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.calendar_today,
-                    size: 14,
-                    color: Colors.white,
-                  ),
-                  SizedBox(width: 6),
+                  const Icon(Icons.calendar_today, size: 14, color: Colors.white),
+                  const SizedBox(width: 6),
                   Text(
-                    'Kỳ chốt: Tháng 08/2024',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    'Kỳ chốt: Tháng ${now.month.toString().padLeft(2, '0')}/${now.year}',
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
-              Icon(Icons.history, color: Colors.white70, size: 18),
+              const Icon(Icons.history, color: Colors.white70, size: 18),
             ],
           ),
-          SizedBox(height: 12),
-          Text(
-            'CƠ SỞ CHO THUÊ',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 5),
+          const SizedBox(height: 10),
           Row(
             children: [
-              Icon(
-                Icons.corporate_fare,
-                color: AppColors.warningOrange,
-                size: 20,
-              ),
-              SizedBox(width: 8),
+              const Icon(Icons.corporate_fare, color: AppColors.accentYellow, size: 20),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Khu Trọ Xanh - Bình Thạnh',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                  widget.propertyName ?? 'Cơ sở cho thuê',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ),
-              Text(
-                '12 phòng',
-                style: TextStyle(color: Colors.white, fontSize: 11),
-              ),
+              Text('${_rooms.length} phòng', style: const TextStyle(color: Colors.white, fontSize: 11)),
             ],
           ),
         ],
@@ -355,53 +321,26 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
   }
 
-  Widget _buildProgressCard(
-      int completed,
-      int total,
-      int pending,
-      double progress,
-      ) {
+  Widget _buildProgressCard(int completed, int total, int pending, double progress) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Tiến độ ghi số',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              Text(
-                'Còn $pending phòng',
-                style: const TextStyle(
-                  color: Colors.brown,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                ),
-              ),
+              const Text('Tiến độ ghi số', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('Còn $pending phòng', style: const TextStyle(color: Colors.brown, fontWeight: FontWeight.bold, fontSize: 11)),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Đã hoàn thành $completed trên $total phòng',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              Text(
-                '${(progress * 100).round()}%',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+              Text('Đã hoàn thành $completed trên $total phòng', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              Text('${(progress * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
@@ -419,164 +358,51 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
   }
 
-  Widget _buildOcrBanner() {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chức năng quét AI OCR dùng để demo UI.'),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F8E9),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Row(
-          children: [
-            Icon(
-              Icons.document_scanner_outlined,
-              color: AppColors.primaryGreen,
-              size: 26,
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quét AI OCR hàng loạt',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  SizedBox(height: 3),
-                  Text(
-                    'Chụp đồng hồ và nhận diện chỉ số tự động',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios, size: 14),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterTabs(
-      int total,
-      int pending,
-      int completed,
-      ) {
+  Widget _buildFilterTabs(int total, int pending, int completed) {
     final filters = [
       {'title': 'Tất cả', 'count': '$total'},
       {'title': 'Chưa ghi', 'count': '$pending'},
       {'title': 'Đã ghi', 'count': '$completed'},
-      {'title': 'Bất thường', 'count': ''},
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(filters.length, (index) {
-          final selected = _selectedFilterIndex == index;
-          final alert = index == 3;
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              selected: selected,
-              showCheckmark: false,
-              selectedColor: alert
-                  ? Colors.redAccent
-                  : AppColors.primaryGreen,
-              backgroundColor: Colors.white,
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (alert) ...[
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      size: 14,
-                      color: Colors.redAccent,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    filters[index]['title']!,
-                    style: TextStyle(
-                      color: selected
-                          ? Colors.white
-                          : alert
-                          ? Colors.redAccent
-                          : AppColors.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (filters[index]['count']!.isNotEmpty) ...[
-                    const SizedBox(width: 5),
-                    Text(
-                      filters[index]['count']!,
-                      style: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : AppColors.textSecondary,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ],
+    return Row(
+      children: List.generate(filters.length, (index) {
+        final selected = _selectedFilterIndex == index;
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: ChoiceChip(
+            selected: selected,
+            showCheckmark: false,
+            selectedColor: AppColors.primaryGreen,
+            backgroundColor: Colors.white,
+            label: Text(
+              '${filters[index]['title']} (${filters[index]['count']})',
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
               ),
-              onSelected: (_) {
-                setState(() {
-                  _selectedFilterIndex = index;
-                });
-              },
             ),
-          );
-        }),
-      ),
+            onSelected: (_) => setState(() => _selectedFilterIndex = index),
+          ),
+        );
+      }),
     );
   }
 
   Widget _buildTipBox() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Column(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: const Row(
         children: [
-          Icon(
-            Icons.lightbulb_outline,
-            color: AppColors.primaryGreen,
-            size: 28,
-          ),
-          SizedBox(height: 5),
-          Text(
-            'Mẹo ghi nhanh chỉ số',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-          SizedBox(height: 5),
-          Text(
-            'Có thể bật đèn flash khi chụp ảnh đồng hồ '
-                'để dễ đọc chỉ số trong khu vực thiếu sáng.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
+          Icon(Icons.lightbulb_outline, color: AppColors.primaryGreen, size: 24),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Nhập chỉ số mới cho các phòng và bấm "Chốt số & Tạo hóa đơn" để hệ thống tự động sinh hóa đơn hàng loạt.',
+              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ),
         ],
@@ -589,82 +415,23 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFEEEEEE)),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tổng dự kiến ($completed phòng đã ghi)',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const Text(
-                    '6.850.000 đ',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const Icon(
-                Icons.water_drop_outlined,
-                color: AppColors.primaryGreen,
-              ),
-            ],
+      child: SizedBox(
+        width: double.infinity,
+        height: 46,
+        child: ElevatedButton.icon(
+          onPressed: completed > 0 ? _submitAllCompleted : null,
+          icon: const Icon(Icons.receipt_long, color: Colors.white),
+          label: Text(
+            'Chốt số & Tạo hóa đơn ($completed phòng)',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Đã lưu bản nháp giao diện mẫu.'),
-                      ),
-                    );
-                  },
-                  child: const Text('Lưu nháp'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Chốt số và tạo hóa đơn mẫu.'),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.receipt_long),
-                  label: const Text(
-                    'Chốt số & Tạo hóa đơn',
-                    textAlign: TextAlign.center,
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.warningOrange,
-                    foregroundColor: Colors.black87,
-                  ),
-                ),
-              ),
-            ],
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.warningOrange,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -672,6 +439,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
 class _RoomInfo {
   final String id;
+  final String contractId;
   final String roomName;
   final String tenant;
   final String? phone;
@@ -687,6 +455,7 @@ class _RoomInfo {
 
   const _RoomInfo({
     required this.id,
+    required this.contractId,
     required this.roomName,
     required this.tenant,
     required this.status,

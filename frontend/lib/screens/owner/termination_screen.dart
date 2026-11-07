@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/owner/invoice_service.dart'; // Đảm bảo đúng đường dẫn tới service chứa hàm getLiquidationDetails của bạn
 
 class ContractLiquidationScreen extends StatefulWidget {
-  const ContractLiquidationScreen({super.key});
+  final String? contractId; // Nhận mã hợp đồng từ màn hình danh sách truyền sang
+
+  const ContractLiquidationScreen({super.key, this.contractId});
 
   @override
   State<ContractLiquidationScreen> createState() =>
@@ -11,8 +14,69 @@ class ContractLiquidationScreen extends StatefulWidget {
 
 class _ContractLiquidationScreenState
     extends State<ContractLiquidationScreen> {
+  bool _isLoading = true;
+  Map<String, dynamic>? _data;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiquidationData();
+  }
+
+  Future<void> _fetchLiquidationData() async {
+    setState(() => _isLoading = true);
+
+    // Nếu không truyền ID thì dùng mã mặc định để test
+    final id = widget.contractId ?? 'ctr_01';
+    final res = await OwnerInvoiceService.getLiquidationDetails(id);
+
+    if (mounted) {
+      setState(() {
+        _data = res;
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.primaryGreen,
+        appBar: AppBar(
+          backgroundColor: AppColors.primaryGreen,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+    }
+
+    if (_data == null) {
+      return Scaffold(
+        backgroundColor: AppColors.primaryGreen,
+        appBar: AppBar(
+          backgroundColor: AppColors.primaryGreen,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.cardSurface),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+        ),
+        body: const Center(
+          child: Text(
+            'Không tìm thấy dữ liệu thanh lý hợp đồng',
+            style: TextStyle(color: Colors.white, fontSize: 16),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
@@ -24,7 +88,7 @@ class _ContractLiquidationScreenState
           onPressed: () => Navigator.maybePop(context),
         ),
         title: const Text(
-          'Thanh lý',
+          'Thanh lý hợp đồng',
           style: TextStyle(
             color: AppColors.cardSurface,
             fontWeight: FontWeight.bold,
@@ -142,8 +206,16 @@ class _ContractLiquidationScreenState
     );
   }
 
-  // thẻ thông tin hợp đồng và tiền cọc
+  // thẻ thông tin hợp đồng và tiền cọc (Đã gắn dữ liệu thật từ API)
   Widget _buildContractCard() {
+    final roomName = _data?['roomName'] ?? 'Phòng';
+    final contractCode = _data?['contractCode'] ?? 'HD-000';
+    final tenantName = _data?['tenantName'] ?? 'Khách thuê';
+    final tenantPhone = _data?['tenantPhone'] ?? '';
+    final startDate = _data?['startDate'] ?? '';
+    final endDate = _data?['endDate'] ?? '';
+    final deposit = _data?['deposit'] ?? 0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -163,12 +235,12 @@ class _ContractLiquidationScreenState
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.bookmark_outline, color: Colors.white, size: 14),
-                    SizedBox(width: 4),
-                    Text('Phòng 201',
-                        style: TextStyle(color: Colors.white, fontSize: 12)),
+                    const Icon(Icons.bookmark_outline, color: Colors.white, size: 14),
+                    const SizedBox(width: 4),
+                    Text(roomName,
+                        style: const TextStyle(color: Colors.white, fontSize: 12)),
                   ],
                 ),
               ),
@@ -184,28 +256,28 @@ class _ContractLiquidationScreenState
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            'HĐ #HD-2024-P201',
-            style: TextStyle(
+          Text(
+            'HĐ #$contractCode',
+            style: const TextStyle(
                 fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const SizedBox(height: 8),
-          const Row(
+          Row(
             children: [
-              Icon(Icons.person_outline, color: AppColors.lightGreen, size: 16),
-              SizedBox(width: 6),
-              Text('Nguyễn Văn An • 0908 123 456',
-                  style: TextStyle(color: AppColors.lightGreen, fontSize: 13)),
+              const Icon(Icons.person_outline, color: AppColors.lightGreen, size: 16),
+              const SizedBox(width: 6),
+              Text('$tenantName • $tenantPhone',
+                  style: const TextStyle(color: AppColors.lightGreen, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 4),
-          const Row(
+          Row(
             children: [
-              Icon(Icons.calendar_today_outlined,
+              const Icon(Icons.calendar_today_outlined,
                   color: AppColors.lightGreen, size: 16),
-              SizedBox(width: 6),
-              Text('01/09/2023 ➔ 31/08/2024 (12 tháng)',
-                  style: TextStyle(color: AppColors.lightGreen, fontSize: 13)),
+              const SizedBox(width: 6),
+              Text('$startDate ➔ $endDate',
+                  style: const TextStyle(color: AppColors.lightGreen, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 16),
@@ -215,13 +287,13 @@ class _ContractLiquidationScreenState
               color: Colors.black.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Tiền cọc gốc đang giữ:',
+                const Text('Tiền cọc gốc đang giữ:',
                     style: TextStyle(color: Colors.white, fontSize: 13)),
-                Text('9.000.000 đ',
-                    style: TextStyle(
+                Text('$deposit đ',
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold)),
@@ -239,12 +311,12 @@ class _ContractLiquidationScreenState
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          width: 1.5,
-          color: Colors.grey.shade300,
-        )
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            width: 1.5,
+            color: Colors.grey.shade300,
+          )
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,7 +456,7 @@ class _ContractLiquidationScreenState
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text('Ảnh chụp biên bản 31/08/2024',
+                const Text('Ảnh chụp biên bản bàn giao',
                     style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
               ],
             ),
@@ -394,18 +466,30 @@ class _ContractLiquidationScreenState
     );
   }
 
-  // phần chốt chỉ số điện nước
+  // phần chốt chỉ số điện nước (Đã gắn dữ liệu thật từ API)
   Widget _buildUtilitySection() {
+    final elecOld = _data?['elecOld'] ?? 0;
+    final elecNew = _data?['elecNew'] ?? 0;
+    final elecUsage = _data?['elecUsage'] ?? 0;
+    final elecCost = _data?['elecCost'] ?? 0;
+
+    final waterOld = _data?['waterOld'] ?? 0;
+    final waterNew = _data?['waterNew'] ?? 0;
+    final waterUsage = _data?['waterUsage'] ?? 0;
+    final waterCost = _data?['waterCost'] ?? 0;
+
+    final utilityTotal = _data?['utilityTotal'] ?? 0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade300,
-          width: 1.5
-        )
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: Colors.grey.shade300,
+              width: 1.5
+          )
       ),
       child: Column(
         children: [
@@ -436,19 +520,19 @@ class _ContractLiquidationScreenState
           ),
           const SizedBox(height: 12),
           _buildUtilityRow(
-              Icons.bolt, 'Điện sinh hoạt', '1.420 ➔ 1.475 kWh', '55 kWh × 3.800 đ', '-209.000 đ'),
+              Icons.bolt, 'Điện sinh hoạt', '$elecOld ➔ $elecNew kWh', '$elecUsage kWh × 3.800 đ', '-$elecCost đ'),
           const SizedBox(height: 8),
           _buildUtilityRow(
-              Icons.water_drop, 'Nước sinh hoạt', '85 ➔ 88 m³', '3 m³ × 25.000 đ', '-75.000 đ'),
+              Icons.water_drop, 'Nước sinh hoạt', '$waterOld ➔ $waterNew m³', '$waterUsage m³ × 25.000 đ', '-$waterCost đ'),
           const SizedBox(height: 12),
           const Divider(),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Tổng tiền dịch vụ kỳ cuối:',
+              const Text('Tổng tiền dịch vụ kỳ cuối:',
                   style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-              Text('284.000 đ',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              Text('$utilityTotal đ',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             ],
           ),
         ],
@@ -491,18 +575,24 @@ class _ContractLiquidationScreenState
     );
   }
 
-  // bảng quyết toán thanh lý
+  // bảng quyết toán thanh lý (Đã gắn dữ liệu thật từ API)
   Widget _buildSettlementSummaryCard() {
+    final deposit = _data?['deposit'] ?? 0;
+    final utilityTotal = _data?['utilityTotal'] ?? 0;
+    final deductionTotal = _data?['deductionTotal'] ?? 0;
+    final totalDeductions = utilityTotal + deductionTotal;
+    final refundAmount = _data?['refundAmount'] ?? 0;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.grey.shade300,
-          width: 1.5
-        )
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: Colors.grey.shade300,
+              width: 1.5
+          )
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,14 +609,13 @@ class _ContractLiquidationScreenState
             ],
           ),
           const SizedBox(height: 12),
-          _buildSummaryRow('Tiền đặt cọc ban đầu:', '+9.000.000 đ',
+          _buildSummaryRow('Tiền đặt cọc ban đầu:', '+$deposit đ',
               isBold: true, color: AppColors.textPrimary),
           const SizedBox(height: 6),
-          _buildSummaryRow('• Điện nước cuối kỳ:', '-284.000 đ', color: Colors.red),
-          _buildSummaryRow('• Phí dọn phòng vệ sinh:', '-200.000 đ', color: Colors.red),
-          _buildSummaryRow('• Khẩu trừ vỡ kính tủ bếp:', '-500.000 đ', color: Colors.red),
+          _buildSummaryRow('• Điện nước cuối kỳ:', '-$utilityTotal đ', color: Colors.red),
+          _buildSummaryRow('• Khấu trừ bàn giao / bồi thường:', '-$deductionTotal đ', color: Colors.red),
           const SizedBox(height: 8),
-          _buildSummaryRow('Tổng các khoản trừ:', '-984.000 đ',
+          _buildSummaryRow('Tổng các khoản trừ:', '-$totalDeductions đ',
               isBold: true, color: Colors.red),
           const SizedBox(height: 12),
           Container(
@@ -536,10 +625,10 @@ class _ContractLiquidationScreenState
               color: AppColors.lightGreen,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
+                const Text(
                   'TIỀN THỰC TẾ HOÀN TRẢ KHÁCH',
                   style: TextStyle(
                     fontSize: 12,
@@ -547,17 +636,17 @@ class _ContractLiquidationScreenState
                     color: AppColors.primaryGreen,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  '8.016.000 VNĐ',
-                  style: TextStyle(
+                  '$refundAmount VNĐ',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: AppColors.primaryGreen,
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 4),
+                const Text(
                   'Đã đối soát đầy đủ mọi chi phí phát sinh',
                   style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
@@ -591,14 +680,19 @@ class _ContractLiquidationScreenState
     );
   }
 
-  // chuyển khoản & bàn giao
+  // chuyển khoản & bàn giao (Đã gắn dữ liệu thật từ API)
   Widget _buildTransferAndHandoverCard() {
+    final bankName = _data?['bankName'] ?? 'Techcombank';
+    final bankAccount = _data?['bankAccount'] ?? '';
+    final accountHolder = _data?['accountHolder'] ?? '';
+    final endDate = _data?['endDate'] ?? '';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
+          color: AppColors.cardSurface,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
               color: Colors.grey.shade300,
               width: 1.5
@@ -661,13 +755,13 @@ class _ContractLiquidationScreenState
                   ],
                 ),
                 const SizedBox(height: 8),
-                const _BankInfoRow(label: 'Ngân hàng:', value: 'Techcombank'),
+                _BankInfoRow(label: 'Ngân hàng:', value: bankName),
                 const SizedBox(height: 4),
-                const _BankInfoRow(label: 'Số tài khoản:', value: '190334888291'),
+                _BankInfoRow(label: 'Số tài khoản:', value: bankAccount),
                 const SizedBox(height: 4),
-                const _BankInfoRow(label: 'Chủ tài khoản:', value: 'NGUYEN VAN AN'),
+                _BankInfoRow(label: 'Chủ tài khoản:', value: accountHolder),
                 const SizedBox(height: 4),
-                const _BankInfoRow(label: 'Hạn hoàn tiền:', value: '31/08/2024'),
+                _BankInfoRow(label: 'Hạn hoàn tiền:', value: endDate),
               ],
             ),
           ),
@@ -718,36 +812,44 @@ class _ContractLiquidationScreenState
 
   // phần chữ ký hai bên
   Widget _buildSignatureSection() {
+    final ownerName = _data?['ownerName'] ?? 'Trần Thanh Trúc'; // Lấy tên chủ nhà thật
+    final tenantName = _data?['tenantName'] ?? 'Khách thuê';     // Lấy tên khách thuê thật
+
     return Row(
       children: [
-        Expanded(child: _buildSignatureBox('Chủ nhà (Bên A)', 'Trần Thanh Trúc')),
+        Expanded(child: _signatureBox('Chủ nhà (Bên A)', ownerName)),
         const SizedBox(width: 12),
-        Expanded(child: _buildSignatureBox('Khách thuê (Bên B)', 'Nguyễn Văn An')),
+        Expanded(child: _signatureBox('Khách thuê (Bên B)', tenantName)),
       ],
     );
   }
 
-  Widget _buildSignatureBox(String role, String name) {
+  Widget _signatureBox(String role, String name) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
         borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: Colors.grey.shade300,
-              width: 1.5
-          )
+        border: Border.all(
+          color: Colors.grey.shade300,
+          width: 1.5,
+        ),
       ),
       child: Column(
         children: [
-          Text(role,
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+          Text(
+            role,
+            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 10),
-          Text(name,
-              style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  fontStyle: FontStyle.italic)),
+          Text(
+            name,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
           const SizedBox(height: 10),
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
