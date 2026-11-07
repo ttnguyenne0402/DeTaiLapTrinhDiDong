@@ -4,6 +4,7 @@ import '../../widgets/owner/owner_drawer.dart';
 import 'owner_dashboard.dart';
 import 'properties_manage.dart';
 import 'owner_profile_screen.dart';
+import '../tenant/profile_screen.dart';
 
 class TenantListScreen extends StatefulWidget {
   const TenantListScreen({super.key});
@@ -165,7 +166,20 @@ class _TenantListScreenState extends State<TenantListScreen> {
               );
             }),
             _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
-
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProfileScreen(
+                    user: {
+                      'Name': 'Nguyễn Văn A',
+                      'Email': '',
+                      'Phone': '',
+                      'Avatar': '',
+                      'Role': 'owner',
+                    },
+                  ),
+                ),
+              );
             }),
           ],
         ),

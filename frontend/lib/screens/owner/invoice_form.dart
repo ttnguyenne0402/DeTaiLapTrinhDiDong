@@ -1,29 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/owner/invoice_service.dart';
 import '../../widgets/owner/invoice_form_w.dart';
-import 'invoices_manage..dart';
+import '../../screens/owner/invoices_manage..dart';
 
 class Invoice_form extends StatefulWidget {
   final InvoiceData? invoice;
-  const Invoice_form({super.key,required this.invoice});
+  final String? contractId;
+
+  const Invoice_form({super.key, required this.invoice, this.contractId});
 
   @override
   State<Invoice_form> createState() => _InvoiceFormState();
 }
 
 class _InvoiceFormState extends State<Invoice_form> {
-  final TextEditingController _dienCuController = TextEditingController(text: '1.420');
-  final TextEditingController _dienMoiController = TextEditingController(text: '1.545');
+  final TextEditingController _dienCuController = TextEditingController(text: '0');
+  final TextEditingController _dienMoiController = TextEditingController(text: '0');
 
-  final TextEditingController _nuocCuController = TextEditingController(text: '85');
-  final TextEditingController _nuocMoiController = TextEditingController(text: '91');
+  final TextEditingController _nuocCuController = TextEditingController(text: '0');
+  final TextEditingController _nuocMoiController = TextEditingController(text: '0');
+
+  final TextEditingController _discountController = TextEditingController(text: '0');
 
   final ImagePicker _picker = ImagePicker();
 
-  // Biến kiểm tra xem đã có ảnh đồng hồ hay chưa
   String? _dienImagePath;
   String? _nuocImagePath;
+
+  bool _isLoading = false;
+  String? _selectedPropertyId;
+  String? _selectedContractId;
+
+  var _activeContracts = [];
+  var _otherServices = [];
+
+  String _roomName = 'Chưa chọn phòng';
+  String _tenantName = '';
+  String _tenantPhone = '';
+  double _rentPrice = 0.0;
+  double _electricUnitPrice = 3800.0;
+  double _waterUnitPrice = 25000.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedContractId = widget.contractId ?? widget.invoice?.id;
+    _initData();
+
+    _dienCuController.addListener(() => setState(() {}));
+    _dienMoiController.addListener(() => setState(() {}));
+    _nuocCuController.addListener(() => setState(() {}));
+    _nuocMoiController.addListener(() => setState(() {}));
+    _discountController.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -31,10 +62,153 @@ class _InvoiceFormState extends State<Invoice_form> {
     _dienMoiController.dispose();
     _nuocCuController.dispose();
     _nuocMoiController.dispose();
+    _discountController.dispose();
     super.dispose();
   }
 
-  // Hàm chọn/chụp ảnh và cập nhật trạng thái
+  // Danh sách Khu trọ (không dùng List<...>)
+  get _propertiesList {
+    final propMap = {};
+
+    for (var c in _activeContracts) {
+      final pId = c['propertyId']?.toString() ?? '';
+      final pName = c['propertyName']?.toString() ?? 'Khu trọ';
+
+      if (pId.isNotEmpty) {
+        propMap[pId] = pName;
+      }
+    }
+
+    return propMap.entries
+        .map((e) => {
+      'id': e.key.toString(),
+      'name': e.value.toString(),
+    })
+        .toList();
+  }
+
+  // Lọc phòng theo Khu trọ (không dùng List<...>)
+  get _filteredRooms {
+    if (_selectedPropertyId == null || _selectedPropertyId!.isEmpty) return [];
+    return _activeContracts
+        .where((c) => c['propertyId']?.toString() == _selectedPropertyId)
+        .toList();
+  }
+
+  Future<void> _initData() async {
+    setState(() => _isLoading = true);
+
+    final contractsRes = await OwnerInvoiceService.getActiveContracts();
+    if (mounted && contractsRes != null && contractsRes.isNotEmpty) {
+      _activeContracts = contractsRes;
+
+      if (_selectedContractId != null && _selectedContractId!.isNotEmpty) {
+        final matched = _activeContracts.firstWhere(
+              (c) => c['contractId']?.toString() == _selectedContractId,
+          orElse: () => null,
+        );
+        if (matched != null) {
+          _selectedPropertyId = matched['propertyId']?.toString();
+        }
+      } else {
+        final firstContract = _activeContracts.first;
+        _selectedPropertyId = firstContract['propertyId']?.toString();
+        _selectedContractId = firstContract['contractId']?.toString();
+      }
+
+      if (_selectedContractId != null && _selectedContractId!.isNotEmpty) {
+        await _loadPreviousReading(_selectedContractId!);
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _parseNumStr(dynamic val) {
+    if (val == null) return '0';
+    if (val is num) return val.toStringAsFixed(val.truncateToDouble() == val ? 0 : 2);
+    final parsed = double.tryParse(val.toString()) ?? 0;
+    return parsed.toStringAsFixed(parsed.truncateToDouble() == parsed ? 0 : 2);
+  }
+
+  Future<void> _loadPreviousReading(String contractId) async {
+    setState(() => _isLoading = true);
+
+    final data = await OwnerInvoiceService.getPreviousReading(contractId);
+    if (mounted && data != null && data is Map) {
+      setState(() {
+        _roomName = data['roomName']?.toString() ?? 'Phòng';
+        _tenantName = data['tenantName']?.toString() ?? 'Khách thuê';
+        _tenantPhone = data['tenantPhone']?.toString() ?? '';
+        _rentPrice = (data['rentPrice'] is num) ? (data['rentPrice'] as num).toDouble() : 0.0;
+        _electricUnitPrice = (data['electricUnitPrice'] is num) ? (data['electricUnitPrice'] as num).toDouble() : 3800.0;
+        _waterUnitPrice = (data['waterUnitPrice'] is num) ? (data['waterUnitPrice'] as num).toDouble() : 25000.0;
+        _otherServices = (data['otherServices'] ?? []);
+
+        final oldElRaw = data['oldElectric'] ??
+            data['oldElectricity'] ??
+            data['electricityOld'] ??
+            data['initialElectricityReading'] ??
+            data['initial_electricity_reading'] ??
+            0;
+
+        final oldWtRaw = data['oldWater'] ??
+            data['waterOld'] ??
+            data['initialWaterReading'] ??
+            data['initial_water_reading'] ??
+            0;
+
+        final oldEl = _parseNumStr(oldElRaw);
+        final oldWt = _parseNumStr(oldWtRaw);
+
+        _dienCuController.text = oldEl;
+        _nuocCuController.text = oldWt;
+        _dienMoiController.text = oldEl;
+        _nuocMoiController.text = oldWt;
+
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  double get _electricUsage {
+    final oldVal = double.tryParse(_dienCuController.text) ?? 0;
+    final newVal = double.tryParse(_dienMoiController.text) ?? 0;
+    return (newVal > oldVal) ? (newVal - oldVal) : 0;
+  }
+
+  double get _waterUsage {
+    final oldVal = double.tryParse(_nuocCuController.text) ?? 0;
+    final newVal = double.tryParse(_nuocMoiController.text) ?? 0;
+    return (newVal > oldVal) ? (newVal - oldVal) : 0;
+  }
+
+  double get _totalElectricAmount => _electricUsage * _electricUnitPrice;
+  double get _totalWaterAmount => _waterUsage * _waterUnitPrice;
+
+  double get _totalServicesAmount {
+    double sum = 0;
+    for (var s in _otherServices) {
+      if (s['price'] is num) sum += (s['price'] as num).toDouble();
+    }
+    return sum;
+  }
+
+  double get _subtotal => _rentPrice + _totalElectricAmount + _totalWaterAmount + _totalServicesAmount;
+  double get _discount => double.tryParse(_discountController.text) ?? 0;
+  double get _finalTotal => (_subtotal - _discount) > 0 ? (_subtotal - _discount) : 0;
+
+  String _formatMoney(double value) {
+    return '${value.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (match) => '${match[1]}.',
+    )} đ';
+  }
+
   Future<void> _pickImage(String type, ImageSource source) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -52,33 +226,18 @@ class _InvoiceFormState extends State<Invoice_form> {
             _nuocImagePath = image.path;
           }
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Đã cập nhật ảnh chỉ số $type thành công!'),
-            backgroundColor: AppColors.primaryGreen,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Không thể mở thiết bị ảnh ($type): $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi tải ảnh: $e')));
       }
     }
   }
 
-  // Hộp thoại tùy chọn chụp mới hoặc chọn từ thư viện
   void _showImagePickerSheet(String type) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return SafeArea(
           child: Padding(
@@ -86,27 +245,11 @@ class _InvoiceFormState extends State<Invoice_form> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Text(
-                  'Cập nhật ảnh đồng hồ $type',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+                Text('Cập nhật ảnh chỉ số $type', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 12),
                 ListTile(
                   leading: const Icon(Icons.camera_alt, color: AppColors.primaryGreen),
-                  title: const Text('Chụp ảnh trực tiếp từ Camera'),
+                  title: const Text('Chụp ảnh từ Camera'),
                   onTap: () {
                     Navigator.pop(context);
                     _pickImage(type, ImageSource.camera);
@@ -128,8 +271,62 @@ class _InvoiceFormState extends State<Invoice_form> {
     );
   }
 
+  Future<void> _submitInvoice(String status) async {
+    if (_selectedContractId == null || _selectedContractId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn phòng để lập hóa đơn!')),
+      );
+      return;
+    }
+
+    final newEl = double.tryParse(_dienMoiController.text) ?? 0;
+    final newWt = double.tryParse(_nuocMoiController.text) ?? 0;
+    final oldEl = double.tryParse(_dienCuController.text) ?? 0;
+    final oldWt = double.tryParse(_nuocCuController.text) ?? 0;
+
+    if (newEl < oldEl || newWt < oldWt) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chỉ số mới không được nhỏ hơn chỉ số cũ!')),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+
+    final body = {
+      'contractId': _selectedContractId,
+      'month': now.month,
+      'year': now.year,
+      'oldElectric': oldEl,
+      'newElectric': newEl,
+      'oldWater': oldWt,
+      'newWater': newWt,
+      'discountAmount': _discount,
+      'status': status,
+    };
+
+    setState(() => _isLoading = true);
+    final res = await OwnerInvoiceService.createInvoice(body);
+    setState(() => _isLoading = false);
+
+    if (mounted) {
+      if (res != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(status == 'draft' ? 'Đã lưu hóa đơn nháp!' : 'Đã phát hành hóa đơn thành công!')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lỗi khi lập hóa đơn. Vui lòng kiểm tra lại!')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
@@ -144,38 +341,17 @@ class _InvoiceFormState extends State<Invoice_form> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 10),
-          const CircleAvatar(
-            backgroundColor: Colors.white24,
-            radius: 16,
-            child: Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 16),
-        ],
       ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.background,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(24),
-            topRight: Radius.circular(24),
-          ),
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(24), topRight: Radius.circular(24)),
         ),
-        child: Column(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
           children: [
             Expanded(
               child: SingleChildScrollView(
@@ -183,7 +359,6 @@ class _InvoiceFormState extends State<Invoice_form> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- 1. Trạng thái & Kỳ thu ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -193,474 +368,296 @@ class _InvoiceFormState extends State<Invoice_form> {
                             color: Colors.amber.shade100,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.shade800,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'ĐANG SOẠN THẢO',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.amber.shade900,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            'LẬP HÓA ĐƠN MỚI',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
                           ),
                         ),
-                        const Text(
-                          'Kỳ thu: T08/2024',
-                          style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                        Text(
+                          'Kỳ thu: T${now.month.toString().padLeft(2, '0')}/${now.year}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // --- 2. Thông tin phòng & Hợp đồng ---
+                    // KHU VỰC CHỌN KHU TRỌ & PHÒNG
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppColors.lightGreen.withOpacity(0.4),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade200),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: const [
-                                  Icon(Icons.apartment, size: 18, color: AppColors.primaryGreen),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Thông tin phòng & Hợp đồng',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-                                  ),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.grey.shade200),
-                                ),
-                                child:Text(
-                                  widget.invoice?.code ?? '#HD-2024-P201',
-                                  style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
-
-                                ),
-                              ),
-                            ],
+                          const Text(
+                            '1. Chọn Khu trọ / Tòa nhà',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
                           ),
-                          const SizedBox(height: 10),
-                          const Text('Chọn Nhà & Phòng', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Colors.grey.shade50,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.grey.shade200),
+                              border: Border.all(color: Colors.grey.shade300),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children:[
-                                Text(
-                                  'Khu Trọ Xanh • ${widget.invoice?.room ?? "Phòng 201 – Tầng 2"}',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                                ),
-                                Icon(Icons.keyboard_arrow_down, size: 18, color: AppColors.textSecondary),
-                              ],
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton(
+                                isExpanded: true,
+                                hint: const Text('Chọn khu trọ'),
+                                value: _selectedPropertyId,
+                                items: [
+                                  for (var p in _propertiesList)
+                                    DropdownMenuItem(
+                                      value: p['id'].toString(),
+                                      child: Text(
+                                        p['name'].toString(),
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                                onChanged: (propId) {
+                                  if (propId != null && propId != _selectedPropertyId) {
+                                    setState(() {
+                                      _selectedPropertyId = propId.toString();
+                                      final roomsInProp = _activeContracts
+                                          .where((c) => c['propertyId']?.toString() == propId.toString())
+                                          .toList();
+                                      if (roomsInProp.isNotEmpty) {
+                                        _selectedContractId = roomsInProp.first['contractId']?.toString();
+                                        _loadPreviousReading(_selectedContractId!);
+                                      } else {
+                                        _selectedContractId = null;
+                                        _dienCuController.text = '0';
+                                        _nuocCuController.text = '0';
+                                      }
+                                    });
+                                  }
+                                },
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 10),
+
+                          const SizedBox(height: 12),
+
+                          const Text(
+                            '2. Chọn Phòng đang thuê',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 6),
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade200),
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade300),
                             ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primaryGreen,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: const Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            widget.invoice?.tenant ?? 'Nguyễn Văn An',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.lightGreen,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: const Text('Hiệu lực', style: TextStyle(fontSize: 9, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-                                          ),
-                                        ],
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton(
+                                isExpanded: true,
+                                hint: const Text('Chọn phòng'),
+                                value: _selectedContractId,
+                                items: [
+                                  for (var c in _filteredRooms)
+                                    DropdownMenuItem(
+                                      value: c['contractId'].toString(),
+                                      child: Text(
+                                        '${c['roomName'] ?? 'Phòng'} - ${c['tenantName'] ?? 'Khách'}',
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textPrimary),
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        widget.invoice != null && widget.invoice!.phone.isNotEmpty
-                                            ? '${widget.invoice!.phone} • HĐ 12 tháng'
-                                            : '0912 ••• 889 • HĐ 12 tháng',
-                                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        children: const [
-                                          Icon(Icons.calendar_today, size: 10, color: AppColors.textSecondary),
-                                          SizedBox(width: 4),
-                                          Text('01/08 - 31/08/2024', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                                          SizedBox(width: 10),
-                                          Icon(Icons.access_time, size: 10, color: Colors.red),
-                                          SizedBox(width: 4),
-                                          Text('Hạn đóng: 05/09/2024', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                    ),
+                                ],
+                                onChanged: (contractId) {
+                                  if (contractId != null) {
+                                    setState(() => _selectedContractId = contractId.toString());
+                                    _loadPreviousReading(contractId.toString());
+                                  }
+                                },
+                              ),
                             ),
+                          ),
+
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(Icons.person_outline, size: 16, color: AppColors.primaryGreen),
+                              const SizedBox(width: 6),
+                              Text('Khách thuê: $_tenantName',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              if (_tenantPhone.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                Text('($_tenantPhone)',
+                                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              ]
+                            ],
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 14),
 
-                    // --- 3. Chỉ số Điện & Nước ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.bolt, size: 18, color: Colors.amber),
-                            SizedBox(width: 6),
-                            Text('Chỉ số Điện & Nước', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary)),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.lightGreen,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text('Tính tự động', style: TextStyle(fontSize: 10, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
+                    const Text('Chỉ số Điện & Nước', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 10),
 
-                    // Card Điện: Có ảnh thì hiện "Đổi ảnh", chưa có thì hiện "Chụp ảnh"
                     InvoiceWidgetHelpers.buildUtilityCard(
                       icon: Icons.electric_bolt,
                       title: 'Điện sinh hoạt',
-                      unitPrice: 'Đơn giá: 3.800 đ/kWh',
-                      totalAmount: '475.000 đ',
+                      unitPrice: 'Đơn giá: ${_formatMoney(_electricUnitPrice)}/kWh',
+                      totalAmount: _formatMoney(_totalElectricAmount),
                       oldController: _dienCuController,
                       newController: _dienMoiController,
                       unitLabel: 'kWh',
-                      consumption: '125 kWh',
+                      consumption: '${_electricUsage.toStringAsFixed(0)} kWh',
                       actionText: _dienImagePath != null ? 'Đổi ảnh' : 'Chụp ảnh',
                       actionIcon: Icons.camera_alt_outlined,
                       onActionPressed: () => _showImagePickerSheet('điện'),
                     ),
                     const SizedBox(height: 10),
 
-                    // Card Nước: Có ảnh thì hiện "Đổi ảnh", chưa có thì hiện "Chụp ảnh"
                     InvoiceWidgetHelpers.buildUtilityCard(
                       icon: Icons.water_drop,
                       title: 'Nước sinh hoạt',
-                      unitPrice: 'Đơn giá: 25.000 đ/m³',
-                      totalAmount: '150.000 đ',
+                      unitPrice: 'Đơn giá: ${_formatMoney(_waterUnitPrice)}/m³',
+                      totalAmount: _formatMoney(_totalWaterAmount),
                       oldController: _nuocCuController,
                       newController: _nuocMoiController,
                       unitLabel: 'm³',
-                      consumption: '6 m³',
+                      consumption: '${_waterUsage.toStringAsFixed(0)} m³',
                       actionText: _nuocImagePath != null ? 'Đổi ảnh' : 'Chụp ảnh',
                       actionIcon: Icons.camera_alt_outlined,
                       onActionPressed: () => _showImagePickerSheet('nước'),
                     ),
                     const SizedBox(height: 14),
 
-                    // --- 4. Chi tiết các khoản thu ---
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppColors.lightGreen.withOpacity(0.4),
+                        color: AppColors.lightGreen.withAlpha(100),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.grey.shade200),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Row(
-                                children: [
-                                  Icon(Icons.receipt_long, size: 18, color: AppColors.primaryGreen),
-                                  SizedBox(width: 8),
-                                  Text('Chi tiết các khoản thu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
-                                ],
-                              ),
-                              Text('7 mục', style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          InvoiceWidgetHelpers.buildFeeItem('Tiền phòng cố định', '4.500.000 đ', subtitle: 'HĐ #HD-2024-P201', icon: Icons.bed),
-                          InvoiceWidgetHelpers.buildFeeItem('Tiền điện sinh hoạt', '475.000 đ', subtitle: '125 kWh × 3.800 đ', icon: Icons.electric_bolt),
-                          InvoiceWidgetHelpers.buildFeeItem('Tiền nước sinh hoạt', '150.000 đ', subtitle: '6 m³ × 25.000 đ', icon: Icons.water_drop),
-                          InvoiceWidgetHelpers.buildFeeItem('Wifi & Internet cáp quang', '100.000 đ', subtitle: 'Gói tốc độ cao', icon: Icons.wifi),
-                          InvoiceWidgetHelpers.buildFeeItem('Vệ sinh & Rác hành lang', '50.000 đ', subtitle: 'Cố định tháng', icon: Icons.cleaning_services),
-                          InvoiceWidgetHelpers.buildFeeItem('Phí giữ xe', '100.000 đ', subtitle: '2 xe máy (50.000 đ/xe)', icon: Icons.two_wheeler),
-
-                          // Dòng giảm giá đỏ
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.shade50,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Icon(Icons.local_offer, size: 14, color: Colors.red),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: const [
-                                        Text('Giảm giá / Ưu đãi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
-                                        Text('Ưu đãi đóng sớm', style: TextStyle(fontSize: 9, color: AppColors.textSecondary)),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const Text('- 100.000 đ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red)),
-                              ],
+                          const Text('Chi tiết các khoản thu',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 10),
+                          InvoiceWidgetHelpers.buildFeeItem(
+                              'Tiền phòng cố định', _formatMoney(_rentPrice),
+                              icon: Icons.bed),
+                          InvoiceWidgetHelpers.buildFeeItem(
+                              'Tiền điện sinh hoạt', _formatMoney(_totalElectricAmount),
+                              subtitle: '${_electricUsage.toStringAsFixed(0)} kWh',
+                              icon: Icons.electric_bolt),
+                          InvoiceWidgetHelpers.buildFeeItem(
+                              'Tiền nước sinh hoạt', _formatMoney(_totalWaterAmount),
+                              subtitle: '${_waterUsage.toStringAsFixed(0)} m³',
+                              icon: Icons.water_drop),
+                          for (var s in _otherServices)
+                            InvoiceWidgetHelpers.buildFeeItem(
+                              s['name']?.toString() ?? 'Dịch vụ',
+                              _formatMoney((s['price'] is num) ? (s['price'] as num).toDouble() : 0),
+                              icon: Icons.miscellaneous_services,
                             ),
-                          ),
                           const Divider(height: 16),
-                          TextButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.add_circle_outline, size: 14, color: AppColors.primaryGreen),
-                            label: const Text('Thêm khoản thu phát sinh (sửa chữa, dịch vụ khác)', style: TextStyle(fontSize: 11, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-                            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                          Row(
+                            children: [
+                              const Text('Giảm trừ / Khuyến mãi (đ): ',
+                                  style: TextStyle(fontSize: 12, color: Colors.red)),
+                              Expanded(
+                                child: TextField(
+                                  controller: _discountController,
+                                  keyboardType: TextInputType.number,
+                                  decoration:
+                                  const InputDecoration(isDense: true, border: UnderlineInputBorder()),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 14),
 
-                    // --- 5. Tổng kết & Nhận tiền ---
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppColors.lightGreen.withOpacity(0.4),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.grey.shade200),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: const [
-                                  Icon(Icons.calculate, size: 18, color: AppColors.primaryGreen),
-                                  SizedBox(width: 8),
-                                  Text('Tổng kết & Nhận tiền', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
-                                ],
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text('VietQR 24/7', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Text('Tạm tính (Subtotal):', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                              Text('5.375.000 đ', style: TextStyle(fontSize: 11, color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Text('Giảm trừ ưu đãi:', style: TextStyle(fontSize: 11, color: Colors.red)),
-                              Text('- 100.000 đ', style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const Divider(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              const Text('TỔNG CỘNG CẦN THU', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                              RichText(
-                                text: const TextSpan(
-                                  text: '5.275.000 ',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
-                                  children: [
-                                    TextSpan(text: 'VNĐ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          // Thông tin ngân hàng
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: const [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.account_balance, size: 12, color: AppColors.textSecondary),
-                                          SizedBox(width: 4),
-                                          Text('Techcombank', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                                        ],
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text('1903 8888 6688', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
-                                      Text('NGUYEN VAN CHU TRO', style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
-                                      SizedBox(height: 2),
-                                      Text('Nội dung: P201 T082024', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.grey.shade200),
-                                  ),
-                                  child: const Icon(Icons.qr_code_2, size: 45, color: AppColors.primaryGreen),
-                                ),
-                              ],
-                            ),
+                          const Text('TỔNG CỘNG THỰC THU',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text(
+                            _formatMoney(_finalTotal),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18, color: Colors.red),
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
 
-            // --- 6. Thanh hành động dưới cùng ---
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -2))],
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withAlpha(12),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2))
+                ],
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(context, {
-                          'status': InvoiceStatus.draft,
-                          'code': widget.invoice?.code,
-                        });
-                      },
+                      onPressed: () => _submitInvoice('draft'),
                       style: OutlinedButton.styleFrom(
                         backgroundColor: Colors.grey.shade100,
                         side: BorderSide.none,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.save_outlined, size: 16, color: AppColors.textPrimary),
-                          SizedBox(width: 6),
-                          Text('Lưu nháp', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                        ],
-                      ),
+                      child: const Text('Lưu nháp',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context, {
-                          'status': InvoiceStatus.unpaid,
-                          'code': widget.invoice?.code,
-                        });
-                      },
+                      onPressed: () => _submitInvoice('unpaid'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accentYellow,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.send, size: 16, color: Colors.white),
-                          SizedBox(width: 6),
-                          Text('Phát hành & Báo khách', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                        ],
-                      ),
+                      child: const Text('Phát hành & Báo khách',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 10)
           ],
         ),
       ),
