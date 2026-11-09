@@ -32,7 +32,6 @@ namespace Backend.Controllers
                     .Include(c => c.Tenant)
                     .Where(c => c.Status == "active");
 
-                // Lọc theo khu trọ nếu có truyền propertyId
                 if (!string.IsNullOrEmpty(propertyId))
                 {
                     query = query.Where(c => c.Room != null && c.Room.PropertyId == propertyId);
@@ -60,7 +59,6 @@ namespace Backend.Controllers
         }
 
         // 1. GET: /api/OwnerInvoices?month=8&year=2026&search=
-        // Lấy danh sách hóa đơn và tổng quan tài chính theo tháng
         [HttpGet]
         public async Task<IActionResult> GetMonthlyInvoices(
             [FromQuery] int? month,
@@ -162,14 +160,11 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy hợp đồng." });
                 }
 
-                // Tìm lần ghi điện nước gần nhất theo RoomId và sắp xếp giảm dần theo Month
                 var lastReading = await _context.UtilityReadings
                     .Where(u => u.RoomId == contract.RoomId)
                     .OrderByDescending(u => u.Month)
                     .FirstOrDefaultAsync();
 
-                // Nếu đã có lần chốt số trước -> Lấy số mới của lần trước làm số cũ kỳ này
-                // Nếu chưa từng có -> Lấy số ban đầu trong hợp đồng
                 decimal oldElectric = lastReading != null
                     ? lastReading.ElectricityNew
                     : contract.InitialElectricityReading;
@@ -277,6 +272,7 @@ namespace Backend.Controllers
                     Id = "inv_" + Guid.NewGuid().ToString("N")[..8],
                     InvoiceCode = $"#HD-T{req.Month:D2}-{contract.Room?.Name?.Replace(" ", "")}",
                     ContractId = contract.Id,
+                    BankAccountId = req.BankAccountId, // <-- Lưu ID tài khoản ngân hàng chủ trọ chọn
                     BillingMonth = billingMonth,
                     IssueDate = today,
                     DueDate = dueDate,
@@ -292,13 +288,13 @@ namespace Backend.Controllers
                 {
                     Id = "ur_" + Guid.NewGuid().ToString("N")[..8],
                     RoomId = contract.RoomId,
-                    Month = billingMonth, // billingMonth kiểu DateOnly đã khai báo ở trên
+                    Month = billingMonth,
                     ElectricityOld = oldElectric,
                     ElectricityNew = req.NewElectric,
                     ElectricityPrice = electricUnitPrice,
                     WaterOld = oldWater,
                     WaterNew = req.NewWater,
-                    WaterPrice = waterUnitPrice, // Tên biến đúng là waterUnitPrice
+                    WaterPrice = waterUnitPrice,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -352,7 +348,7 @@ namespace Backend.Controllers
             }
         }
 
-        // 5. GET: /api/OwnerInvoices/{id} (Chi tiết hóa đơn đầy đủ)
+        // 5. GET: /api/OwnerInvoices/{id} (Chi tiết hóa đơn đầy đủ kèm tài khoản ngân hàng)
         [HttpGet("{id}")]
         public async Task<IActionResult> GetInvoiceDetail(string id)
         {
@@ -363,6 +359,7 @@ namespace Backend.Controllers
                         .ThenInclude(c => c.Room)
                     .Include(i => i.Contract)
                         .ThenInclude(c => c.Tenant)
+                    .Include(i => i.BankAccount) // <-- Nạp tài khoản ngân hàng đã chọn
                     .Include(i => i.UtilityReading)
                     .Include(i => i.InvoiceItems)
                         .ThenInclude(it => it.Service)
@@ -376,7 +373,6 @@ namespace Backend.Controllers
                 var contract = invoice.Contract;
                 var reading = invoice.UtilityReading;
 
-                // Lấy tiền điện nước từ InvoiceItems hoặc UtilityReading
                 decimal electricAmount = 0;
                 decimal waterAmount = 0;
                 decimal electricUsage = 0;
@@ -392,7 +388,6 @@ namespace Backend.Controllers
                     waterAmount = waterUsage * reading.WaterPrice;
                 }
 
-                // Danh sách dịch vụ khác (lấy từ InvoiceItems loại service/other)
                 var otherServices = new List<object>();
 
                 if (invoice.InvoiceItems != null && invoice.InvoiceItems.Any())
@@ -434,7 +429,16 @@ namespace Backend.Controllers
                     subtotal = invoice.Subtotal,
                     discount = invoice.Discount ?? 0,
                     total = invoice.Total,
-                    otherServices = otherServices
+                    otherServices = otherServices,
+
+                    // Thông tin ngân hàng trả về cho app Người thuê xem & quét VietQR
+                    bankAccount = invoice.BankAccount != null ? new
+                    {
+                        bankCode = invoice.BankAccount.BankCode,
+                        bankName = invoice.BankAccount.BankName,
+                        accountNumber = invoice.BankAccount.AccountNumber,
+                        accountHolder = invoice.BankAccount.AccountHolder
+                    } : null
                 });
             }
             catch (Exception ex)
@@ -442,7 +446,6 @@ namespace Backend.Controllers
                 return StatusCode(500, new { message = "Lỗi khi lấy chi tiết hóa đơn", error = ex.Message });
             }
         }
-
 
         // GET: /api/OwnerInvoices/rooms-utility-summary
         [HttpGet("rooms-utility-summary")]
@@ -460,7 +463,6 @@ namespace Backend.Controllers
 
                 foreach (var c in contracts)
                 {
-                    // Lấy lần ghi gần nhất của phòng
                     var lastReading = await _context.UtilityReadings
                         .Where(u => u.RoomId == c.RoomId)
                         .OrderByDescending(u => u.Month)
@@ -494,7 +496,6 @@ namespace Backend.Controllers
             }
         }
 
-
         // GET: /api/OwnerInvoices/room-utility-history/{roomId}
         [HttpGet("room-utility-history/{roomId}")]
         public async Task<IActionResult> GetRoomUtilityHistory(string roomId)
@@ -505,7 +506,7 @@ namespace Backend.Controllers
                     .Include(u => u.Room)
                     .Where(u => u.RoomId == roomId)
                     .OrderByDescending(u => u.Month)
-                    .Take(12) // Lấy 12 tháng gần nhất cho biểu đồ
+                    .Take(12)
                     .ToListAsync();
 
                 var historyList = readings.Select(r => new
@@ -533,6 +534,32 @@ namespace Backend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi nạp lịch sử điện nước", error = ex.Message });
+            }
+        }
+
+        [HttpGet("bank-accounts")]
+        public async Task<IActionResult> GetBankAccounts()
+        {
+            try
+            {
+                var banks = await _context.BankAccounts
+                    .Where(b => b.Status == "active")
+                    .Select(b => new
+                    {
+                        id = b.Id,
+                        bankCode = b.BankCode,
+                        bankName = b.BankName,
+                        accountNumber = b.AccountNumber,
+                        accountHolder = b.AccountHolder,
+                        isDefault = b.IsDefault
+                    })
+                    .ToListAsync();
+
+                return Ok(banks);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi nạp danh sách ngân hàng", error = ex.Message });
             }
         }
     }

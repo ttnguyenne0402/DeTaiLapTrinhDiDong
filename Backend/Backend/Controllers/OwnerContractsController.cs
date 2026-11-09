@@ -664,5 +664,31 @@ namespace Backend.Controllers
                 return StatusCode(500, new { message = "Lỗi khi lấy dữ liệu thanh lý", error = ex.Message });
             }
         }
+
+        [HttpGet("bank-accounts")] 
+        public async Task<IActionResult> GetBankAccounts()
+        {
+            try
+            {
+                var banks = await _context.BankAccounts
+                    .Where(b => b.Status == "active")
+                    .Select(b => new
+                    {
+                        id = b.Id,
+                        bankCode = b.BankCode,
+                        bankName = b.BankName,
+                        accountNumber = b.AccountNumber,
+                        accountHolder = b.AccountHolder,
+                        isDefault = b.IsDefault
+                    })
+                    .ToListAsync();
+
+                return Ok(banks);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách tài khoản ngân hàng", error = ex.Message });
+            }
+        }
     }
 }

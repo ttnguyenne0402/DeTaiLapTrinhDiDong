@@ -12,6 +12,7 @@ public partial class Invoice
     public string ContractId { get; set; } = null!;
 
     public string? UtilityReadingId { get; set; }
+    public string? BankAccountId { get; set; }
 
     public DateOnly BillingMonth { get; set; }
 
@@ -32,6 +33,7 @@ public partial class Invoice
     public DateTime? UpdatedAt { get; set; }
 
     public virtual Contract Contract { get; set; } = null!;
+    public virtual BankAccount? BankAccount { get; set; }
 
     public virtual ICollection<InvoiceItem> InvoiceItems { get; set; } = new List<InvoiceItem>();
 
