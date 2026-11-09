@@ -33,6 +33,10 @@ class _InvoiceFormState extends State<Invoice_form> {
   String? _selectedPropertyId;
   String? _selectedContractId;
 
+  // Danh sách tài khoản ngân hàng & tài khoản được chọn
+  List<dynamic> _bankAccounts = [];
+  String? _selectedBankAccountId;
+
   var _activeContracts = [];
   var _otherServices = [];
 
@@ -66,7 +70,7 @@ class _InvoiceFormState extends State<Invoice_form> {
     super.dispose();
   }
 
-  // Danh sách Khu trọ (không dùng List<...>)
+  // Danh sách Khu trọ
   get _propertiesList {
     final propMap = {};
 
@@ -87,7 +91,7 @@ class _InvoiceFormState extends State<Invoice_form> {
         .toList();
   }
 
-  // Lọc phòng theo Khu trọ (không dùng List<...>)
+  // Lọc phòng theo Khu trọ
   get _filteredRooms {
     if (_selectedPropertyId == null || _selectedPropertyId!.isEmpty) return [];
     return _activeContracts
@@ -98,7 +102,24 @@ class _InvoiceFormState extends State<Invoice_form> {
   Future<void> _initData() async {
     setState(() => _isLoading = true);
 
+    // 1. Tải danh sách hợp đồng đang hoạt động
     final contractsRes = await OwnerInvoiceService.getActiveContracts();
+
+    // 2. Tải danh sách tài khoản ngân hàng của chủ trọ
+    try {
+      final banksRes = await OwnerInvoiceService.getBankAccounts();
+      if (banksRes != null && banksRes is List) {
+        _bankAccounts = banksRes;
+        if (_bankAccounts.isNotEmpty) {
+          final defaultBank = _bankAccounts.firstWhere(
+                (b) => b['isDefault'] == true || b['is_default'] == 1 || b['is_default'] == true,
+            orElse: () => _bankAccounts.first,
+          );
+          _selectedBankAccountId = (defaultBank['id'] ?? '').toString();
+        }
+      }
+    } catch (_) {}
+
     if (mounted && contractsRes != null && contractsRes.isNotEmpty) {
       _activeContracts = contractsRes;
 
@@ -303,6 +324,7 @@ class _InvoiceFormState extends State<Invoice_form> {
       'newWater': newWt,
       'discountAmount': _discount,
       'status': status,
+      'bankAccountId': _selectedBankAccountId, // Đính kèm ID tài khoản ngân hàng được chọn
     };
 
     setState(() => _isLoading = true);
@@ -381,7 +403,7 @@ class _InvoiceFormState extends State<Invoice_form> {
                     ),
                     const SizedBox(height: 12),
 
-                    // KHU VỰC CHỌN KHU TRỌ & PHÒNG
+                    // KHU VỰC CHỌN KHU TRỌ, PHÒNG & TÀI KHOẢN NGÂN HÀNG
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -500,6 +522,51 @@ class _InvoiceFormState extends State<Invoice_form> {
                                     style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                               ]
                             ],
+                          ),
+
+                          const SizedBox(height: 14),
+                          const Divider(height: 1),
+                          const SizedBox(height: 14),
+
+                          // MỤC CHỌN TÀI KHOẢN NGÂN HÀNG NHẬN TIỀN
+                          const Text(
+                            '3. Tài khoản nhận tiền chuyển khoản',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                hint: const Text('Chọn tài khoản ngân hàng'),
+                                value: _selectedBankAccountId,
+                                items: [
+                                  for (var b in _bankAccounts)
+                                    DropdownMenuItem(
+                                      value: b['id']?.toString(),
+                                      child: Text(
+                                        '${b['bankName'] ?? b['bankCode']} - ${b['accountNumber']} (${b['accountHolder']})',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                                onChanged: (bankId) {
+                                  if (bankId != null) {
+                                    setState(() => _selectedBankAccountId = bankId);
+                                  }
+                                },
+                              ),
+                            ),
                           ),
                         ],
                       ),

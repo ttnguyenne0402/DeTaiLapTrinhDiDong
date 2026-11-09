@@ -24,21 +24,25 @@ namespace Backend.DTOs
         public string ContractId { get; set; } = null!;
         public int Month { get; set; }
         public int Year { get; set; }
+        public decimal OldElectric { get; set; }
         public decimal NewElectric { get; set; }
+        public decimal OldWater { get; set; }
         public decimal NewWater { get; set; }
-        public decimal DiscountAmount { get; set; } = 0; // Giảm giá / ưu đãi
+        public decimal DiscountAmount { get; set; } = 0; 
         public string? Note { get; set; }
-        public string Status { get; set; } = "unpaid"; // "draft" hoặc "unpaid"
+        public string Status { get; set; } = "unpaid"; 
+
+   
+        public string? BankAccountId { get; set; }
     }
 
-    // DTO cập nhật trạng thái hóa đơn (xác nhận thu tiền / duyệt / hủy)
+
     public class UpdateInvoiceStatusRequest
     {
         public string Status { get; set; } = null!; // "paid", "unpaid", "pending", "cancelled"
-        public string? PaymentMethod { get; set; } // "VietQR", "Cash", "Transfer"
+        public string? PaymentMethod { get; set; } 
     }
 
-    // DTO hiển thị danh sách hóa đơn theo tháng
     public class InvoiceListItemDto
     {
         public string Id { get; set; } = null!;
@@ -48,11 +52,10 @@ namespace Backend.DTOs
         public string Phone { get; set; } = null!;
         public DateTime DueDate { get; set; }
         public decimal Total { get; set; }
-        public string Status { get; set; } = null!; // "paid", "unpaid", "overdue", "draft", "pending"
+        public string Status { get; set; } = null!;
         public string PaymentInfo { get; set; } = "";
     }
 
-    // DTO tổng hợp tài chính tháng
     public class MonthlyInvoiceSummaryDto
     {
         public int Month { get; set; }
@@ -63,8 +66,6 @@ namespace Backend.DTOs
         public List<InvoiceListItemDto> Invoices { get; set; } = new();
     }
 
-
-    // DTO cho Dropdown chọn Khu & Phòng khi bấm Lập hóa đơn mới
     public class ActiveContractForBillingDto
     {
         public string ContractId { get; set; } = null!;
@@ -74,5 +75,13 @@ namespace Backend.DTOs
         public string RoomName { get; set; } = null!;
         public string TenantName { get; set; } = null!;
         public string TenantPhone { get; set; } = "";
+    }
+
+    public class BankAccountInfoDto
+    {
+        public string BankCode { get; set; } = null!;
+        public string? BankName { get; set; }
+        public string AccountNumber { get; set; } = null!;
+        public string AccountHolder { get; set; } = null!;
     }
 }

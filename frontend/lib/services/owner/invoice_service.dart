@@ -173,4 +173,20 @@ class OwnerInvoiceService {
 
     return null;
   }
+
+  static Future<List<dynamic>?> getBankAccounts() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/bank-accounts'),
+        headers: {'Accept': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      print('Error loading bank accounts: $e');
+    }
+    return null;
+  }
 }
