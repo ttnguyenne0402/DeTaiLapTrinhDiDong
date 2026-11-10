@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/owner/service_service.dart';
 
 class ServiceFormScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -12,6 +13,7 @@ class ServiceFormScreen extends StatefulWidget {
 
 class _ServiceFormScreenState extends State<ServiceFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  bool _isSaving = false;
 
   late TextEditingController _nameController;
   late TextEditingController _priceController;
@@ -19,7 +21,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
 
   String _selectedUnit = 'kWh';
   bool _isMandatory = false;
-  IconData _selectedIcon = Icons.miscellaneous_services;
+  IconData _selectedIcon = Icons.bolt;
 
   final List<String> _units = [
     'kWh',
@@ -46,16 +48,72 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
     super.initState();
     final data = widget.initialData;
     _nameController = TextEditingController(text: data?['name'] ?? '');
-    _priceController = TextEditingController(text: data?['price'] ?? '');
+
+    // Trích xuất đơn giá sạch để người dùng tiện chỉnh sửa
+    String priceText = '';
+    if (data != null) {
+      if (data['rawPrice'] != null) {
+        final num val = data['rawPrice'];
+        priceText = val == val.roundToDouble() ? '${val.toInt()}' : '$val';
+      } else if (data['price'] != null) {
+        priceText = data['price'].toString().replaceAll('.', '').replaceAll(',', '').trim();
+      }
+    }
+    _priceController = TextEditingController(text: priceText);
     _descriptionController = TextEditingController(
       text: data?['description'] ?? '',
     );
 
     if (data != null) {
-      _selectedUnit = data['unit'] ?? 'kWh';
+      String unit = data['unit'] ?? 'kWh';
+      if (unit == 'm3') unit = 'm³';
+      if (!_units.contains(unit)) {
+        _units.add(unit);
+      }
+      _selectedUnit = unit;
       _isMandatory = data['isMandatory'] ?? false;
-      _selectedIcon = data['icon'] ?? Icons.miscellaneous_services;
+
+      if (data['iconName'] != null) {
+        _selectedIcon = _getIconDataByName(data['iconName'].toString());
+      } else if (data['icon'] is IconData) {
+        _selectedIcon = data['icon'];
+      }
     }
+  }
+
+  IconData _getIconDataByName(String icon) {
+    switch (icon.toLowerCase()) {
+      case 'bolt':
+        return Icons.bolt;
+      case 'water_drop':
+        return Icons.water_drop;
+      case 'wifi':
+        return Icons.wifi;
+      case 'cleaning_services':
+        return Icons.cleaning_services;
+      case 'elevator':
+        return Icons.elevator;
+      case 'two_wheeler':
+        return Icons.two_wheeler;
+      case 'security':
+        return Icons.security;
+      case 'local_laundry_service':
+        return Icons.local_laundry_service;
+      default:
+        return Icons.bolt;
+    }
+  }
+
+  String _getIconString(IconData icon) {
+    if (icon == Icons.bolt) return 'bolt';
+    if (icon == Icons.water_drop) return 'water_drop';
+    if (icon == Icons.wifi) return 'wifi';
+    if (icon == Icons.cleaning_services) return 'cleaning_services';
+    if (icon == Icons.elevator) return 'elevator';
+    if (icon == Icons.two_wheeler) return 'two_wheeler';
+    if (icon == Icons.security) return 'security';
+    if (icon == Icons.local_laundry_service) return 'local_laundry_service';
+    return 'bolt';
   }
 
   @override
@@ -150,7 +208,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                         children: [
                           TextFormField(
                             controller: _nameController,
-                            validator: (val) => val == null || val.isEmpty
+                            validator: (val) => val == null || val.trim().isEmpty
                                 ? 'Vui lòng nhập tên dịch vụ'
                                 : null,
                             decoration: InputDecoration(
@@ -173,12 +231,12 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                                 child: TextFormField(
                                   controller: _priceController,
                                   keyboardType: TextInputType.number,
-                                  validator: (val) => val == null || val.isEmpty
+                                  validator: (val) => val == null || val.trim().isEmpty
                                       ? 'Nhập đơn giá'
                                       : null,
                                   decoration: InputDecoration(
                                     labelText: 'Đơn giá (VNĐ)',
-                                    hintText: '3.500',
+                                    hintText: '3500',
                                     prefixIcon: Icon(
                                       Icons.attach_money,
                                       color: AppColors.primaryGreen,
@@ -193,7 +251,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                               Expanded(
                                 flex: 2,
                                 child: DropdownButtonFormField<String>(
-                                  value: _selectedUnit,
+                                  initialValue: _selectedUnit,
                                   decoration: InputDecoration(
                                     labelText: 'Đơn vị tính',
                                     border: OutlineInputBorder(
@@ -209,8 +267,9 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                                       )
                                       .toList(),
                                   onChanged: (val) {
-                                    if (val != null)
+                                    if (val != null) {
                                       setState(() => _selectedUnit = val);
+                                    }
                                   },
                                 ),
                               ),
@@ -221,9 +280,8 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                             controller: _descriptionController,
                             maxLines: 2,
                             decoration: InputDecoration(
-                              labelText: 'Mô tả / Cách tính',
-                              hintText:
-                                  'VD: Thu theo chỉ số đồng hồ chốt ngày 30 hàng tháng',
+                              labelText: 'Mô tả tính toán',
+                              hintText: 'VD: Tính theo chỉ số công tơ điện hàng tháng',
                               prefixIcon: Icon(
                                 Icons.description_outlined,
                                 color: AppColors.primaryGreen,
@@ -272,13 +330,13 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
 
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Color(0x0D000000),
                       blurRadius: 10,
-                      offset: const Offset(0, -4),
+                      offset: Offset(0, -4),
                     ),
                   ],
                 ),
@@ -287,38 +345,92 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          Navigator.pop(context, {
-                            'id':
-                                widget.initialData?['id'] ??
-                                DateTime.now().millisecondsSinceEpoch
-                                    .toString(),
-                            'name': _nameController.text,
-                            'price': _priceController.text,
-                            'unit': _selectedUnit,
-                            'icon': _selectedIcon,
-                            'iconColor': AppColors.primaryGreen,
-                            'isMandatory': _isMandatory,
-                            'status': true,
-                            'description': _descriptionController.text,
-                          });
-                        }
-                      },
+                      onPressed: _isSaving
+                          ? null
+                          : () async {
+                              if (_formKey.currentState!.validate()) {
+                                final messenger = ScaffoldMessenger.of(context);
+                                final navigator = Navigator.of(context);
+
+                                setState(() => _isSaving = true);
+                                try {
+                                  final rawPrice = _priceController.text
+                                      .replaceAll('.', '')
+                                      .replaceAll(',', '')
+                                      .replaceAll(' ', '')
+                                      .trim();
+                                  final priceVal = double.tryParse(rawPrice) ?? 0.0;
+                                  final iconStr = _getIconString(_selectedIcon);
+
+                                  final payload = {
+                                    'ownerId': 'USER_OWNER_01',
+                                    'name': _nameController.text.trim(),
+                                    'price': priceVal,
+                                    'unit': _selectedUnit,
+                                    'isMandatory': _isMandatory,
+                                    'icon': iconStr,
+                                    'description': _descriptionController.text.trim(),
+                                    'status': widget.initialData?['status'] ?? true,
+                                  };
+
+                                  bool ok = false;
+                                  if (isEdit && widget.initialData != null && widget.initialData!['id'] != null) {
+                                    final serviceId = widget.initialData!['id'].toString();
+                                    ok = await ServiceManagementService.updateService(serviceId, payload);
+                                  } else {
+                                    ok = await ServiceManagementService.createService(payload);
+                                  }
+
+                                  if (!mounted) return;
+                                  setState(() => _isSaving = false);
+
+                                  if (ok) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(isEdit
+                                            ? 'Cập nhật dịch vụ thành công'
+                                            : 'Thêm dịch vụ thành công'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                    navigator.pop(true);
+                                  } else {
+                                    messenger.showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Lưu dịch vụ thất bại. Vui lòng thử lại!'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  setState(() => _isSaving = false);
+                                  messenger.showSnackBar(
+                                    SnackBar(content: Text('Lỗi kết nối API: $e')),
+                                  );
+                                }
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryGreen,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(
-                        isEdit ? 'CẬP NHẬT DỊCH VỤ' : 'THÊM DỊCH VỤ',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              isEdit ? 'CẬP NHẬT DỊCH VỤ' : 'THÊM DỊCH VỤ',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -334,7 +446,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: FontWeight.bold,
         color: Colors.black87,
       ),
@@ -346,7 +458,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(children: children),
     );

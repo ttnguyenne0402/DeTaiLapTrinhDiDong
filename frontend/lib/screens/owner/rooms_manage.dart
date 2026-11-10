@@ -1,15 +1,27 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../widgets/owner/property_card.dart';
 import 'owner_dashboard.dart';
 import 'room_form.dart';
 import 'tenant_list_screen.dart';
+import '../../services/owner/room_service.dart';
 
-// Màn hình quản lý danh sách phòng trọ của chủ trọ
-class RoomsManageScreen extends StatelessWidget {
+// Màn hình quản lý danh sách phòng trọ của chủ trọ (kết nối trực tiếp SQL Server)
+class RoomsManageScreen extends StatefulWidget {
   const RoomsManageScreen({super.key});
 
+  @override
+  State<RoomsManageScreen> createState() => _RoomsManageScreenState();
+}
+
+class _RoomsManageScreenState extends State<RoomsManageScreen> {
   final Color primaryColor = const Color(0xFF1B5E55);
+  int _refreshCounter = 0;
+
+  void _reload() {
+    setState(() {
+      _refreshCounter++;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +36,13 @@ class RoomsManageScreen extends StatelessWidget {
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              tooltip: 'Làm mới',
+              onPressed: _reload,
+            ),
+          ],
           title: const Text(
             'Quản lý phòng',
             style: TextStyle(
@@ -35,20 +54,20 @@ class RoomsManageScreen extends StatelessWidget {
           centerTitle: true,
 
           // Thanh bộ lọc trạng thái phòng
-          bottom: TabBar(
+          bottom: const TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,
             indicatorColor: Colors.orange,
             indicatorWeight: 3,
-            labelStyle: const TextStyle(
+            labelStyle: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,
             ),
-            unselectedLabelStyle: const TextStyle(
+            unselectedLabelStyle: TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: 14,
             ),
-            tabs: const [
+            tabs: [
               Tab(text: 'Đang cho thuê'),
               Tab(text: 'Còn trống'),
               Tab(text: 'Tất cả'),
@@ -80,11 +99,14 @@ class RoomsManageScreen extends StatelessWidget {
 
         // Nút thêm phòng mới
         floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
+          onPressed: () async {
+            final res = await Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const RoomFormScreen()),
             );
+            if (res == true) {
+              _reload();
+            }
           },
           backgroundColor: Colors.orange,
           shape: const CircleBorder(),
@@ -107,21 +129,14 @@ class RoomsManageScreen extends StatelessWidget {
                   ),
                 );
               }),
-              _buildNavItem(Icons.apartment, 'Phòng', true, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RoomsManageScreen(),
-                  ),
-                );
-              }),
+              _buildNavItem(Icons.apartment, 'Phòng', true, () {}),
               const SizedBox(width: 40),
               _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TenantListScreen(),
-                    ),
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TenantListScreen(),
+                  ),
                 );
               }),
               _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
@@ -132,108 +147,126 @@ class RoomsManageScreen extends StatelessWidget {
     );
   }
 
-  // Danh sách phòng có bộ lọc theo tab
+  // Danh sách phòng có bộ lọc theo tab kết nối trực tiếp Backend SQL Server
   Widget _buildRoomList(String filter) {
-    // Dữ liệu danh sách phòng mẫu
-    final sampleRooms = [
-      {
-        'roomName': 'Phòng 201',
-        'detail': '25 m² - Tầng 2',
-        'price': '4.000.000đ',
-        'status': 'Đang cho thuê',
-        'isRented': true,
-        'images': "frontend/assets/images/anhPhongDemo.jpg",
+    return RefreshIndicator(
+      onRefresh: () async {
+        _reload();
       },
-      {
-        'roomName': 'Phòng 202',
-        'detail': '25 m² - Tầng 2',
-        'price': '4.500.000đ',
-        'status': 'Còn trống',
-        'isRented': false,
-        'images': "frontend/assets/images/anhPhongDemo.jpg",
-      },
-      {
-        'roomName': 'Phòng 301',
-        'detail': '30 m² - Tầng 3',
-        'price': '5.000.000đ',
-        'status': 'Đang cho thuê',
-        'isRented': true,
-        'images': "frontend/assets/images/anhPhongDemo.jpg",
-      },
-      {
-        'roomName': 'Phòng 302',
-        'detail': '20 m² - Tầng 3',
-        'price': '4.000.000đ',
-        'status': 'Bảo trì',
-        'isRented': false,
-        'images': "frontend/assets/images/anhPhongDemo.jpg",
-      },
-    ];
+      child: FutureBuilder<List<RoomModel>>(
+        key: ValueKey('$filter-$_refreshCounter'),
+        future: RoomService.fetchRooms('USER_OWNER_01', status: filter),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-    // Lọc danh sách phòng theo tham số
-    final filtered = sampleRooms.where((room) {
-      if (filter == 'rented') return room['isRented'] == true;
-      if (filter == 'empty') return room['isRented'] == false;
-      return true;
-    }).toList();
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.cloud_off, size: 54, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Lỗi kết nối máy chủ: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _reload,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Thử lại'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: filtered.length,
-      itemBuilder: (context, index) {
-        final room = filtered[index];
-        return PropertyCard(
-          title: room['roomName'] as String,
-          subtitle: room['detail'] as String,
-          price: room['price'] as String,
-          status: room['status'] as String,
-          isRented: room['isRented'] as bool,
-          imageUrl: room['images'] as String,
-          onTap: () {},
-        );
-      },
+          final rooms = snapshot.data ?? [];
+
+          if (rooms.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.meeting_room_outlined, size: 56, color: Colors.grey[400]),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Không có phòng nào trong danh mục này',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: rooms.length,
+            itemBuilder: (context, index) {
+              final room = rooms[index];
+              return _buildRoomCard(room);
+            },
+          );
+        },
+      ),
     );
   }
 
-  // Thẻ hiển thị thông tin từng phòng
-  Widget _buildRoomCard({
-    required String roomName,
-    required String detail,
-    required String price,
-    required String status,
-    required String images,
-  }) {
+  // Thẻ hiển thị thông tin từng phòng và nút Sửa
+  Widget _buildRoomCard(RoomModel room) {
+    final bool isNetwork = room.images.startsWith('http://') || room.images.startsWith('https://');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Color(0x0A000000),
             blurRadius: 8,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Ảnh phòng
+          // Ảnh phòng (hỗ trợ cả link Web SQL Server lẫn asset cục bộ)
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              images,
-              width: 85,
-              height: 85,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 85,
-                height: 85,
-                color: Colors.grey[200],
-                child: const Icon(Icons.apartment, color: Colors.grey),
-              ),
-            ),
+            child: isNetwork
+                ? Image.network(
+                    room.images,
+                    width: 85,
+                    height: 85,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 85,
+                      height: 85,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.apartment, color: Colors.grey),
+                    ),
+                  )
+                : Image.asset(
+                    room.images,
+                    width: 85,
+                    height: 85,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 85,
+                      height: 85,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.apartment, color: Colors.grey),
+                    ),
+                  ),
           ),
           const SizedBox(width: 14),
 
@@ -243,7 +276,7 @@ class RoomsManageScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  roomName,
+                  room.name,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -252,23 +285,62 @@ class RoomsManageScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  detail,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  room.propertyName.isNotEmpty
+                      ? '${room.propertyName} • ${room.detail}'
+                      : room.detail,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  price,
+                  room.priceFormatted,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: AppColors.primaryGreen,
                   ),
                 ),
                 const SizedBox(height: 6),
 
                 // Badge trạng thái phòng
-                _buildStatusBadge(status),
+                _buildStatusBadge(room.statusText),
               ],
+            ),
+          ),
+
+          // Nút Sửa thông tin phòng
+          GestureDetector(
+            onTap: () async {
+              final res = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => RoomFormScreen(initialData: room),
+                ),
+              );
+              if (res == true) {
+                _reload();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.edit_outlined, size: 14, color: Colors.blue[700]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Sửa',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

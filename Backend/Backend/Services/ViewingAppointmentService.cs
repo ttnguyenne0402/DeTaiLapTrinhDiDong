@@ -19,10 +19,10 @@ namespace Backend.Services
 
         public async Task<ViewingAppointmentResponseDTO> CreateAppointmentAsync(ViewingAppointmentRequestDTO request)
         {
-            // 1. Xử lý nghiệp vụ: Tự động tạo ID cho lịch hẹn mới
+            // Xử lý nghiệp vụ: Tự động tạo ID cho lịch hẹn mới
             string newId = "VA" + DateTime.Now.ToString("yyyyMMddHHmmss");
 
-            // 2. Chuyển đổi từ DTO (Flutter gửi) sang Model (Database hiểu)
+            // Chuyển đổi từ DTO (Flutter gửi) sang Model (Database hiểu)
             var appointment = new ViewingAppointment
             {
                 Id = newId,
@@ -37,10 +37,10 @@ namespace Backend.Services
                 UpdatedAt = DateTime.Now
             };
 
-            // 3. Gọi Repo để lưu xuống SQL Server
+            // Gọi Repo để lưu xuống SQL Server
             await _repository.AddAsync(appointment);
 
-            // 4. Trả về kết quả xác nhận cho Flutter
+            // Trả về kết quả xác nhận cho Flutter
             return new ViewingAppointmentResponseDTO
             {
                 Id = appointment.Id,

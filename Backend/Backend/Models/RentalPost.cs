@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Backend.Models;
@@ -13,13 +13,19 @@ public partial class RentalPost
 
     public string Description { get; set; } = null!;
 
+    public decimal? Price { get; set; }
+
+    public string? Amenities { get; set; }
+
+    public int Views { get; set; } = 0;
+
+    public string? SubmitNote { get; set; }
+
     public string Status { get; set; } = null!;
 
     public string? RejectionReason { get; set; }
 
     public DateTime? PublishedAt { get; set; }
-
-    public DateTime? ExpiredAt { get; set; }
 
     public DateTime? CreatedAt { get; set; }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
+import '../../services/owner/service_service.dart';
 import 'service_form.dart';
 
 class ServicesManageScreen extends StatefulWidget {
@@ -11,63 +12,92 @@ class ServicesManageScreen extends StatefulWidget {
 }
 
 class _ServicesManageScreenState extends State<ServicesManageScreen> {
-  final List<Map<String, dynamic>> _services = [
-    {
-      'id': 's1',
-      'name': 'Điện sinh hoạt',
-      'price': '3.500',
-      'unit': 'kWh',
-      'icon': Icons.bolt,
-      'iconColor': Colors.amber[700],
-      'isMandatory': true,
-      'status': true,
-      'description': 'Tính theo chỉ số đồng hồ hàng tháng.',
-    },
-    {
-      'id': 's2',
-      'name': 'Nước sinh hoạt',
-      'price': '100.000',
-      'unit': 'người/tháng',
-      'icon': Icons.water_drop,
-      'iconColor': Colors.blue[600],
-      'isMandatory': true,
-      'status': true,
-      'description': 'Tính khoán theo số lượng người ở thực tế.',
-    },
-    {
-      'id': 's3',
-      'name': 'Internet / Wifi tốc độ cao',
-      'price': '100.000',
-      'unit': 'phòng/tháng',
-      'icon': Icons.wifi,
-      'iconColor': Colors.green[600],
-      'isMandatory': false,
-      'status': true,
-      'description': 'Gói cước băng thông 150Mbps.',
-    },
-    {
-      'id': 's4',
-      'name': 'Phí vệ sinh & Rác thải',
-      'price': '50.000',
-      'unit': 'phòng/tháng',
-      'icon': Icons.cleaning_services,
-      'iconColor': Colors.orange[700],
-      'isMandatory': true,
-      'status': true,
-      'description': 'Thu gom rác hàng ngày và lau dọn hành lang.',
-    },
-    {
-      'id': 's5',
-      'name': 'Phí bảo trì Thang máy',
-      'price': '50.000',
-      'unit': 'người/tháng',
-      'icon': Icons.elevator,
-      'iconColor': Colors.purple[600],
-      'isMandatory': false,
-      'status': false,
-      'description': 'Áp dụng cho các tầng từ tầng 2 trở lên.',
-    },
-  ];
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<Map<String, dynamic>> _services = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadServices();
+  }
+
+  // Tải danh sách dịch vụ trực tiếp từ SQL Server qua Backend Web API
+  Future<void> _loadServices() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final list = await ServiceManagementService.fetchServices('USER_OWNER_01');
+      if (mounted) {
+        setState(() {
+          _services = list.map((s) => {
+            'id': s.id,
+            'name': s.name,
+            'price': s.priceFormatted.isNotEmpty ? s.priceFormatted : '${s.price.toInt()}',
+            'rawPrice': s.price,
+            'unit': s.unit,
+            'icon': _getIconData(s.icon),
+            'iconName': s.icon,
+            'iconColor': _getIconColor(s.icon),
+            'isMandatory': s.isMandatory,
+            'status': s.status,
+            'description': s.description,
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải danh sách dịch vụ từ API: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Không kết nối được tới máy chủ.\nKiểm tra lại Backend đã chạy chưa rồi thử lại.';
+        });
+      }
+    }
+  }
+
+  IconData _getIconData(String icon) {
+    switch (icon.toLowerCase()) {
+      case 'bolt':
+        return Icons.bolt;
+      case 'water_drop':
+        return Icons.water_drop;
+      case 'wifi':
+        return Icons.wifi;
+      case 'cleaning_services':
+        return Icons.cleaning_services;
+      case 'elevator':
+        return Icons.elevator;
+      case 'two_wheeler':
+        return Icons.two_wheeler;
+      case 'security':
+        return Icons.security;
+      case 'local_laundry_service':
+        return Icons.local_laundry_service;
+      default:
+        return Icons.miscellaneous_services;
+    }
+  }
+
+  Color _getIconColor(String icon) {
+    switch (icon.toLowerCase()) {
+      case 'bolt':
+        return Colors.amber[700]!;
+      case 'water_drop':
+        return Colors.blue[600]!;
+      case 'wifi':
+        return Colors.green[600]!;
+      case 'cleaning_services':
+        return Colors.orange[700]!;
+      case 'elevator':
+        return Colors.purple[600]!;
+      default:
+        return AppColors.primaryGreen;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +123,13 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Làm mới',
+            onPressed: _loadServices,
+          ),
+        ],
       ),
       body: Container(
         width: double.infinity,
@@ -104,68 +141,105 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             topRight: Radius.circular(24),
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGreen.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: AppColors.primaryGreen.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: AppColors.primaryGreen,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Bảng giá dịch vụ này sẽ được áp dụng tự động khi tính hóa đơn tiền trọ hàng tháng.',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          color: AppColors.primaryGreen,
-                          height: 1.3,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadServices,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGreen.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primaryGreen.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: AppColors.primaryGreen,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Bảng giá dịch vụ lấy trực tiếp từ SQL Server và được áp dụng khi lập hóa đơn hàng tháng.',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppColors.primaryGreen,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Danh sách dịch vụ áp dụng',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${_services.length} dịch vụ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _services.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      _errorMessage ?? 'Chưa có dịch vụ nào trong cơ sở dữ liệu.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: _errorMessage != null ? Colors.red[400] : Colors.grey,
+                                      ),
+                                    ),
+                                    if (_errorMessage != null) ...[
+                                      const SizedBox(height: 12),
+                                      OutlinedButton.icon(
+                                        onPressed: _loadServices,
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text('Thử lại'),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _services.length,
+                              itemBuilder: (context, index) {
+                                final service = _services[index];
+                                return _buildServiceCard(service);
+                              },
+                            ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Danh sách dịch vụ áp dụng',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '${_services.length} dịch vụ',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _services.length,
-                itemBuilder: (context, index) {
-                  final service = _services[index];
-                  return _buildServiceCard(service);
-                },
-              ),
-            ],
-          ),
-        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -173,16 +247,16 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             context,
             MaterialPageRoute(builder: (context) => const ServiceFormScreen()),
           );
-          if (result != null && result is Map<String, dynamic>) {
-            setState(() {
-              _services.add(result);
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Đã thêm dịch vụ mới thành công!'),
-                backgroundColor: AppColors.primaryGreen,
-              ),
-            );
+          if (result == true) {
+            _loadServices();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Đã cập nhật dịch vụ từ SQL Server!'),
+                  backgroundColor: AppColors.primaryGreen,
+                ),
+              );
+            }
           }
         },
         backgroundColor: Colors.orange,
@@ -293,29 +367,43 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                 Switch(
                   value: isActive,
                   activeThumbColor: AppColors.primaryGreen,
-                  onChanged: (val) {
+                  onChanged: (val) async {
                     setState(() {
                       service['status'] = val;
                     });
+                    try {
+                      await ServiceManagementService.toggleServiceStatus(service['id']);
+                    } catch (e) {
+                      debugPrint('Lỗi chuyển trạng thái dịch vụ: $e');
+                    }
                   },
                 ),
                 GestureDetector(
                   onTap: () async {
-                    await Navigator.push(
+                    final res = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
                             ServiceFormScreen(initialData: service),
                       ),
                     );
-                    setState(() {});
+                    if (res == true) {
+                      _loadServices();
+                    }
                   },
-                  child: Text(
-                    'Sửa',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue[700],
-                      fontWeight: FontWeight.bold,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Sửa',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),

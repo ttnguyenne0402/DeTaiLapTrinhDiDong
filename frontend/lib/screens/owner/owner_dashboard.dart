@@ -4,6 +4,7 @@ import 'properties_manage.dart';
 import '../tenant/profile_screen.dart';
 import 'tenant_list_screen.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/owner/owner_dashboard_service.dart'; // Import service gọi API
 
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key});
@@ -28,6 +29,7 @@ class OwnerDashboard extends StatelessWidget {
         ],
       ),
 
+      // Sử dụng FutureBuilder để lấy dữ liệu động từ API (SQL Server)
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -38,152 +40,176 @@ class OwnerDashboard extends StatelessWidget {
             topRight: Radius.circular(24),
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              //Phần Thông tin cá nhân
-              Row(
+        child: FutureBuilder<OwnerDashboardModel>(
+          // Truyền đúng mã ID chủ trọ trong cơ sở dữ liệu của bạn vào đây
+          //future: OwnerDashboardService.fetchDashboardData(loggedInUserId), khi đăng nhập hoàn tất sẽ như này
+          future: OwnerDashboardService.fetchDashboardData('USER_OWNER_01'),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('Lỗi tải dữ liệu: ${snapshot.error}'));
+            } else if (!snapshot.hasData) {
+              return const Center(child: Text('Không có dữ liệu'));
+            }
+
+            final data = snapshot.data!;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
-                    radius: 24,
-                    backgroundImage: AssetImage(
-                      "frontend/assets/images/avatarDemo.jpg",
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Phần Thông tin cá nhân (Đọc từ SQL lên)
+                  Row(
                     children: [
-                      const Text(
-                        'Xin chào, Nguyễn Văn A 👋',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      const CircleAvatar(
+                        radius: 24,
+                        backgroundImage: AssetImage(
+                          "frontend/assets/images/avatarDemo.jpg",
                         ),
                       ),
-                      Text(
-                        'Chủ trọ khu vực Quận 9',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Xin chào, ${data.ownerName} 👋',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            data.ownerRole,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: primaryColor,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tổng quan hôm nay',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                  // Tổng quan hôm nay (Thống kê số liệu thực tế từ SQL)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tổng quan hôm nay',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: _buildDashboardCard(
+                                icon: Icons.meeting_room,
+                                value: '${data.totalRentedRooms}',
+                                label: 'Phòng đang cho thuê',
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDashboardCard(
+                                icon: Icons.calendar_today,
+                                value: '${data.scheduledAppointments}',
+                                label: 'Lịch xem phòng',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: _buildDashboardCard(
+                                icon: Icons.door_front_door_outlined,
+                                value: '${data.emptyRooms}',
+                                label: 'Phòng trống',
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDashboardCard(
+                                icon: Icons.build_circle_outlined,
+                                value: '${data.repairRequests}',
+                                label: 'Yêu cầu sửa chữa',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Lịch xem phòng sắp tới',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: _buildDashboardCard(
-                            icon: Icons.meeting_room,
-                            value: '12',
-                            label: 'Phòng đang cho thuê',
-                          ),
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text(
+                          'Xem tất cả',
+                          style: TextStyle(color: Colors.orange),
                         ),
-                        Expanded(
-                          child: _buildDashboardCard(
-                            icon: Icons.calendar_today,
-                            value: '5',
-                            label: 'Lịch xem phòng',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: _buildDashboardCard(
-                            icon: Icons.door_front_door_outlined,
-                            value: '8',
-                            label: 'Phòng trống',
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildDashboardCard(
-                            icon: Icons.build_circle_outlined,
-                            value: '3',
-                            label: 'Yêu cầu sửa chữa',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Lịch xem phòng sắp tới',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text(
-                      'Xem tất cả',
-                      style: TextStyle(color: Colors.orange),
-                    ),
-                  ),
+                  // Hiển thị danh sách lịch hẹn lấy động từ Database
+                  data.upcomingAppointments.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text('Không có lịch hẹn nào sắp tới'),
+                          ),
+                        )
+                      : Column(
+                          children: data.upcomingAppointments.map((item) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: _buildViewingItem(
+                                avatarPath:
+                                    "frontend/assets/images/avatarDemo.jpg",
+                                time: item.time,
+                                name: item.name,
+                                roomInfo: item.roomInfo,
+                                status: item.status,
+                                statusColor: item.status == 'Đã xác nhận'
+                                    ? Colors.green
+                                    : Colors.orange,
+                                onCallTap: () {
+                                  // Xử lý gọi điện đến số: item.phone
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
                 ],
               ),
-
-              //Item Danh sách
-              _buildViewingItem(
-                avatarPath: "frontend/assets/images/avatarDemo.jpg",
-                time: "Hôm nay, 10:00",
-                name: "Nguyễn Văn A",
-                roomInfo: "Phòng 202 - Chung cư mini",
-                status: "Đã xác nhận",
-                onCallTap: () {},
-              ),
-
-              const SizedBox(height: 8),
-              _buildViewingItem(
-                avatarPath: "frontend/assets/images/avatarDemo.jpg",
-                time: "Hôm nay, 10:00",
-                name: "Nguyễn Thị B",
-                roomInfo: "Phòng 201 - Chung cư mini",
-                status: "Đã xác nhận",
-                onCallTap: () {},
-              ),
-
-              const SizedBox(height: 8),
-              _buildViewingItem(
-                avatarPath: "frontend/assets/images/avatarDemo.jpg",
-                time: "Ngày mai, 14:30",
-                name: "Trần Văn C",
-                roomInfo: "Phòng 102 - Nhà trọ A",
-                status: "Chờ xác nhận",
-                statusColor: Colors.orange,
-                onCallTap: () {},
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
 
@@ -274,7 +300,7 @@ class OwnerDashboard extends StatelessWidget {
     );
   }
 
-  //hàm các card
+  // Hàm các card lịch hẹn
   Widget _buildViewingItem({
     required String avatarPath,
     required String time,
@@ -333,7 +359,7 @@ class OwnerDashboard extends StatelessWidget {
     );
   }
 
-  //hàm cho bottom
+  // Hàm cho bottom navigation bar
   Widget _buildNavItem(
     IconData icon,
     String label,

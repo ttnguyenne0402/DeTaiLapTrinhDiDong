@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'screens/admin/content_moderation.dart';
 import 'screens/owner/appointments_manage.dart';
@@ -11,7 +12,18 @@ import 'screens/owner/posts_manage.dart';
 import 'screens/owner/properties_manage.dart';
 import 'screens/owner/services_manage.dart';
 
+// Bỏ qua xác thực chứng chỉ SSL tự ký (self-signed cert) khi debug/phát triển local với .NET Core
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() {
+  HttpOverrides.global = MyHttpOverrides();
   runApp(const MyApp());
 }
 
@@ -25,7 +37,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Flutter Demo',
       // initialRoute: AppRoutes.invoicesManage,
-      // onGenerateRoute: AppRouter.generateRoute,
+      onGenerateRoute: AppRouter.generateRoute,
       theme: ThemeData(
         // This is the theme of your application.
         //

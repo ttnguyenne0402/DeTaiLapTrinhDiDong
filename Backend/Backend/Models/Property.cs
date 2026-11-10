@@ -10,6 +10,7 @@ public partial class Property
     public string OwnerId { get; set; } = null!;
 
     public string Name { get; set; } = null!;
+    public string? Image { get; set; }
 
     public string Type { get; set; } = null!;
 

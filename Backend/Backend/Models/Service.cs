@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Backend.Models;
@@ -14,6 +14,12 @@ public partial class Service
     public string? Description { get; set; }
 
     public string Unit { get; set; } = null!;
+
+    public decimal Price { get; set; } = 0;
+
+    public bool IsMandatory { get; set; } = false;
+
+    public string? Icon { get; set; }
 
     public string Status { get; set; } = null!;
 

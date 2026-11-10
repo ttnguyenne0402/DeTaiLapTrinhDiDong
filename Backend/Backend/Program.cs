@@ -1,7 +1,7 @@
-
-var builder = WebApplication.CreateBuilder(args);
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Backend.Models; // Namespace chứa QuanLyPhongTroContext
+var builder = WebApplication.CreateBuilder(args);
+
 
 // Add services to the container.
 
@@ -9,14 +9,20 @@ builder.Services.AddDbContext<QuanLyPhongTroContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 // ----------------------------------------
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-// 1. ĐĂNG KÝ DATABASE CONTEXT 
-builder.Services.AddDbContext<Backend.Models.QuanLyPhongTroContext>();
-
 
 // 2. Đăng ký Repositories
 builder.Services.AddScoped<Backend.Repositories.IViewingAppointmentRepository, Backend.Repositories.ViewingAppointmentRepository>();
@@ -27,6 +33,8 @@ builder.Services.AddScoped<Backend.Services.IViewingAppointmentService, Backend.
 builder.Services.AddScoped<Backend.Services.IContractService, Backend.Services.ContractService>();
 
 var app = builder.Build();
+
+app.UseCors("AllowAll");
 
 if (app.Environment.IsDevelopment())
 {
