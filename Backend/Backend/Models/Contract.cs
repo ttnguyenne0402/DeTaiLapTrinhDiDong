@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Backend.Models;
 
@@ -28,6 +29,12 @@ public partial class Contract
     public string PaymentCycle { get; set; } = null!;
 
     public string? Terms { get; set; }
+
+    [Column("owner_signature")]
+    public string? OwnerSignature { get; set; }
+
+    [Column("tenant_signature")]
+    public string? TenantSignature { get; set; }
 
     public string Status { get; set; } = null!;
 

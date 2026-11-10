@@ -9,6 +9,8 @@ import '../../core/constants/app_colors.dart';
 import 'utility_history.dart';
 import 'utility_readings.dart';
 import '../../services/owner/property_service.dart';
+import '../tenant/profile_screen.dart';
+
 
 class PropertiesManageScreen extends StatefulWidget {
   const PropertiesManageScreen({super.key});
@@ -160,7 +162,31 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                   ),
                 );
               }),
-              _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
+              const SizedBox(width: 40),
+              _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TenantListScreen(),
+                    ),
+                );
+              }),
+              _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(
+                      user: {
+                        'Name': 'Nguyễn Văn A',
+                        'Email': '',
+                        'Phone': '',
+                        'Avatar': '',
+                        'Role': 'owner',
+                      },
+                    ),
+                  ),
+                );
+              }),
             ],
           ),
         ),
@@ -338,7 +364,10 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const InvoiceCreateScreen(),
+                              builder: (context) => InvoiceCreateScreen(
+                                propertyId: item['id']?.toString(),       // Mã khu trọ (ví dụ: 'p1', 'p2'...)
+                                propertyName: item['name']?.toString(),   // Tên khu trọ (ví dụ: 'Chung cư Mini Q7')
+                              ),
                             ),
                           );
                         },
@@ -367,8 +396,10 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  const LandlordUtilityScreen(),
+                              builder: (context) => LandlordUtilityScreen(
+                                propertyId: item['id']?.toString(),     // Truyền ID khu trọ sang
+                                propertyName: item['name']?.toString(), // Truyền Tên khu trọ sang
+                              ),
                             ),
                           );
                         },

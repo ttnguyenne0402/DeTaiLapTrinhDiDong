@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import 'dart:convert';
+import 'dart:io';
+
 import '../../core/constants/app_colors.dart';
-import '../../route/app_routes.dart';
 import '../../widgets/common/status_badge.dart';
 
 class booking_history_screen extends StatefulWidget {
@@ -11,90 +15,151 @@ class booking_history_screen extends StatefulWidget {
 }
 
 class _BookingHistoryScreenState extends State<booking_history_screen> {
+  List<dynamic> _appointments = [];
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> mockAppointments = [
-    {
-      "id": "A01",
-      "roomName": "Phòng 101",
-      "address": "KDC Nhơn Đức, Xã Nhơn Đức, Huyện Nhà Bè",
-      "date": "18/09/2026",
-      "time": "14:30",
-      "status": "pending",
-      "message": "Mình đi làm về muộn, chủ nhà hỗ trợ chờ giúp mình nhé.",
-      "ownerNote": null
-    },
-    {
-      "id": "A02",
-      "roomName": "Căn hộ mini Lê Trọng Tấn",
-      "address": "Phường Tây Thạnh, Quận Tân Phú",
-      "date": "20/09/2026",
-      "time": "09:00",
-      "status": "rescheduled",
-      "message": "Hẹn xem buổi sáng.",
-      "ownerNote": "Sáng anh đi vắng, em đổi sang 15:00 chiều cùng ngày được không?"
-    },
-    {
-      "id": "A03",
-      "roomName": "Phòng 205 KTX HUIT",
-      "address": "140 Lê Trọng Tấn, Tân Phú",
-      "date": "15/09/2026",
-      "time": "18:00",
-      "status": "confirmed",
-      "message": "",
-      "ownerNote": null
-    },
-    {
-      "id": "A04",
-      "roomName": "Phòng trọ sinh viên",
-      "address": "Khu công nghiệp Tân Bình",
-      "date": "10/09/2026",
-      "time": "19:00",
-      "status": "rejected",
-      "message": "",
-      "ownerNote": "Phòng vừa được cọc hồi chiều, mong bạn thông cảm."
-    },
-  ];
+  // URL API Backend
+  final String _baseUrl = 'https://10.0.2.2:7203/api/viewing-appointments';
+  final String _tenantId = 'TENANT01'; // Giả lập TenantId hiện tại
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.primaryGreen,
-      appBar: AppBar(
-        backgroundColor: AppColors.primaryGreen,
-        title: const Text(
-          'Lịch xem phòng của tôi',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
+  void initState() {
+    super.initState();
+    _fetchAppointments();
+  }
 
-        elevation: 0,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16.0),
-            itemCount: mockAppointments.length,
-            itemBuilder: (context, index) {
-              final appointment = mockAppointments[index];
-              return _buildAppointmentCard(appointment);
-            },
-          ),
-        ),
-      )
+  // Khởi tạo Custom Client bỏ qua SSL
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
+  //  API: Lấy danh sách
+  Future<void> _fetchAppointments() async {
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(Uri.parse('$_baseUrl/tenant/$_tenantId'));
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _appointments = json.decode(response.body);
+          _isLoading = false;
+        });
+      } else {
+        print("Lỗi từ server: ${response.statusCode}");
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Lỗi kết nối: $e");
+      setState(() => _isLoading = false);
+    } finally {
+      client.close();
+    }
+  }
+
+  //  API: Hủy lịch hẹn
+  Future<void> _cancelAppointment(String id) async {
+    final client = _getCustomClient();
+    try {
+      final response = await client.patch(Uri.parse('$_baseUrl/$id/cancel'));
+
+      if (response.statusCode == 200) {
+        _showMessage("Đã hủy lịch hẹn thành công", Colors.green);
+        _fetchAppointments();
+      } else {
+        _showMessage("Không thể hủy lịch hẹn này", Colors.redAccent);
+      }
+    } catch (e) {
+      _showMessage("Lỗi kết nối máy chủ", Colors.redAccent);
+    } finally {
+      client.close();
+    }
+  }
+
+  // API: Cập nhật trạng thái
+  Future<void> _updateStatus(String id, String status) async {
+    final client = _getCustomClient();
+    try {
+      final response = await client.patch(
+        Uri.parse('$_baseUrl/$id/status'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({"status": status}),
+      );
+
+      if (response.statusCode == 200) {
+        final message = status == "confirmed" ? "Đã đồng ý giờ hẹn mới" : "Đã từ chối giờ hẹn";
+        _showMessage(message, AppColors.primaryGreen);
+        _fetchAppointments();
+      } else {
+        _showMessage("Cập nhật thất bại", Colors.redAccent);
+      }
+    } catch (e) {
+      _showMessage("Lỗi kết nối máy chủ", Colors.redAccent);
+    } finally {
+      client.close();
+    }
+  }
+
+  void _showMessage(String text, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text), backgroundColor: color, behavior: SnackBarBehavior.floating),
     );
   }
 
-  // thẻ lịch hẹn
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        backgroundColor: AppColors.primaryGreen,
+        appBar: AppBar(
+          backgroundColor: AppColors.primaryGreen,
+          title: const Text(
+            'Lịch xem phòng của tôi',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          centerTitle: true,
+
+          elevation: 0,
+        ),
+        body: Container(
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _appointments.isEmpty
+                ? const Center(
+              child: Text('Bạn chưa có lịch hẹn nào.', style: TextStyle(color: AppColors.textSecondary)),
+            )
+                : ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: _appointments.length,
+              itemBuilder: (context, index) {
+                return _buildAppointmentCard(_appointments[index]);
+              },
+            ),
+          ),
+        )
+    );
+  }
+
   Widget _buildAppointmentCard(Map<String, dynamic> data) {
-    final status = data['status'] as String;
+    final status = data['status']?.toString() ?? 'pending';
+    final id = data['id'].toString();
+
+    final roomName = data['roomName'] ?? 'Phòng trọ';
+    final address = data['address'] ?? 'Đang cập nhật địa chỉ';
+
+    final date = data['date']?.toString() ?? '';
+    final time = data['time']?.toString() ?? '';
+
+    final message = data['message'] ?? '';
+    final ownerNote = data['ownerNote'] ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -114,56 +179,45 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // tên phòng và trạng thái
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
-                    data['roomName'],
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
+                    roomName,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                StatusBadge(status: status), //trạng thái
+                StatusBadge(status: status),
               ],
             ),
             const Divider(height: 24, color: Color(0xFFE5E7EB)),
 
-            // thời gian
             Row(
               children: [
                 const Icon(Icons.access_time, size: 18, color: AppColors.primaryGreen),
                 const SizedBox(width: 8),
                 Text(
-                  "${data['time']} - Ngày ${data['date']}",
+                  "$time - Ngày $date",
                   style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
             const SizedBox(height: 8),
 
-            // địa chỉ
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.location_on_outlined, size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    data['address'],
-                    style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                  ),
+                  child: Text(address, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
                 ),
               ],
             ),
 
-            // ghi chú
-            if (data['message'] != null && data['message'].toString().isNotEmpty) ...[
+            if (message.toString().isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,7 +226,7 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "Lời nhắn: ${data['message']}",
+                      "Lời nhắn: $message",
                       style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
                     ),
                   ),
@@ -180,8 +234,7 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
               ),
             ],
 
-            // lời nhắn của chủ nhà (nếu trạng thái là từ chối hoặc đề xuất giờ khác)
-            if (data['ownerNote'] != null && (status == 'rejected' || status == 'rescheduled')) ...[
+            if (ownerNote.toString().isNotEmpty && (status == 'rejected' || status == 'rescheduled')) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -196,7 +249,7 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        "Chủ nhà: ${data['ownerNote']}",
+                        "Chủ nhà: $ownerNote",
                         style: const TextStyle(fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.w500),
                       ),
                     ),
@@ -205,12 +258,12 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
               ),
             ],
 
-            // gọi hàm _buildActionButtons
+            // ĐÃ MỞ KHÓA VÀ TRUYỀN ID CHO CÁC NÚT BẤM
             if (status == 'pending' || status == 'rescheduled') ...[
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
-                children: _buildActionButtons(status),
+                children: _buildActionButtons(status, id),
               ),
             ]
           ],
@@ -219,15 +272,12 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
     );
   }
 
-  // hàm xử lý nếu bị từ chối
-  List<Widget> _buildActionButtons(String status) {
+  // HÀM TẠO NÚT BẤM DỰA TRÊN TRẠNG THÁI
+  List<Widget> _buildActionButtons(String status, String id) {
     if (status == 'pending') {
       return [
         OutlinedButton(
-          onPressed: () {
-            // gọi API PATCH /api/viewing-appointments/{id}/cancel
-            print("Đã nhấn Hủy lịch");
-          },
+          onPressed: () => _cancelAppointment(id), // Gọi API Hủy
           style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
           child: const Text("Hủy lịch"),
         ),
@@ -235,22 +285,18 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
     } else if (status == 'rescheduled') {
       return [
         OutlinedButton(
-          onPressed: () {
-            // gọi API từ chối giờ mới
-          },
+          onPressed: () => _updateStatus(id, 'rejected'), // Gọi API Từ chối
           style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
           child: const Text("Từ chối"),
         ),
         const SizedBox(width: 12),
         ElevatedButton(
-          onPressed: () {
-            // gọi API chấp nhận giờ mới
-          },
+          onPressed: () => _updateStatus(id, 'confirmed'), // Gọi API Đồng ý
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
           child: const Text("Đồng ý giờ mới", style: TextStyle(color: Colors.white)),
         ),
       ];
     }
     return [];
-}
+  }
 }

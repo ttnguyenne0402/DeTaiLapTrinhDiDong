@@ -32,5 +32,15 @@ namespace Backend.Repositories
                 .OrderByDescending(v => v.CreatedAt)
                 .ToListAsync();
         }
+        public async Task<ViewingAppointment> GetByIdAsync(string id)
+        {
+            return await _context.ViewingAppointments.FirstOrDefaultAsync(v => v.Id == id);
+        }
+
+        public async Task UpdateAsync(ViewingAppointment appointment)
+        {
+            _context.ViewingAppointments.Update(appointment);
+            await _context.SaveChangesAsync();
+        }
     }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/admin/admin_post_service.dart';
 
 class RoomApprovalDetailScreen extends StatefulWidget {
   const RoomApprovalDetailScreen({super.key});
@@ -9,10 +10,11 @@ class RoomApprovalDetailScreen extends StatefulWidget {
 }
 
 class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
-  // controller quản lý ô nhập lý do từ chối
   final TextEditingController _rejectionController = TextEditingController();
+  AdminPostDetail? _detail;
+  bool _isLoading = true;
+  String? _postId;
 
-  // danh sách các chip gợi ý lý do nhanh
   final List<String> _quickReasons = [
     'Ảnh mờ / thiếu sáng',
     'Thiếu cam kết PCCC',
@@ -20,8 +22,103 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
     'Tiêu đề sai lệch',
   ];
 
-  // mảng lưu trạng thái chọn của 4 tiêu chí thẩm định
-  final List<bool> _checklistStatus = [true, true, true, false];
+  // Khởi tạo mặc định 4 tiêu chí chưa được tick
+  final List<bool> _checklistStatus = [false, false, false, false];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_postId == null) {
+      _postId = ModalRoute.of(context)?.settings.arguments as String?;
+      if (_postId != null) {
+        _loadDetail(_postId!);
+      } else {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadDetail(String id) async {
+    try {
+      final data = await AdminPostService.getPostDetail(id);
+      setState(() {
+        _detail = data;
+        _isLoading = false;
+        if (data.rejectionReason != null && data.rejectionReason!.isNotEmpty) {
+          _rejectionController.text = data.rejectionReason!;
+        }
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint("Lỗi tải chi tiết: $e");
+    }
+  }
+
+  // LOGIC KIỂM DUYỆT CÓ RÀNG BUỘC CHECKLIST
+  Future<void> _handleModerate(String action) async {
+    if (_postId == null) return;
+
+    // 1. Phê duyệt: Bắt buộc đạt đủ 4/4 tiêu chí
+    if (action == 'approve') {
+      final bool isAllChecked = _checklistStatus.every((status) => status == true);
+      if (!isAllChecked) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Vui lòng kiểm tra và tích đủ 4/4 tiêu chí thẩm định trước khi phê duyệt!'),
+                ),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return; // Dừng lại, không gửi API
+      }
+    }
+
+    // 2. Từ chối: Bắt buộc có lý do
+    if (action == 'reject') {
+      final reason = _rejectionController.text.trim();
+      if (reason.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.orange,
+            content: Text('Vui lòng chọn hoặc nhập lý do từ chối bài đăng!'),
+          ),
+        );
+        return; // Dừng lại
+      }
+    }
+
+    // Gửi yêu cầu lên Backend
+    final success = await AdminPostService.moderatePost(
+      id: _postId!,
+      action: action,
+      rejectionReason: _rejectionController.text.trim(),
+    );
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: action == 'approve' ? AppColors.primaryGreen : Colors.red,
+          content: Text(action == 'approve' ? 'Đã phê duyệt tin thành công!' : 'Đã từ chối tin đăng!'),
+        ),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+    );
+  }
 
   @override
   void dispose() {
@@ -31,8 +128,11 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Kiểm tra xem đã đạt đủ 4 tiêu chí chưa để cập nhật màu nút
+    final bool isAllChecked = _checklistStatus.every((status) => status == true);
+
     return Scaffold(
-      backgroundColor: AppColors.primaryGreen, // dùng màu primary green cho header phía trên
+      backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -45,62 +145,32 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
           'Chi tiết tin',
           style: TextStyle(color: AppColors.cardSurface, fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 16),
-          const CircleAvatar(
-            backgroundColor: Colors.white24,
-            radius: 16,
-            child: Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 16),
-        ],
       ),
-      body: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : _detail == null
+          ? const Center(child: Text('Không tìm thấy thông tin bài đăng.', style: TextStyle(color: Colors.white)))
+          : Column(
         children: [
-          // container chính bo hai góc tròn phía trên
           Expanded(
             child: Container(
               decoration: const BoxDecoration(
-                color: AppColors.background, // dùng màu nền chung của app
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(24.0), // bo góc trái phải trên
-                ),
+                color: AppColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24.0)),
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24.0),
-                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24.0)),
                 child: ListView(
                   padding: const EdgeInsets.all(16.0),
                   children: [
-                    // 1. top metadata card
                     _buildTopMetadata(),
                     const SizedBox(height: 16),
-
-                    // 2. hình ảnh xác thực & ai safety check
                     _buildImageSection(),
                     const SizedBox(height: 16),
-
-                    // 3. thông tin bài đăng
                     _buildPropertyDetails(),
                     const SizedBox(height: 16),
-
-                    // 4. tiêu chí thẩm định
                     _buildValidationChecklist(),
                     const SizedBox(height: 16),
-
-                    // 5. lý do từ chối / yêu cầu sửa
                     _buildRejectionSection(),
                     const SizedBox(height: 20),
                   ],
@@ -108,41 +178,50 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
               ),
             ),
           ),
-
-          // thanh bottom bar cố định dưới cùng
-          _buildBottomActionBar(),
-
-          SizedBox(height: 10,)
+          _buildBottomActionBar(isAllChecked),
+          const SizedBox(height: 10),
         ],
       ),
     );
   }
 
-  // widget thẻ thông tin mã tin và người đăng
   Widget _buildTopMetadata() {
+    final statusText = _detail?.status == 'published'
+        ? 'ĐÃ DUYỆT'
+        : _detail?.status == 'rejected'
+        ? 'TỪ CHỐI'
+        : 'CHỜ KIỂM DUYỆT';
+
+    final statusColor = _detail?.status == 'published'
+        ? AppColors.primaryGreen
+        : _detail?.status == 'rejected'
+        ? Colors.redAccent
+        : AppColors.warningOrange;
+
+    final dateStr = _detail?.createdAt != null
+        ? '${_detail!.createdAt!.day.toString().padLeft(2, '0')}/${_detail!.createdAt!.month.toString().padLeft(2, '0')}/${_detail!.createdAt!.year}'
+        : '--/--/----';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Text(
-              'Mã tin: ',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const Text(
-              '#POST-2024-889',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            const Text('Mã tin: ', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text(
+              '#${_detail?.id ?? ''}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.accentYellow.withOpacity(0.2),
+                color: statusColor.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'CHỜ KIỂM DUYỆT',
-                style: TextStyle(fontSize: 10, color: AppColors.warningOrange, fontWeight: FontWeight.bold),
+              child: Text(
+                statusText,
+                style: TextStyle(fontSize: 10, color: statusColor, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -158,15 +237,15 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.borderLight),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.calendar_today, size: 16, color: AppColors.textSecondary),
-                    SizedBox(width: 8),
+                    const Icon(Icons.calendar_today, size: 16, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Ngày gửi', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                        Text('31/08/2024', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        const Text('Ngày gửi', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                        Text(dateStr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                       ],
                     ),
                   ],
@@ -182,16 +261,22 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.borderLight),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
-                    SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Người đăng', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                        Text('QL Bình Thạnh', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                      ],
+                    const Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Người đăng', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                          Text(
+                            _detail?.ownerName ?? 'Ẩn danh',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -203,8 +288,10 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
     );
   }
 
-  // widget khối hình ảnh xác thực và ai safety check
   Widget _buildImageSection() {
+    final images = _detail?.images ?? [];
+    final firstImage = images.isNotEmpty ? images.first : '';
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -215,34 +302,17 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.photo_library_outlined, size: 18, color: AppColors.textPrimary),
-                  SizedBox(width: 6),
-                  Text('Hình ảnh xác thực (5)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary)),
-                ],
+              const Icon(Icons.photo_library_outlined, size: 18, color: AppColors.textPrimary),
+              const SizedBox(width: 6),
+              Text(
+                'Hình ảnh xác thực (${images.length})',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
               ),
-
             ],
           ),
-          const SizedBox(height: 8),
-
-          // ai safety check banner
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.lightGreen,
-              borderRadius: BorderRadius.circular(10),
-            ),
-
-          ),
           const SizedBox(height: 10),
-
-          // ảnh đại diện chính
           Stack(
             children: [
               Container(
@@ -252,8 +322,19 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                   color: AppColors.borderLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Center(
-                  child: Text('IMAGE', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+                child: firstImage.isNotEmpty
+                    ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    firstImage,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(Icons.image_not_supported, color: Colors.grey),
+                    ),
+                  ),
+                )
+                    : const Center(
+                  child: Text('Chưa có ảnh', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
                 ),
               ),
               Positioned(
@@ -274,67 +355,42 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                   ),
                 ),
               ),
-              Positioned(
-                bottom: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.textPrimary.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text('is_thumbnail = true', style: TextStyle(color: AppColors.cardSurface, fontSize: 9)),
-                ),
+            ],
+          ),
+          if (images.length > 1) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 60,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: images.length - 1,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final imgUrl = images[index + 1];
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      imgUrl,
+                      width: 70,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 70,
+                        height: 60,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.image, size: 20, color: Colors.grey),
+                      ),
+                    ),
+                  );
+                },
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // danh sách ảnh nhỏ phía dưới
-          Row(
-            children: [
-              _buildThumbTile('#1 Bếp'),
-              const SizedBox(width: 6),
-              _buildThumbTile('#2 WC'),
-              const SizedBox(width: 6),
-              _buildThumbTile('#3 Ban công'),
-              const SizedBox(width: 6),
-              _buildThumbTile('#4 Nệm'),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildThumbTile(String label) {
-    return Expanded(
-      child: Container(
-        height: 60,
-        decoration: BoxDecoration(
-          color: AppColors.borderLight,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            Container(
-              width: double.infinity,
-              color: AppColors.textPrimary.withOpacity(0.5),
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.cardSurface, fontSize: 9),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // widget khối thông tin bài đăng
   Widget _buildPropertyDetails() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -348,34 +404,35 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
         children: [
           const Text('TIÊU ĐỀ BÀI ĐĂNG', style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text(
-            'Studio Cao Cấp 28m² Ban Công Thoáng – Full Nội Thất Khu Bình Thạnh (P.202)',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+          Text(
+            _detail?.title ?? '',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 12),
-
-          // khung giá thuê và tiền cọc
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.lightGreen.withOpacity(0.5),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Giá thuê niêm yết', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                      SizedBox(height: 2),
+                      const Text('Giá thuê niêm yết', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                      const SizedBox(height: 2),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
                         children: [
-                          Text('4.800.000', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
-                          SizedBox(width: 2),
-                          Text('đ/tháng', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                          Text(
+                            _formatCurrency(_detail?.price ?? 0),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
+                          ),
+                          const SizedBox(width: 2),
+                          const Text('đ/tháng', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                         ],
                       ),
                     ],
@@ -385,9 +442,12 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Tiền đặt cọc (2T)', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                      SizedBox(height: 2),
-                      Text('9.600.000 đ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.warningOrange)),
+                      const Text('Tiền đặt cọc', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_formatCurrency(_detail?.deposit ?? 0)} đ',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.warningOrange),
+                      ),
                     ],
                   ),
                 ),
@@ -395,37 +455,49 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
             ),
           ),
           const SizedBox(height: 10),
-
-          // thông số nhanh
-          const Row(
+          Row(
             children: [
-              _ChipInfo(icon: Icons.square_foot, label: '28 m²'),
-              SizedBox(width: 8),
-              _ChipInfo(icon: Icons.layers_outlined, label: 'Tầng 2 (P.202)'),
+              _ChipInfo(icon: Icons.square_foot, label: '${_detail?.area ?? 0} m²'),
+              const SizedBox(width: 8),
+              _ChipInfo(icon: Icons.layers_outlined, label: 'Tầng ${_detail?.floor ?? 1}'),
+              const SizedBox(width: 8),
+              _ChipInfo(icon: Icons.people_outline, label: 'Tối đa ${_detail?.maxPeople ?? 1} người'),
             ],
           ),
-          const SizedBox(height: 6),
-          const _ChipInfo(icon: Icons.people_outline, label: 'Tối đa 2 người'),
           const SizedBox(height: 12),
-
-          // danh sách tiện ích
           const Text('Tiện ích đi kèm', style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          const GridViewWidget(),
-
+          _detail?.amenities.isNotEmpty == true
+              ? Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: _detail!.amenities.map((item) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Text(item, style: const TextStyle(fontSize: 11, color: AppColors.textPrimary)),
+              );
+            }).toList(),
+          )
+              : const Text('Chưa có thông tin tiện ích.', style: TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 12),
           const Text('Mô tả bài đăng (description)', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: AppColors.background,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.borderLight),
             ),
-            child: const Text(
-              'Phòng mới decor cực xinh, ban công đón gió mát rượi, giờ giấc tự do không chung chủ, có bảo vệ 24/7, camera an ninh toàn dãy. Đầy đủ tiện nghi cao cấp chỉ việc xách vali vào ở. Gần trường ĐH HUTECH, Ngoại Thương, Landmark 81 di chuyển 5 phút..',
-              style: TextStyle(fontSize: 12, height: 1.4, color: AppColors.textPrimary),
+            child: Text(
+              _detail?.description ?? 'Không có mô tả.',
+              style: const TextStyle(fontSize: 12, height: 1.4, color: AppColors.textPrimary),
             ),
           ),
         ],
@@ -433,9 +505,7 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
     );
   }
 
-  // widget tiêu chí thẩm định (có tính năng nhấp chọn checkbox)
   Widget _buildValidationChecklist() {
-    // tự động tính số lượng tiêu chí đã đạt
     int passedCount = _checklistStatus.where((item) => item).length;
 
     return Container(
@@ -461,39 +531,40 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.lightGreen,
+                  color: passedCount == 4 ? AppColors.lightGreen : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '$passedCount/4 Đạt',
-                  style: const TextStyle(fontSize: 10, color: AppColors.primaryGreen, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: passedCount == 4 ? AppColors.primaryGreen : AppColors.warningOrange,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-
           _buildCheckItem(
             index: 0,
             title: 'Tính xác thực phòng & chủ sở hữu',
-            subtitle: 'Khớp với hồ sơ giấy tờ nhà đất phòng P.202',
+            subtitle: 'Khớp với thông tin đăng ký của chủ nhà',
           ),
           _buildCheckItem(
             index: 1,
             title: 'Hình ảnh chất lượng & minh bạch',
-            subtitle: 'Không chèn số điện thoại liệu hay ảnh mạng',
+            subtitle: 'Không chèn số điện thoại lạ hay ảnh mạng trùng lặp',
           ),
           _buildCheckItem(
             index: 2,
-            title: 'Tiêu chuẩn PCCC & lối thoát hiểm',
-            subtitle: 'Có ban công mở và bình bọt chữa cháy hành lang',
+            title: 'Tiêu chuẩn PCCC & an toàn',
+            subtitle: 'Đáp ứng lối thoát hiểm và không gian thông thoáng',
           ),
           _buildCheckItem(
             index: 3,
-            title: 'Khung giá thuê khu vực',
-            subtitle: 'Khu vực P.25 Bình Thạnh studio đang ở mức 4.2 - 4.6 triệu',
-            badgeText: 'Cần rà soát',
-            isWarning: true,
+            title: 'Khung giá thuê khu vực hợp lý',
+            subtitle: 'Giá thuê và tiền cọc phù hợp mặt bằng chung',
           ),
         ],
       ),
@@ -504,15 +575,13 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
     required int index,
     required String title,
     required String subtitle,
-    String? badgeText,
-    bool isWarning = false,
   }) {
     bool isChecked = _checklistStatus[index];
 
     return InkWell(
       onTap: () {
         setState(() {
-          _checklistStatus[index] = !_checklistStatus[index]; // toggle tick/bỏ tick
+          _checklistStatus[index] = !_checklistStatus[index];
         });
       },
       borderRadius: BorderRadius.circular(8),
@@ -520,7 +589,7 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: isWarning ? AppColors.accentYellow.withOpacity(0.1) : Colors.transparent,
+          color: isChecked ? AppColors.lightGreen.withOpacity(0.3) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -536,31 +605,11 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                      if (badgeText != null) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: AppColors.warningOrange.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(badgeText, style: const TextStyle(fontSize: 9, color: AppColors.warningOrange, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ],
-                  ),
+                  Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                   const SizedBox(height: 2),
                   Text(subtitle, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                 ],
               ),
-            ),
-            Icon(
-              isWarning ? Icons.more_horiz : Icons.check_circle_outline,
-              color: isWarning ? AppColors.warningOrange : AppColors.primaryGreen,
-              size: 18,
             ),
           ],
         ),
@@ -568,7 +617,6 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
     );
   }
 
-  // widget khối lý do từ chối
   Widget _buildRejectionSection() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -590,14 +638,11 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                   Text('Lý do từ chối / Yêu cầu sửa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
                 ],
               ),
-              Text('rejection_reason', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
             ],
           ),
           const SizedBox(height: 8),
           const Text('Gợi ý lý do phổ biến', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
-
-          // wrap danh sách chip gợi ý
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -621,14 +666,12 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
             }).toList(),
           ),
           const SizedBox(height: 10),
-
-          // ô textField nhập chi tiết
           TextField(
             controller: _rejectionController,
             maxLines: 2,
             style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
             decoration: InputDecoration(
-              hintText: 'Nhập chi tiết yêu cầu người đăng bổ sung/chỉnh sửa trước khi được xuất bản...',
+              hintText: 'Nhập chi tiết yêu cầu người đăng bổ sung/chỉnh sửa...',
               hintStyle: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
               fillColor: AppColors.background,
               filled: true,
@@ -648,8 +691,7 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
     );
   }
 
-  // widget thanh nút bấm duyệt ở bottom
-  Widget _buildBottomActionBar() {
+  Widget _buildBottomActionBar(bool isAllChecked) {
     return Container(
       color: AppColors.cardSurface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -662,13 +704,9 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red.shade50,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: () {
-                  // // xử lý từ chối duyệt bài
-                },
+                onPressed: () => _handleModerate('reject'),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -686,15 +724,11 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
               height: 48,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGreen,
+                  backgroundColor: isAllChecked ? AppColors.primaryGreen : Colors.grey.shade400,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: () {
-                  // // xử lý phê duyệt bài đăng ngay
-                },
+                onPressed: () => _handleModerate('approve'),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -703,7 +737,6 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                     Text('Phê duyệt ngay', style: TextStyle(color: AppColors.cardSurface, fontWeight: FontWeight.bold, fontSize: 13)),
                   ],
                 ),
-
               ),
             ),
           ),
@@ -713,7 +746,6 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
   }
 }
 
-// widget phụ: hiển thị chip thông tin nhỏ
 class _ChipInfo extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -737,50 +769,6 @@ class _ChipInfo extends StatelessWidget {
           Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textPrimary)),
         ],
       ),
-    );
-  }
-}
-
-// widget phụ: hiển thị grid tiện ích
-class GridViewWidget extends StatelessWidget {
-  const GridViewWidget({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final amenities = [
-      {'icon': Icons.ac_unit, 'label': 'Máy lạnh Inverter'},
-      {'icon': Icons.kitchen, 'label': 'Tủ lạnh 2 cánh'},
-      {'icon': Icons.local_laundry_service, 'label': 'Máy giặt riêng'},
-      {'icon': Icons.fingerprint, 'label': 'Khóa vân tay'},
-      {'icon': Icons.elevator, 'label': 'Thang máy thẻ từ'},
-      {'icon': Icons.access_time, 'label': 'Giờ giấc tự do 24/7'},
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 4.5,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 6,
-      ),
-      itemCount: amenities.length,
-      itemBuilder: (context, index) {
-        return Row(
-          children: [
-            Icon(amenities[index]['icon'] as IconData, size: 14, color: AppColors.textSecondary),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                amenities[index]['label'] as String,
-                style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }

@@ -32,7 +32,7 @@ namespace Backend.Services
                 AppointmentTime = TimeOnly.FromTimeSpan(request.AppointmentTime), 
                 Phone = request.Phone,
                 Message = request.Message,
-                Status = "pending", // Luôn gán trạng thái mặc định là Đang chờ
+                Status = "pending",
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
@@ -44,7 +44,7 @@ namespace Backend.Services
             return new ViewingAppointmentResponseDTO
             {
                 Id = appointment.Id,
-                RoomName = "Đã ghi nhận", // Sẽ cập nhật đủ khi load danh sách
+                RoomName = "Đã ghi nhận", 
                 Address = "Đã ghi nhận",
                 Status = appointment.Status
             };
@@ -73,6 +73,40 @@ namespace Backend.Services
                 Message = a.Message,
                 OwnerNote = a.OwnerNote
             });
+        }
+        public async Task<bool> CancelAppointmentAsync(string id)
+        {
+            var appointment = await _repository.GetByIdAsync(id);
+            if (appointment == null) return false;
+
+            // Chỉ cho phép hủy nếu lịch chưa bị hủy trước đó
+            if (appointment.Status != "cancelled")
+            {
+                appointment.Status = "cancelled";
+                appointment.CancelledAt = DateTime.Now;
+                appointment.UpdatedAt = DateTime.Now;
+
+                await _repository.UpdateAsync(appointment);
+            }
+            return true;
+        }
+
+        public async Task<bool> UpdateStatusAsync(string id, string status)
+        {
+            var appointment = await _repository.GetByIdAsync(id);
+            if (appointment == null) return false;
+
+            appointment.Status = status;
+            appointment.UpdatedAt = DateTime.Now;
+
+            // Nếu đồng ý lịch dời, ghi lại thời gian xác nhận
+            if (status == "confirmed")
+            {
+                appointment.ConfirmedAt = DateTime.Now;
+            }
+
+            await _repository.UpdateAsync(appointment);
+            return true;
         }
     }
 }

@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../services/tenant/review_service.dart';
 
 class ReviewForm extends StatefulWidget {
   final Map<String, dynamic>? room;
@@ -56,8 +58,23 @@ class _ReviewFormState extends State<ReviewForm> {
       return;
     }
 
-    if (_reviewController.text.trim().isEmpty) {
+    final comment = _reviewController.text.trim();
+
+    if (comment.isEmpty) {
       _showMessage('Vui lòng nhập nội dung đánh giá.');
+      return;
+    }
+
+    if (comment.length > 500) {
+      _showMessage('Nội dung đánh giá không được vượt quá 500 ký tự.');
+      return;
+    }
+
+    // Lấy ID phòng từ dữ liệu phòng được truyền vào
+    final roomId = widget.room?['id']?.toString() ?? '';
+
+    if (roomId.isEmpty) {
+      _showMessage('Không tìm thấy mã phòng để gửi đánh giá.');
       return;
     }
 
@@ -65,38 +82,73 @@ class _ReviewFormState extends State<ReviewForm> {
       _isSubmitting = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 700));
+    try {
+      // Gọi API gửi đánh giá lên backend
+      final result = await ReviewService.createReview(
+        roomId: roomId,
+        rating: _rating,
+        comment: comment,
+      );
 
-    final review = {
-      'name': 'Bạn',
-      'rating': _rating,
-      'date': 'Vừa xong',
-      'content': _reviewController.text.trim(),
-      'avatar': 'B',
-    };
+      if (!mounted) return;
 
-    widget.onReviewSubmitted?.call(review);
-
-    if (!mounted) return;
-
-    setState(() {
-      _isSubmitting = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Đánh giá của bạn đã được gửi thành công.',
+      // Chuyển dữ liệu backend thành cấu trúc dùng trong giao diện
+      final review = {
+        'id': result['id'],
+        'name': result['tenantName']?.toString() ?? 'Người dùng',
+        'rating': (result['rating'] as num?)?.toInt() ?? _rating,
+        'date': 'Vừa xong',
+        'content': result['comment']?.toString() ?? comment,
+        'avatar': _getAvatar(
+          result['tenantName']?.toString() ?? 'Người dùng',
         ),
-        backgroundColor: AppColors.primaryGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-    );
+      };
 
-    Navigator.pop(context);
+      widget.onReviewSubmitted?.call(review);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Đánh giá của bạn đã được gửi thành công.',
+          ),
+          backgroundColor: AppColors.primaryGreen,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+
+      // Trả kết quả về ReviewsScreen để tải lại dữ liệu
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+
+      _showMessage(
+        e.toString().replaceAll('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  String _getAvatar(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+
+    if (parts.isEmpty || parts.first.isEmpty) {
+      return 'U';
+    }
+
+    if (parts.length == 1) {
+      return parts.first[0].toUpperCase();
+    }
+
+    return '${parts[parts.length - 2][0]}${parts.last[0]}'
+        .toUpperCase();
   }
 
   void _showMessage(String message) {
@@ -419,7 +471,8 @@ class _ReviewFormState extends State<ReviewForm> {
         onPressed: _isSubmitting ? null : _submitReview,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryGreen,
-          disabledBackgroundColor: AppColors.primaryGreen.withOpacity(.5),
+          disabledBackgroundColor:
+              AppColors.primaryGreen.withOpacity(.5),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(

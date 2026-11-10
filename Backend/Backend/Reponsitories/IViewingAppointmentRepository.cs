@@ -11,5 +11,10 @@ namespace Backend.Repositories
 
         // Hàm lấy danh sách lịch hẹn của 1 người thuê
         Task<IEnumerable<ViewingAppointment>> GetByTenantIdAsync(string tenantId);
+        // Hàm lấy 1 lịch hẹn theo ID
+        Task<ViewingAppointment> GetByIdAsync(string id);
+
+        // Hàm cập nhật thay đổi xuống CSDL
+        Task UpdateAsync(ViewingAppointment appointment);
     }
 }

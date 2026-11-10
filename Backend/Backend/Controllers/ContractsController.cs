@@ -21,7 +21,19 @@ namespace Backend.Controllers
         public async Task<IActionResult> GetTenantContracts(string tenantId)
         {
             var contracts = await _service.GetTenantContractsAsync(tenantId);
-            return Ok(contracts); // Trả về JSON cho Flutter hiển thị
+            return Ok(contracts); 
+        }
+        // GET: api/contracts/{id}
+        // Lấy chi tiết hợp đồng cho màn hình contract_detail_screen
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetContractDetail(string id)
+        {
+            var contract = await _service.GetContractDetailAsync(id);
+
+            if (contract == null)
+                return NotFound(new { message = "Không tìm thấy hợp đồng" });
+
+            return Ok(contract);
         }
     }
 }
