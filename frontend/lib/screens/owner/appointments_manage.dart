@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
+import '../../services/owner/appointment_service.dart';
 
 class AppointmentsManageScreen extends StatefulWidget {
   const AppointmentsManageScreen({super.key});
@@ -13,69 +14,88 @@ class AppointmentsManageScreen extends StatefulWidget {
 class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  final List<Map<String, dynamic>> _appointments = [
-    {
-      'id': 'a1',
-      'name': 'Nguyễn Văn A',
-      'phone': '0901234567',
-      'roomInfo': 'Phòng 202 - Chung cư Mini Q7',
-      'time': '10:00 - Hôm nay',
-      'date': '09/10/2026',
-      'status': 'confirmed',
-      'note': 'Hẹn gặp tại cổng chính, khách xin xem thêm chỗ để xe.',
-      'avatar': 'frontend/assets/images/avatarDemo.jpg',
-    },
-    {
-      'id': 'a2',
-      'name': 'Trần Thị B',
-      'phone': '0912345678',
-      'roomInfo': 'Phòng 101 - Dãy trọ Lê Văn Sỹ',
-      'time': '14:30 - Hôm nay',
-      'date': '09/10/2026',
-      'status': 'pending',
-      'note': 'Khách muốn xem phòng vào buổi chiều.',
-      'avatar': 'frontend/assets/images/avatarDemo.jpg',
-    },
-    {
-      'id': 'a3',
-      'name': 'Lê Hoàng C',
-      'phone': '0987654321',
-      'roomInfo': 'Phòng 301 - Chung cư Mini Q7',
-      'time': '09:00 - Ngày mai',
-      'date': '10/10/2026',
-      'status': 'confirmed',
-      'note': 'Khách muốn đặt cọc luôn nếu phòng sạch đẹp.',
-      'avatar': 'frontend/assets/images/avatarDemo.jpg',
-    },
-    {
-      'id': 'a4',
-      'name': 'Phạm Minh D',
-      'phone': '0933445566',
-      'roomInfo': 'Phòng 201 - Dãy trọ Lê Văn Sỹ',
-      'time': '16:00 - 05/10/2026',
-      'date': '05/10/2026',
-      'status': 'completed',
-      'note': 'Đã xem phòng và chốt ký hợp đồng ngày 15/10.',
-      'avatar': 'frontend/assets/images/avatarDemo.jpg',
-    },
-    {
-      'id': 'a5',
-      'name': 'Vũ Hoàng E',
-      'phone': '0977889900',
-      'roomInfo': 'Phòng 102 - Chung cư Mini Q7',
-      'time': '11:00 - 02/10/2026',
-      'date': '02/10/2026',
-      'status': 'cancelled',
-      'note': 'Khách bận việc đột xuất không qua được.',
-      'avatar': 'frontend/assets/images/avatarDemo.jpg',
-    },
-  ];
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _appointments = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadAppointments();
+  }
+
+  // Tải danh sách lịch hẹn thực tế từ SQL Server qua Backend Web API
+  Future<void> _loadAppointments() async {
+    setState(() => _isLoading = true);
+    try {
+      final list = await AppointmentService.fetchOwnerAppointments('USER_OWNER_01');
+      if (mounted) {
+        setState(() {
+          _appointments = list.map((a) => {
+            'id': a.id,
+            'name': a.name,
+            'phone': a.phone,
+            'roomInfo': a.roomInfo,
+            'time': a.time,
+            'date': a.date,
+            'status': a.status,
+            'note': a.note ?? 'Khách hẹn xem phòng trực tiếp',
+            'avatar': a.avatar,
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải lịch hẹn từ API: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _updateStatus(
+    Map<String, dynamic> item,
+    String newStatus,
+    String successMessage,
+  ) async {
+    final prevStatus = item['status'];
+    setState(() => item['status'] = newStatus);
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final success = await AppointmentService.updateAppointmentStatus(
+        item['id'].toString(),
+        newStatus,
+      );
+
+      if (success) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(successMessage),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        await _loadAppointments();
+      } else {
+        setState(() => item['status'] = prevStatus);
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Cập nhật lịch hẹn thất bại. Vui lòng kiểm tra kết nối!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Lỗi cập nhật lịch hẹn: $e');
+      setState(() => item['status'] = prevStatus);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Lỗi kết nối máy chủ khi cập nhật lịch hẹn'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -93,7 +113,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
         .where((a) => a['status'] == 'completed')
         .toList();
     final cancelled = _appointments
-        .where((a) => a['status'] == 'cancelled')
+        .where((a) => a['status'] == 'cancelled' || a['status'] == 'rejected')
         .toList();
 
     return Scaffold(
@@ -118,6 +138,13 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Làm mới',
+            onPressed: _loadAppointments,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -143,14 +170,19 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
             topRight: Radius.circular(24),
           ),
         ),
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildAppointmentList(upcoming),
-            _buildAppointmentList(completed),
-            _buildAppointmentList(cancelled),
-          ],
-        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadAppointments,
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildAppointmentList(upcoming),
+                    _buildAppointmentList(completed),
+                    _buildAppointmentList(cancelled),
+                  ],
+                ),
+              ),
       ),
     );
   }
@@ -281,11 +313,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
               children: [
                 if (status == 'pending') ...[
                   OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        item['status'] = 'cancelled';
-                      });
-                    },
+                    onPressed: () => _updateStatus(item, 'cancelled', 'Hủy lịch hẹn thành công'),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
                       shape: RoundedRectangleBorder(
@@ -299,11 +327,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        item['status'] = 'confirmed';
-                      });
-                    },
+                    onPressed: () => _updateStatus(item, 'confirmed', 'Xác nhận lịch hẹn thành công'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryGreen,
                       shape: RoundedRectangleBorder(
@@ -318,11 +342,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                 ],
                 if (status == 'confirmed') ...[
                   OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        item['status'] = 'cancelled';
-                      });
-                    },
+                    onPressed: () => _updateStatus(item, 'cancelled', 'Hủy lịch hẹn thành công'),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.grey),
                       shape: RoundedRectangleBorder(
@@ -336,11 +356,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        item['status'] = 'completed';
-                      });
-                    },
+                    onPressed: () => _updateStatus(item, 'completed', 'Cập nhật xem phòng thành công'),
                     icon: const Icon(
                       Icons.check,
                       size: 16,

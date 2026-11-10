@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'post_form.dart';
+import 'post_detail_owner.dart';
+import '../../services/local/sqlite_helper.dart';
+import '../../services/owner/post_service.dart';
 
 class PostsManageScreen extends StatefulWidget {
   const PostsManageScreen({super.key});
@@ -14,68 +17,104 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
   // Dùng GlobalKey để điều khiển TabBarView từ bên ngoài mà không cần TabController thủ công
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Key _tab3Key = UniqueKey();
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _posts = [];
 
-  // Danh sách bài đăng quản lý
-  final List<Map<String, dynamic>> _posts = [
-    {
-      'id': 'p1',
-      'title': 'Cho thuê phòng trọ có gác xép, full nội thất',
-      'room': 'Phòng 201 - Chung cư Mini Q7',
-      'price': '4.000.000đ/tháng',
-      'views': 124,
-      'likes': 12,
-      'date': '24/09/2026',
-      'status': 'active', // active: đang hiển thị
-      'image': 'frontend/assets/images/anhPhongDemo.jpg',
-    },
-    {
-      'id': 'p2',
-      'title': 'Phòng trọ cao cấp ban công thoáng mát gần ĐH FPT',
-      'room': 'Phòng 305 - Chung cư Mini Q7',
-      'price': '3.800.000đ/tháng',
-      'views': 0,
-      'likes': 0,
-      'date': 'Hôm nay, 10:15',
-      'status': 'pending', // pending: đang chờ admin duyệt
-      'submitNote': 'Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC',
-      'image': 'frontend/assets/images/anhPhongDemo.jpg',
-    },
-    {
-      'id': 'p3',
-      'title': 'Phòng studio full tiện nghi ban công rộng',
-      'room': 'Phòng 402 - Chung cư Mini Bình Thạnh',
-      'price': '4.800.000đ/tháng',
-      'views': 0,
-      'likes': 0,
-      'date': '05/10/2026',
-      'status': 'draft', // draft: bản nháp chưa gửi duyệt
-      'image': 'frontend/assets/images/anhPhongDemo.jpg',
-    },
-    {
-      'id': 'p4',
-      'title': 'Phòng trọ giá mềm cho sinh viên ĐH Hutech',
-      'room': 'Phòng 104 - Nhà trọ Tân Bình',
-      'price': '2.200.000đ/tháng',
-      'views': 15,
-      'likes': 1,
-      'date': '02/10/2026',
-      'status': 'rejected', // rejected: admin từ chối duyệt
-      'rejectReason':
-          'Ảnh chụp phòng mờ, chưa đính kèm biên bản cam kết an toàn PCCC.',
-      'image': 'frontend/assets/images/anhPhongDemo.jpg',
-    },
-    {
-      'id': 'p5',
-      'title': 'Phòng giá rẻ cho sinh viên ĐH Tôn Đức Thắng',
-      'room': 'Phòng 102 - Dãy trọ Lê Văn Sỹ',
-      'price': '2.500.000đ/tháng',
-      'views': 45,
-      'likes': 2,
-      'date': '20/09/2026',
-      'status': 'hidden', // hidden: đã ẩn
-      'image': 'frontend/assets/images/anhPhongDemo.jpg',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadAllPosts();
+  }
+
+  // Tải đồng thời: Bài đăng chính thức từ SQL Server + Bản nháp offline từ SQLite
+  Future<void> _loadAllPosts() async {
+    setState(() => _isLoading = true);
+    await _loadPostsFromSqlServer();
+    await _loadDraftsFromSqlite();
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // 1. Tải bài đăng từ SQL Server
+  Future<void> _loadPostsFromSqlServer() async {
+    try {
+      final list = await PostService.fetchPosts('USER_OWNER_01');
+      if (mounted) {
+        setState(() {
+          _posts = list.map((p) => {
+            'id': p.id,
+            'roomId': p.roomId,
+            'roomName': p.roomName,
+            'propertyId': p.propertyId,
+            'propertyName': p.propertyName,
+            'propertyAddress': p.propertyAddress,
+            'room': p.room,
+            'roomArea': p.roomArea,
+            'roomDeposit': p.roomDeposit,
+            'roomMaxPeople': p.roomMaxPeople,
+            'roomFloor': p.roomFloor,
+            'roomStatus': p.roomStatus,
+            'roomDescription': p.roomDescription,
+            'title': p.title,
+            'description': p.description,
+            'rawPrice': p.price,
+            'price': p.priceFormatted,
+            'amenities': p.amenities,
+            'views': p.views,
+            'likes': p.likes,
+            'date': p.date,
+            'status': p.status,
+            'submitNote': p.submitNote,
+            'rejectReason': p.rejectReason,
+            'image': p.image,
+            'images': p.images,
+          }).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải bài đăng từ SQL Server: $e');
+    }
+  }
+
+  // 2. Tải các bản nháp được lưu trong cơ sở dữ liệu SQLite cục bộ trên điện thoại
+  Future<void> _loadDraftsFromSqlite() async {
+    try {
+      final sqliteDrafts = await SqliteHelper.instance.getDraftPosts();
+      if (sqliteDrafts.isNotEmpty && mounted) {
+        setState(() {
+          _posts.removeWhere((p) => p['isSqlite'] == true);
+          for (var draft in sqliteDrafts) {
+            final amnStr = (draft['amenities'] ?? '').toString();
+            final amnList = amnStr.isNotEmpty
+                ? amnStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+                : <String>['Wifi', 'Chỗ để xe'];
+
+            _posts.insert(0, {
+              'id': 'sqlite_${draft['id']}',
+              'sqliteId': draft['id'],
+              'isSqlite': true,
+              'roomId': draft['room_id'] ?? 'room_101',
+              'roomName': draft['room_name'] ?? 'Phòng',
+              'propertyName': draft['building_name'] ?? 'Tòa nhà',
+              'title': draft['title'] ?? 'Bản nháp tin đăng',
+              'description': draft['description'] ?? '',
+              'room': '${draft['room_name'] ?? 'Phòng'} - ${draft['building_name'] ?? 'Tòa nhà'} (Bản nháp)',
+              'price': draft['price'] ?? 'Thỏa thuận',
+              'amenities': amnList,
+              'views': 0,
+              'likes': 0,
+              'date': draft['created_at'] ?? 'Hôm nay',
+              'status': 'draft',
+              'image': draft['image'] ?? 'frontend/assets/images/anhPhongDemo.jpg',
+            });
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải danh sách nháp từ SQLite: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +160,13 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                 ),
               ),
               centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  tooltip: 'Làm mới',
+                  onPressed: _loadAllPosts,
+                ),
+              ],
               bottom: TabBar(
                 labelColor: Colors.white,
                 unselectedLabelColor: Colors.white60,
@@ -148,16 +194,21 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                     topRight: Radius.circular(24),
                   ),
                 ),
-                child: TabBarView(
-                  children: [
-                    _buildPostList('active'),
-                    _buildPostList('pending'),
-                    KeyedSubtree(
-                      key: _tab3Key,
-                      child: _buildPostList('hidden_draft'),
-                    ),
-                  ],
-                ),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _loadAllPosts,
+                        child: TabBarView(
+                          children: [
+                            _buildPostList('active'),
+                            _buildPostList('pending'),
+                            KeyedSubtree(
+                              key: _tab3Key,
+                              child: _buildPostList('hidden_draft'),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ),
             floatingActionButton: FloatingActionButton.extended(
@@ -169,7 +220,10 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                   ),
                 );
 
-                if (newPost != null && newPost is Map<String, dynamic>) {
+                if (newPost == true) {
+                  await _loadAllPosts();
+                } else if (newPost != null && newPost is Map<String, dynamic>) {
+                  await _loadAllPosts();
                   setState(() {
                     _posts.insert(0, Map<String, dynamic>.from(newPost));
                     _tab3Key = UniqueKey();
@@ -284,19 +338,32 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
     );
   }
 
-  // Thẻ hiển thị một bài đăng
+  // Thẻ hiển thị một bài đăng (thông tin cơ bản, bấm vào để xem chi tiết)
   Widget _buildPostCard(Map<String, dynamic> post) {
     final String status = post['status'] ?? 'draft';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       elevation: 1.5,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: InkWell(
+        onTap: () async {
+          final changed = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostDetailOwnerScreen(post: post),
+            ),
+          );
+          if (changed == true) {
+            _loadAllPosts();
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -528,18 +595,32 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                     ],
                     if (status == 'active') ...[
                       TextButton.icon(
-                        onPressed: () {
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
                           setState(() {
                             post['status'] = 'hidden';
                           });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Đã ẩn tin đăng khỏi danh sách công khai.',
-                              ),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          try {
+                            final success = await PostService.updatePostStatus(
+                              post['id'].toString(),
+                              'hidden',
+                            );
+                            if (success) {
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Ẩn tin đăng thành công'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              _loadAllPosts();
+                            } else {
+                              setState(() => post['status'] = 'active');
+                            }
+                          } catch (e) {
+                            debugPrint('Lỗi ẩn tin: $e');
+                            setState(() => post['status'] = 'active');
+                          }
                         },
                         icon: const Icon(
                           Icons.visibility_off,
@@ -556,14 +637,49 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                         ),
                       ),
                     ],
+                    if (status == 'draft') ...[
+                      TextButton.icon(
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          if (post['isSqlite'] == true && post['sqliteId'] != null) {
+                            await SqliteHelper.instance.deleteDraftPost(post['sqliteId']);
+                          }
+                          setState(() {
+                            _posts.remove(post);
+                          });
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Xóa bản nháp thành công'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 16,
+                          color: Colors.red,
+                        ),
+                        label: const Text(
+                          'Xóa nháp',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
                     TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
+                      onPressed: () async {
+                        final res = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const PostFormScreen(),
+                            builder: (context) => PostFormScreen(initialData: post),
                           ),
                         );
+                        if (res == true) {
+                          _loadAllPosts();
+                        }
                       },
                       icon: Icon(
                         Icons.edit_outlined,
@@ -585,6 +701,7 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -898,31 +1015,44 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
     );
   }
 
-  void _submitPost(Map<String, dynamic> post, String note) {
-    setState(() {
-      post['status'] = 'pending';
-      post['submitNote'] = note.isNotEmpty
-          ? 'Lời nhắn: "$note"'
-          : 'Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC';
-      post['date'] = 'Vừa gửi';
-    });
+  void _submitPost(Map<String, dynamic> post, String note) async {
+    final messenger = ScaffoldMessenger.of(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    // Nếu là bản nháp từ SQLite cục bộ trên điện thoại:
+    if (post['isSqlite'] == true && post['sqliteId'] != null) {
+      final cleanPrice = double.tryParse(
+            (post['price'] ?? '')
+                .toString()
+                .replaceAll('.', '')
+                .replaceAll(',', '')
+                .replaceAll('đ', '')
+                .replaceAll('/tháng', '')
+                .trim(),
+          ) ??
+          0;
+      // 1. Gửi tin lên máy chủ Backend SQL Server
+      await PostService.createPost({
+        'roomId': post['roomId'] ?? 'room_101',
+        'title': post['title'] ?? 'Tin đăng phòng trọ',
+        'description': post['description'] ?? '',
+        'price': cleanPrice,
+        'amenities': post['amenities'] is List ? post['amenities'] : ['Wifi', 'Chỗ để xe'],
+        'submitNote': note.isNotEmpty ? note : 'Gửi duyệt từ bản nháp',
+        'status': 'pending',
+        'images': ['frontend/assets/images/anhPhongDemo.jpg'],
+      });
+      // 2. Xóa bản nháp khỏi SQLite vì đã gửi duyệt lên SQL Server
+      await SqliteHelper.instance.deleteDraftPost(post['sqliteId']);
+      await _loadAllPosts();
+    } else if (post['id'] != null) {
+      await PostService.updatePostStatus(post['id'].toString(), 'pending');
+      await _loadAllPosts();
+    }
+
+    messenger.showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Đã gửi tin "${post['title']}" cho Admin duyệt!',
-                style: const TextStyle(fontWeight: FontWeight.w500),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+        backgroundColor: AppColors.primaryGreen,
+        content: const Text('Gửi duyệt tin đăng thành công'),
       ),
     );
   }
@@ -955,17 +1085,30 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              final messenger = ScaffoldMessenger.of(context);
               setState(() {
                 post['status'] = 'draft';
               });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Dé thu hồi yêu cầu duyệt tin đăng.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              try {
+                final success = await PostService.updatePostStatus(
+                  post['id'].toString(),
+                  'draft',
+                );
+                if (success) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Thu hồi tin đăng thành công'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  _loadAllPosts();
+                }
+              } catch (e) {
+                debugPrint('Lỗi thu hồi tin: $e');
+              }
             },
             child: const Text('Thu hồi', style: TextStyle(color: Colors.white)),
           ),

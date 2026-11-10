@@ -10,7 +10,7 @@ class PropertyCard extends StatelessWidget {
   final VoidCallback? onTap;
 
   const PropertyCard({
-    Key? key,
+    super.key,
     required this.title,
     required this.subtitle,
     required this.price,
@@ -18,7 +18,7 @@ class PropertyCard extends StatelessWidget {
     required this.isRented,
     required this.imageUrl,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,18 +35,31 @@ class PropertyCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  imageUrl,
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    width: 80,
-                    height: 80,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.meeting_room, color: Colors.grey),
-                  ),
-                ),
+                child: (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))
+                    ? Image.network(
+                        imageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.meeting_room, color: Colors.grey),
+                        ),
+                      )
+                    : Image.asset(
+                        imageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 80,
+                          height: 80,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.meeting_room, color: Colors.grey),
+                        ),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(

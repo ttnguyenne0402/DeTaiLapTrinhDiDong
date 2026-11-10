@@ -1,3 +1,4 @@
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -12,24 +13,52 @@ builder.Services.AddDbContext<QuanLyPhongTroContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Đăng ký Repositories (Đặt lịch & Hợp đồng)
+// 2. Đăng ký Repositories Đặt lịch và Hợp đồng
 builder.Services.AddScoped<Backend.Repositories.IViewingAppointmentRepository,
     Backend.Repositories.ViewingAppointmentRepository>();
 
 builder.Services.AddScoped<Backend.Repositories.IContractRepository,
     Backend.Repositories.ContractRepository>();
 
-// 3. Đăng ký Services (Đặt lịch & Hợp đồng)
+// 3. Đăng ký Services Đặt lịch và Hợp đồng
 builder.Services.AddScoped<Backend.Services.IViewingAppointmentService,
     Backend.Services.ViewingAppointmentService>();
 
 builder.Services.AddScoped<Backend.Services.IContractService,
     Backend.Services.ContractService>();
 
-// 4. Đăng ký HttpClient
+// 4. Đăng ký Repositories Hóa đơn và Thanh toán
+builder.Services.AddScoped<Backend.Repositories.IInvoiceRepository,
+    Backend.Repositories.InvoiceRepository>();
+
+builder.Services.AddScoped<Backend.Repositories.IPaymentRepository,
+    Backend.Repositories.PaymentRepository>();
+
+// 5. Đăng ký Services Hóa đơn và Thanh toán
+builder.Services.AddScoped<Backend.Services.IInvoiceService,
+    Backend.Services.InvoiceService>();
+
+builder.Services.AddScoped<Backend.Services.IPaymentService,
+    Backend.Services.PaymentService>();
+
+// 6. Đăng ký Repositories Thông báo và Sửa chữa
+builder.Services.AddScoped<Backend.Repositories.INotificationRepository,
+    Backend.Repositories.NotificationRepository>();
+
+builder.Services.AddScoped<Backend.Repositories.IMaintenanceRequestRepository,
+    Backend.Repositories.MaintenanceRequestRepository>();
+
+// 7. Đăng ký Services Thông báo và Sửa chữa
+builder.Services.AddScoped<Backend.Services.INotificationService,
+    Backend.Services.NotificationService>();
+
+builder.Services.AddScoped<Backend.Services.IMaintenanceService,
+    Backend.Services.MaintenanceService>();
+
+// 8. Đăng ký HttpClient
 builder.Services.AddHttpClient();
 
-// 5. Cấu hình JWT
+// 9. Cấu hình JWT
 var jwtKey = builder.Configuration["Jwt:Key"];
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
@@ -65,12 +94,24 @@ builder.Services
         };
     });
 
-// 6. Đăng ký Authorization
+// 10. Đăng ký Authorization
 builder.Services.AddAuthorization();
 
-// 7. Đăng ký Controllers và Swagger (Có tích hợp nút Authorize JWT)
+// 11. Cấu hình CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+// 12. Đăng ký Controllers và Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -99,25 +140,9 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Đăng ký Repositories Hóa đơn và thanh toán
-builder.Services.AddScoped<Backend.Repositories.IInvoiceRepository, Backend.Repositories.InvoiceRepository>();
-builder.Services.AddScoped<Backend.Repositories.IPaymentRepository, Backend.Repositories.PaymentRepository>();
-
-// Đăng ký Services Hóa đơn và thanh toán
-builder.Services.AddScoped<Backend.Services.IInvoiceService, Backend.Services.InvoiceService>();
-builder.Services.AddScoped<Backend.Services.IPaymentService, Backend.Services.PaymentService>();
-
-// Đăng ký Repositories Thông báo và Sửa chữa 
-builder.Services.AddScoped<Backend.Repositories.INotificationRepository, Backend.Repositories.NotificationRepository>();
-builder.Services.AddScoped<Backend.Repositories.IMaintenanceRequestRepository, Backend.Repositories.MaintenanceRequestRepository>();
-
-// Đăng ký Services Thông báo và Sửa chữa
-builder.Services.AddScoped<Backend.Services.INotificationService, Backend.Services.NotificationService>();
-builder.Services.AddScoped<Backend.Services.IMaintenanceService, Backend.Services.MaintenanceService>();
-
 var app = builder.Build();
 
-// 8. Cấu hình Swagger
+// 13. Cấu hình Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -126,11 +151,14 @@ if (app.Environment.IsDevelopment())
 
 // app.UseHttpsRedirection();
 
-// 9. Xác thực JWT phải chạy trước phân quyền
+// 14. Middleware CORS
+app.UseCors("AllowAll");
+
+// 15. Xác thực JWT và phân quyền
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 10. Map Controllers
+// 16. Map Controllers
 app.MapControllers();
 
 app.Run();

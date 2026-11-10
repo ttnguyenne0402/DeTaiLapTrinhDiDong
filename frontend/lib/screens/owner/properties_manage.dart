@@ -6,16 +6,25 @@ import 'property_form.dart';
 import 'rooms_manage.dart';
 import 'tenant_list_screen.dart';
 import '../../core/constants/app_colors.dart';
-import '../../route/app_routes.dart';
 import 'utility_history.dart';
 import 'utility_readings.dart';
+import '../../services/owner/property_service.dart';
 import '../tenant/profile_screen.dart';
 
 
-class PropertiesManageScreen extends StatelessWidget {
+class PropertiesManageScreen extends StatefulWidget {
   const PropertiesManageScreen({super.key});
 
+  @override
+  State<PropertiesManageScreen> createState() => _PropertiesManageScreenState();
+}
+
+class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
   final Color primaryColor = const Color(0xFF1B5E55);
+
+  void _refreshList() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +32,7 @@ class PropertiesManageScreen extends StatelessWidget {
       length: 3,
       child: Scaffold(
         backgroundColor: AppColors.primaryGreen,
-        drawer: const OwnerDrawer(currentRoute: 'utilities'),
+        drawer: const OwnerDrawer(currentRoute: 'properties'),
         appBar: AppBar(
           backgroundColor: AppColors.primaryGreen,
           elevation: 0,
@@ -37,29 +46,27 @@ class PropertiesManageScreen extends StatelessWidget {
           actions: [
             IconButton(
               icon: const Icon(Icons.notifications_none, color: Colors.white),
-              onPressed: () {
-
-              },
+              onPressed: () {},
             ),
-
             const SizedBox(width: 10),
-             CircleAvatar(
+            CircleAvatar(
               backgroundColor: Colors.white24,
               radius: 16,
               child: IconButton(
                 iconSize: 18,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(Icons.person, color: Colors.white,size: 20,),
+                icon: const Icon(Icons.person, color: Colors.white, size: 20),
                 onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
                       builder: (context) => const OwnerProfileScreen(),
                     ),
                   );
                 },
               ),
             ),
-
             const SizedBox(width: 16),
           ],
           title: const Text(
@@ -71,11 +78,9 @@ class PropertiesManageScreen extends StatelessWidget {
             ),
           ),
           centerTitle: true,
-
-          // THANH TAB BAR LỌC TÒA NHÀ
           bottom: TabBar(
             labelColor: AppColors.lightGreen,
-            unselectedLabelColor: AppColors.lightGreen, //màu của tab ch dc chọn
+            unselectedLabelColor: AppColors.lightGreen,
             indicatorColor: Colors.orange,
             indicatorWeight: 1,
             indicatorSize: TabBarIndicatorSize.label,
@@ -94,8 +99,6 @@ class PropertiesManageScreen extends StatelessWidget {
             ],
           ),
         ),
-
-        //body bo góc trên và trái
         body: Container(
           decoration: const BoxDecoration(
             color: AppColors.background,
@@ -118,23 +121,23 @@ class PropertiesManageScreen extends StatelessWidget {
             ),
           ),
         ),
-
-        // NÚT THÊM BẤT ĐỘNG SẢN MỚI
         floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            Navigator.push(
+          onPressed: () async {
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => const PropertyFormScreen(),
               ),
             );
+            if (result == true) {
+              _refreshList();
+            }
           },
           backgroundColor: Colors.orange,
           shape: const CircleBorder(),
           child: const Icon(Icons.add, color: Colors.white),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-
         bottomNavigationBar: BottomAppBar(
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,
@@ -149,11 +152,13 @@ class PropertiesManageScreen extends StatelessWidget {
                   ),
                 );
               }),
-              _buildNavItem(Icons.apartment, 'Tòa nhà', true, () {
+              _buildNavItem(Icons.apartment, 'Tòa nhà', true, () {}),
+              const SizedBox(width: 40),
+              _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const PropertiesManageScreen(),
+                    builder: (context) => const TenantListScreen(),
                   ),
                 );
               }),
@@ -189,70 +194,38 @@ class PropertiesManageScreen extends StatelessWidget {
     );
   }
 
-  // Hàm xây dựng danh sách các Tòa nhà / Bất động sản theo filter
   Widget _buildPropertyList(String filter) {
-    // Dữ liệu mẫu các Tòa nhà / Bất động sản
-    final sampleProperties = [
-      {
-        'id': 'p1',
-        'name': 'Chung cư Mini Q7',
-        'address': '123 Nguyễn Thị Thập, P. Tân Quy, Quận 7, TP.HCM',
-        'totalRooms': 20,
-        'rentedRooms': 16,
-        'emptyRooms': 4,
-        'status': 'Đang hoạt động',
-        'image': 'frontend/assets/images/anhPhongDemo.jpg',
-      },
-      {
-        'id': 'p2',
-        'name': 'Dãy trọ Xô Viết Nghệ Tĩnh',
-        'address': '456 Xô Viết Nghệ Tĩnh, P.25, Q. Bình Thạnh, TP.HCM',
-        'totalRooms': 12,
-        'rentedRooms': 12,
-        'emptyRooms': 0,
-        'status': 'Đang hoạt động',
-        'image': 'frontend/assets/images/anhPhongDemo.jpg',
-      },
-      {
-        'id': 'p3',
-        'name': 'Tòa nhà Căn hộ Lê Văn Sỹ',
-        'address': '789 Lê Văn Sỹ, P.14, Quận 3, TP.HCM',
-        'totalRooms': 15,
-        'rentedRooms': 8,
-        'emptyRooms': 7,
-        'status': 'Bảo trì',
-        'image': 'frontend/assets/images/anhPhongDemo.jpg',
-      },
-    ];
+    return FutureBuilder<List<PropertyModel>>(
+      future: PropertyService.fetchProperties('USER_OWNER_01', filter),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Lỗi: ${snapshot.error}'));
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Text(
+              'Không có bất động sản nào',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+          );
+        }
 
-    // Logic lọc danh sách Tòa nhà
-    final filtered = sampleProperties.where((property) {
-      if (filter == 'active') return property['status'] == 'Đang hoạt động';
-      if (filter == 'maintenance') return property['status'] == 'Bảo trì';
-      return true;
-    }).toList();
+        final filtered = snapshot.data!;
 
-    if (filtered.isEmpty) {
-      return const Center(
-        child: Text(
-          'Không có bất động sản nào',
-          style: TextStyle(color: Colors.grey, fontSize: 14),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: filtered.length,
-      itemBuilder: (context, index) {
-        final item = filtered[index];
-        return _buildPropertyCard(context, item);
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final item = filtered[index];
+            return _buildPropertyCard(context, item);
+          },
+        );
       },
     );
   }
 
-  // Widget Thẻ Tòa nhà / Bất động sản
-  Widget _buildPropertyCard(BuildContext context, Map<String, dynamic> item) {
+  Widget _buildPropertyCard(BuildContext context, PropertyModel item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -260,7 +233,7 @@ class PropertiesManageScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -269,7 +242,6 @@ class PropertiesManageScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Khung chứa Ảnh Bất động sản + Status Badge
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: SizedBox(
@@ -278,46 +250,66 @@ class PropertiesManageScreen extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: Image.asset(
-                      item['image'] as String,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: Colors.grey[200],
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.apartment, size: 44, color: Colors.grey),
-                            SizedBox(height: 4),
-                            Text(
-                              'Chưa có ảnh',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
+                    child: (item.image.startsWith('http://') || item.image.startsWith('https://'))
+                        ? Image.network(
+                            item.image,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: Colors.grey[200],
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.apartment, size: 44, color: Colors.grey),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Chưa có ảnh',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
+                          )
+                        : Image.asset(
+                            item.image,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: Colors.grey[200],
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.apartment, size: 44, color: Colors.grey),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Chưa có ảnh',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                   ),
                   Positioned(
                     top: 12,
                     right: 12,
-                    child: _buildStatusBadge(item['status'] as String),
+                    child: _buildStatusBadge(item.status),
                   ),
                 ],
               ),
             ),
           ),
-
-          // Thông tin Tòa nhà
           Padding(
             padding: const EdgeInsets.all(14.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item['name'] as String,
+                  item.name,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -336,7 +328,7 @@ class PropertiesManageScreen extends StatelessWidget {
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        item['address'] as String,
+                        item.address,
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -350,22 +342,20 @@ class PropertiesManageScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildStatItem('Tổng phòng', '${item['totalRooms']}'),
+                    _buildStatItem('Tổng phòng', '${item.totalRooms}'),
                     _buildStatItem(
                       'Đang thuê',
-                      '${item['rentedRooms']}',
+                      '${item.rentedRooms}',
                       color: Colors.green[700],
                     ),
                     _buildStatItem(
                       'Còn trống',
-                      '${item['emptyRooms']}',
+                      '${item.emptyRooms}',
                       color: Colors.orange[800],
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-
-                //2 nút ghi điện nước và xem tiêu thụ
                 Row(
                   children: [
                     Expanded(
@@ -434,9 +424,6 @@ class PropertiesManageScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // ----------------------------------------------------
-
-                // Nút chuyển sang màn hình Quản lý Phòng
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(

@@ -1,3 +1,4 @@
+
 import 'dart:io' ; // 1. Thư viện xử lý HTTP Overrides để bypass SSL trên máy ảo
 import 'package:flutter/material.dart';
 import 'route/app_router.dart';
@@ -12,10 +13,19 @@ class MyHttpOverrides extends HttpOverrides {
   }
 }
 
+// Bỏ qua xác thực chứng chỉ SSL tự ký (self-signed cert) khi debug/phát triển local với .NET Core
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() {
-  // 3. Kích hoạt bypass SSL trước khi chạy app
+
   HttpOverrides.global = MyHttpOverrides();
-  
   runApp(const MyApp());
 }
 
@@ -26,6 +36,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'Flutter Demo',
+      // initialRoute: AppRoutes.invoicesManage,
+      onGenerateRoute: AppRouter.generateRoute,
       title: 'Trọ Ơi',
       theme: ThemeData(
         // Đã sửa lỗi cú pháp dấu chấm thừa trước fromSeed

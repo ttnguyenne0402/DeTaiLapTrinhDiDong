@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -707,7 +707,11 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnName("created_at");
             entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.ExpiredAt).HasColumnName("expired_at");
+            entity.Property(e => e.Price)
+                .HasColumnType("decimal(15, 2)")
+                .HasColumnName("price");
+            entity.Property(e => e.Amenities)
+                .HasColumnName("amenities");
             entity.Property(e => e.PublishedAt).HasColumnName("published_at");
             entity.Property(e => e.RejectionReason).HasColumnName("rejection_reason");
             entity.Property(e => e.RoomId)
@@ -719,6 +723,10 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             entity.Property(e => e.Title)
                 .HasMaxLength(200)
                 .HasColumnName("title");
+            entity.Property(e => e.Views)
+                .HasColumnName("views");
+            entity.Property(e => e.SubmitNote)
+                .HasColumnName("submit_note");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnName("updated_at");
@@ -907,6 +915,14 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             entity.Property(e => e.Unit)
                 .HasMaxLength(50)
                 .HasColumnName("unit");
+            entity.Property(e => e.Price)
+                .HasColumnType("decimal(15, 2)")
+                .HasColumnName("price");
+            entity.Property(e => e.IsMandatory)
+                .HasColumnName("is_mandatory");
+            entity.Property(e => e.Icon)
+                .HasMaxLength(50)
+                .HasColumnName("icon");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnName("updated_at");
