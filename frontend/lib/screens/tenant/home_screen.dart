@@ -27,15 +27,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
-  // Danh sách các màn hình tương ứng với từng Tab
-  final List<Widget> _screens = [
-    const _HomeContent(), // 0: Nội dung trang chủ gốc
-    const MyInvoicesScreen(), // 1: Hóa đơn
-    const booking_history_screen(), // 2: Đặt lịch
-    const MyContractsScreen(), // 3: Hợp đồng
-    const FavoritesScreen(), // 4: Yêu thích
-    const ProfileScreen(), // 5: Cá nhân
-  ];
+
 
   void _onItemTapped(int index) {
     setState(() {
@@ -77,13 +69,35 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
+  Widget _getScreen() {
+    switch (_selectedIndex) {
+      case 0:
+        return const _HomeContent(); // Trang chủ giữ nguyên
+      case 1:
+      // Thêm UniqueKey() để ép làm mới Hóa đơn
+        return MyInvoicesScreen(key: UniqueKey());
+      case 2:
+      // Thêm UniqueKey() để ép làm mới Đặt lịch
+        return booking_history_screen(key: UniqueKey());
+      case 3:
+      // Thêm UniqueKey() để ép làm mới Hợp đồng
+        return MyContractsScreen(key: UniqueKey());
+      case 4:
+        return const FavoritesScreen();
+      case 5:
+        return const ProfileScreen();
+      default:
+        return const _HomeContent();
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       // Dùng IndexedStack để chuyển tab mà không cần dùng Router
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      body: AnimatedSwitcher(duration: const Duration(milliseconds: 200),
+        child: _getScreen(),
+      ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: SizedBox(

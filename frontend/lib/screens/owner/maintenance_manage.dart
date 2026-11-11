@@ -6,7 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../widgets/owner/owner_drawer.dart';
-
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import '../../services/auth_storage.dart';
+import 'maintenance_detail.dart';
 class MaintenanceManageScreen extends StatefulWidget {
   const MaintenanceManageScreen({super.key});
 
@@ -17,6 +21,67 @@ class MaintenanceManageScreen extends StatefulWidget {
 
 class _MaintenanceManageScreenState
     extends State<MaintenanceManageScreen> {
+  // --- BIẾN MỚI THÊM ĐỂ GỌI API ---
+  List<dynamic> _maintenanceRequests = [];
+  bool _isLoading = true;
+  String _ownerId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOwnerData(); // Gọi hàm load data khi vừa mở trang
+  }
+
+  // Khởi tạo Custom Client bỏ qua SSL
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
+  // Lấy Owner ID từ bộ nhớ và gọi API
+  Future<void> _loadOwnerData() async {
+    final userId = await AuthStorage.getUserId();
+    if (mounted) {
+      setState(() {
+        _ownerId = userId ?? ''; // Có thể gán cứng 'OWNER01' để test nhanh
+      });
+      await _fetchMaintenanceRequests();
+    }
+  }
+
+  // Gọi API lấy danh sách sự cố của Chủ nhà
+  Future<void> _fetchMaintenanceRequests() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/owner/$_ownerId';
+    final client = _getCustomClient();
+
+    try {
+      final response = await client.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        if (mounted) {
+          setState(() {
+            _maintenanceRequests = data;
+            _isLoading = false;
+          });
+        }
+      } else {
+        print("Lỗi server: ${response.statusCode}");
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Lỗi kết nối: $e");
+      if (mounted) setState(() => _isLoading = false);
+    } finally {
+      client.close();
+    }
+  }
+  // --- KẾT THÚC PHẦN THÊM ---
   int _selectedFilterIndex = 0;
 
   final ImagePicker _imagePicker = ImagePicker();
@@ -420,205 +485,120 @@ class _MaintenanceManageScreenState
                 ),
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    // thẻ tổng quan báo cáo chi phí sự cố
-                    _buildSummaryCard(),
-                    const SizedBox(height: 16),
-
-                    // thanh tìm kiếm sự cố
-                    _buildSearchBar(),
-                    const SizedBox(height: 12),
-
-                    // danh sách chip lọc trạng thái
-                    _buildFilterChips(),
-                    const SizedBox(height: 16),
-
-                    // thẻ sự cố phòng 302 - trạng thái chờ tiếp nhận
-                    if (_selectedFilterIndex == 0 ||
-                        _selectedFilterIndex == 1) ...[
-                      _buildMaintenanceCard(
-                        propertyName: 'Khu Trọ Tân Bình 1',
-                        room: 'Phòng 302',
-                        floor: 'Tầng 3',
-                        tenantName: 'Trần Thị Bích',
-                        tenantPhone: '0933 555 799',
-                        title:
-                        'Rò rỉ ống nước bồn rửa chén gây tràn sàn',
-                        description:
-                        'Nước rỉ mạnh từ co nối bên dưới bồn, chảy tràn ra sàn gỗ phòng khách.',
-                        timeAgo: '15 phút trước',
-                        imageCount: 2,
-                        priorityText: 'Khẩn cấp',
-                        priorityColor: Colors.red,
-                        statusText: 'Chờ tiếp nhận',
-                        statusColor: AppColors.textSecondary,
-                        actionButtons: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {},
-                                icon: const Icon(
-                                  Icons.phone,
-                                  size: 16,
-                                  color: AppColors.primaryGreen,
-                                ),
-                                label: const Text(
-                                  'Gọi khách',
-                                  style: TextStyle(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: AppColors.primaryGreen,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, AppRoutes.maintenanceDetail);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryGreen,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Tiếp nhận',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen))
+                    : RefreshIndicator(
+                  onRefresh: _fetchMaintenanceRequests,
+                  color: AppColors.primaryGreen,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _buildSummaryCard(),
                       const SizedBox(height: 16),
-                    ],
-
-                    // thẻ sự cố phòng 201 - trạng thái đang xử lý
-                    if (_selectedFilterIndex == 0 ||
-                        _selectedFilterIndex == 2) ...[
-                      _buildMaintenanceCard(
-                        propertyName: 'Khu Trọ Bình Thạnh 2',
-                        room: 'Phòng 201',
-                        floor: 'Tầng 2',
-                        tenantName: 'Nguyễn Văn An',
-                        tenantPhone: '0908 123 456',
-                        title: 'Máy lạnh không mát, chớp đèn báo lỗi',
-                        description:
-                        'Đã bật 18 độ quạt gió mạnh 1 tiếng nhưng chỉ ra gió thường, phòng rất ngột ngạt.',
-                        timeAgo: 'Báo lúc 09:30 hôm nay',
-                        imageCount: 1,
-                        priorityText: 'Ưu tiên cao',
-                        priorityColor: AppColors.warningOrange,
-                        statusText: 'Đang xử lý',
-                        statusColor: AppColors.warningOrange,
-                        actionButtons:Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {},
-                                icon: const Icon(
-                                  Icons.phone,
-                                  size: 16,
-                                  color: AppColors.primaryGreen,
-                                ),
-                                label: const Text(
-                                  'Gọi khách',
-                                  style: TextStyle(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: AppColors.primaryGreen,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, AppRoutes.maintenanceDetail);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryGreen,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Tiếp nhận',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildSearchBar(),
+                      const SizedBox(height: 12),
+                      _buildFilterChips(),
                       const SizedBox(height: 16),
-                    ],
 
-                    // thẻ sự cố phòng 105 - trạng thái đã hoàn thành
-                    if (_selectedFilterIndex == 0 ||
-                        _selectedFilterIndex == 3) ...[
-                      _buildMaintenanceCard(
-                        propertyName: 'Khu Trọ Tân Bình 1',
-                        room: 'Phòng 105',
-                        floor: 'Tầng 1',
-                        tenantName: 'Phạm Hoàng Nam',
-                        tenantPhone: '0911 222 333',
-                        title:
-                        'Thay bóng đèn tuýp LED ban công bị hỏng',
-                        description: '',
-                        timeAgo: 'Xong lúc: 26/08/2024',
-                        imageCount: 1,
-                        priorityText: 'Bình thường',
-                        priorityColor: AppColors.textSecondary,
-                        statusText: 'Đã hoàn thành',
-                        statusColor: AppColors.primaryGreen,
-                        costText:
-                        'Chi phí: 80.000đ (Đã cộng hóa đơn T8)',
-                        actionButtons: const SizedBox.shrink(),
-                      ),
-                      const SizedBox(height: 60),
-                    ],
+                      // --- ĐỔ DỮ LIỆU TỪ API VÀO ĐÂY ---
+                      if (_maintenanceRequests.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Text('Không có sự cố nào.', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                        )
+                      else
+                        ..._maintenanceRequests.map((request) {
+                          final status = request['status'];
 
-                    // thông báo khi bộ lọc không có thẻ phù hợp
-                    if (_selectedFilterIndex != 0 &&
-                        ((_selectedFilterIndex == 1) ||
-                            (_selectedFilterIndex == 2) ||
-                            (_selectedFilterIndex == 3)))
-                      const SizedBox.shrink(),
-                  ],
+                          // Logic Lọc (Filter)
+                          if (_selectedFilterIndex == 1 && status != 'pending') return const SizedBox.shrink();
+                          if (_selectedFilterIndex == 2 && status != 'processing') return const SizedBox.shrink();
+                          if (_selectedFilterIndex == 3 && status != 'completed') return const SizedBox.shrink();
+
+                          final isCompleted = status == 'completed';
+                          final isPending = status == 'pending';
+
+                          return Column(
+                            children: [
+                              _buildMaintenanceCard(
+                                propertyName: request['propertyName'] ?? 'Khu trọ',
+                                room: request['roomName'] ?? 'Phòng',
+                                floor: '', // Tạm ẩn tầng
+                                tenantName: request['tenantName'] ?? 'Khách thuê',
+                                tenantPhone: request['tenantPhone'] ?? '',
+                                title: request['title'] ?? 'Sự cố',
+                                description: request['description'] ?? '',
+                                timeAgo: request['createdAt'] != null
+                                    ? request['createdAt'].toString().substring(0, 10)
+                                    : '',
+                                imageCount: request['image'] != null ? 1 : 0,
+
+                                // Hiển thị Priority
+                                priorityText: request['priority'] == 'urgent' ? 'Khẩn cấp'
+                                    : request['priority'] == 'high' ? 'Ưu tiên cao'
+                                    : 'Bình thường',
+                                priorityColor: request['priority'] == 'urgent' ? Colors.red
+                                    : AppColors.warningOrange,
+
+                                // Hiển thị Status
+                                statusText: isPending ? 'Chờ tiếp nhận'
+                                    : isCompleted ? 'Đã hoàn thành'
+                                    : 'Đang xử lý',
+                                statusColor: isPending ? AppColors.textSecondary
+                                    : isCompleted ? AppColors.primaryGreen
+                                    : AppColors.warningOrange,
+
+                                costText: isCompleted ? 'Đã nghiệm thu' : null,
+
+                                actionButtons: isCompleted ? const SizedBox.shrink() : Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () {},
+                                        icon: const Icon(Icons.phone, size: 16, color: AppColors.primaryGreen),
+                                        label: const Text('Gọi khách', style: TextStyle(color: AppColors.primaryGreen)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () async {
+                                          // DÙNG MATERIAL PAGE ROUTE ĐỂ TRUYỀN ID CHẮC CHẮN 100%
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => MaintenanceDetailScreen(
+                                                issueId: request['id'].toString(), // TRUYỀN ID VÀO ĐÂY
+                                              ),
+                                            ),
+                                          );
+
+                                          _fetchMaintenanceRequests();
+                                        },
+                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+                                        child: Text(
+                                          isPending ? 'Tiếp nhận' : 'Chi tiết',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          );
+                        }).toList(),
+                    ],
+                  ),
                 ),
-              ),
             ),
           ),
+          )
         ],
       ),
 

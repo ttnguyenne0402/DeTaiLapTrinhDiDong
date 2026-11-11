@@ -6,8 +6,8 @@ import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../utils/database_helper.dart';
-import 'contract_detail_screen.dart'; // Đảm bảo đã import trang chi tiết
-
+import 'contract_detail_screen.dart';
+import '../../services/auth_storage.dart';
 class MyContractsScreen extends StatefulWidget {
   const MyContractsScreen({super.key});
 
@@ -23,15 +23,19 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
   List _contracts = [];
   bool _isLoading = true;
 
-  // URL API Backend (Sử dụng 10.0.2.2 cho máy ảo Android)
-  final String _apiUrl = 'https://10.0.2.2:7203/api/contracts/tenant/TENANT01';
+  // URL API Backend
+  late String _apiUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _initData();
   }
-
+  Future<void> _initData() async {
+    final userId = await AuthStorage.getUserId();
+    _apiUrl = 'http://10.0.2.2:5093/api/contracts/tenant/${userId ?? ""}';
+    await _loadData();
+  }
   // Hàm tạo Client tùy chỉnh bỏ qua lỗi SSL
   IOClient _getCustomClient() {
     final httpClient = HttpClient()

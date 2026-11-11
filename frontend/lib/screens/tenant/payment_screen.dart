@@ -6,17 +6,22 @@ import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
-
+import '../../services/auth_storage.dart';
 class PaymentScreen extends StatefulWidget {
   final String invoiceId;
   final String invoiceCode;
   final double amountToPay;
-
+  final String bankName;
+  final String accountNumber;
+  final String accountHolder;
   const PaymentScreen({
     super.key,
     required this.invoiceId,
     required this.invoiceCode,
     required this.amountToPay,
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountHolder,
   });
 
   @override
@@ -27,10 +32,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedMethod = 'qr';
   bool _isSubmitting = false;
 
-  // Giả lập ID người thuê hiện tại
-  final String _currentTenantId = 'TENANT01';
 
-  // Khởi tạo Custom Client bỏ qua SSL
+  String _currentTenantId = '';
+  @override
+  void initState() {
+    super.initState();
+    _loadTenantData();
+  }
+
+  Future<void> _loadTenantData() async {
+    final userId = await AuthStorage.getUserId();
+    if (mounted) {
+      setState(() {
+        _currentTenantId = userId ?? '';
+      });
+    }
+  }
   IOClient _getCustomClient() {
     final httpClient = HttpClient()
       ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
@@ -51,7 +68,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final client = _getCustomClient();
     try {
       final response = await client.post(
-        Uri.parse('https://10.0.2.2:7203/api/payments'),
+        Uri.parse('http://10.0.2.2:5093/api/payments'),
         headers: {"Content-Type": "application/json"},
         body: json.encode(requestData),
       );
@@ -301,18 +318,37 @@ class _PaymentScreenState extends State<PaymentScreen> {
       case 'qr':
         return _buildInfoCard(
           key: const ValueKey('qr'),
-          title: 'MÃ QR THANH TOÁN QUA VNPAY',
+          title: 'THÔNG TIN THANH TOÁN',
           children: [
-            const Center(
-              child: Icon(Icons.security, size: 80, color: AppColors.primaryGreen),
-            ),
-            const SizedBox(height: 16),
-            const Center(
-              child: Text(
-                'Hệ thống sẽ tự động chuyển hướng bạn đến cổng thanh toán bảo mật của VNPay. Vui lòng chuẩn bị ứng dụng ngân hàng hoặc thẻ ATM.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textPrimary, height: 1.5),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primaryGreen.withOpacity(0.3)),
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // SỬ DỤNG DỮ LIỆU THẬT ĐƯỢC TRUYỀN VÀO
+                  Text('Ngân hàng: ${widget.bankName}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const SizedBox(height: 12),
+                  Text('Số TK: ${widget.accountNumber}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.blueAccent)),
+                  const SizedBox(height: 12),
+                  Text('Chủ TK: ${widget.accountHolder}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const SizedBox(height: 12),
+                  Text('Nội dung CK: ${widget.invoiceCode}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+            const Divider(color: AppColors.lightGreen, thickness: 2),
+            const SizedBox(height: 16),
+            const Text(
+              'Bấm nút "XÁC NHẬN THANH TOÁN" ở bên dưới để hệ thống mở cổng thanh toán VNPay.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
             ),
           ],
         );

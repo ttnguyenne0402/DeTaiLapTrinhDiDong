@@ -42,7 +42,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
 
   // Gọi API lấy chi tiết các khoản thu
   Future<void> _fetchInvoiceDetail() async {
-    final url = 'https://10.0.2.2:7203/api/invoices/$_invoiceId';
+    final url = 'http://10.0.2.2:5093/api/invoices/$_invoiceId';
     print("ĐANG GỌI API: $url");
 
     final client = _getCustomClient();
@@ -248,6 +248,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                   const SizedBox(height: 16),
 
                   // Chỉ mở nút thanh toán khi trạng thái là unpaid hoặc overdue
+                  // Chỉ mở nút thanh toán khi trạng thái là unpaid hoặc overdue
                   if (status == 'unpaid' || status == 'overdue')
                     SizedBox(
                       width: double.infinity,
@@ -260,20 +261,27 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                           ),
                         ),
                         onPressed: () async {
-                         await Navigator.push(
+                          // TRÍCH XUẤT THÔNG TIN NGÂN HÀNG TỪ JSON API
+                          final bankAccount = _invoiceDetail!['bankAccount'] as Map<String, dynamic>?;
+
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => PaymentScreen(
                                 invoiceId: _invoiceId,
                                 invoiceCode: invoiceCode,
                                 amountToPay: total,
+                                // TRUYỀN THÊM DỮ LIỆU SANG MÀN HÌNH THANH TOÁN
+                                bankName: bankAccount?['bankName']?.toString() ?? 'Chưa cập nhật ngân hàng',
+                                accountNumber: bankAccount?['accountNumber']?.toString() ?? 'Chưa cập nhật số tài khoản',
+                                accountHolder: bankAccount?['accountHolder']?.toString() ?? 'Chưa cập nhật tên',
                               ),
                             ),
                           );
-                         setState(() {
-                           _isLoading = true;
-                         });
-                         _fetchInvoiceDetail();
+                          setState(() {
+                            _isLoading = true;
+                          });
+                          _fetchInvoiceDetail();
                         },
                         child: const Text(
                           'THANH TOÁN NGAY',

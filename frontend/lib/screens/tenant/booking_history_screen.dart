@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'dart:convert';
 import 'dart:io';
-
+import '../../services/auth_storage.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/common/status_badge.dart';
 
@@ -19,15 +19,23 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
   bool _isLoading = true;
 
   // URL API Backend
-  final String _baseUrl = 'https://10.0.2.2:7203/api/viewing-appointments';
-  final String _tenantId = 'TENANT01'; // Giả lập TenantId hiện tại
+  final String _baseUrl = 'http://10.0.2.2:5093/api/viewing-appointments';
+  String _tenantId = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchAppointments();
+    _initData();
   }
-
+  Future<void> _initData() async {
+    final userId = await AuthStorage.getUserId();
+    if (mounted) {
+      setState(() {
+        _tenantId = userId ?? '';
+      });
+      await _fetchAppointments();
+    }
+  }
   // Khởi tạo Custom Client bỏ qua SSL
   IOClient _getCustomClient() {
     final httpClient = HttpClient()
@@ -132,10 +140,21 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _appointments.isEmpty
-                ? const Center(
-              child: Text('Bạn chưa có lịch hẹn nào.', style: TextStyle(color: AppColors.textSecondary)),
-            )
+                : RefreshIndicator(
+              onRefresh: _fetchAppointments,
+              color: AppColors.primaryGreen,
+              child: _appointments.isEmpty
+                  ? ListView(
+
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.35),
+                  const Center(
+                    child: Text('Bạn chưa có lịch hẹn nào.',
+                        style: TextStyle(color: AppColors.textSecondary)),
+                  ),
+                ],
+              )
                 : ListView.builder(
               padding: const EdgeInsets.all(16.0),
               itemCount: _appointments.length,
@@ -145,6 +164,7 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
             ),
           ),
         )
+    )
     );
   }
 

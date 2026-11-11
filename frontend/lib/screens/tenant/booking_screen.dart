@@ -7,7 +7,7 @@ import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../widgets/tenant/calendar_widget.dart';
-
+import '../../services/auth_storage.dart';
 class booking_screen extends StatefulWidget {
 
   final String roomId;
@@ -38,8 +38,21 @@ class _BookingScreenState extends State<booking_screen> {
   bool _isSubmitting = false;
 
   // Giả lập TenantId (Sau này lấy từ SharedPreferences/Login)
-  final String _currentTenantId = 'TENANT01';
+  String _currentTenantId = '';
+  @override
+  void initState() {
+    super.initState();
+    _loadTenantData();
+  }
 
+  Future<void> _loadTenantData() async {
+    final userId = await AuthStorage.getUserId();
+    if (mounted) {
+      setState(() {
+        _currentTenantId = userId ?? '';
+      });
+    }
+  }
   @override
   void dispose() {
     _phoneController.dispose();
@@ -89,7 +102,7 @@ class _BookingScreenState extends State<booking_screen> {
       final client = _getCustomClient();
       try {
         final response = await client.post(
-          Uri.parse('https://10.0.2.2:7203/api/viewing-appointments'),
+          Uri.parse('http://10.0.2.2:5093/api/viewing-appointments'),
           headers: {"Content-Type": "application/json"},
           body: json.encode(requestData),
         );

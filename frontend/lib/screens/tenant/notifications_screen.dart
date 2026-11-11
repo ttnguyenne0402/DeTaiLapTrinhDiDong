@@ -7,6 +7,7 @@ import '../../utils/database_helper.dart';
 import '../../widgets/tenant/notification_item.dart';
 import 'dart:io';
 import 'package:http/io_client.dart';
+import '../../services/auth_storage.dart';
 import '../../utils/database_helper.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -22,14 +23,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _isLoading = true;
 
 
-  final String _apiUrl = 'https://10.0.2.2:7203/api/notifications/user/TENANT01';
+  late String _apiUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _initData();
   }
-
+  Future<void> _initData() async {
+    final userId = await AuthStorage.getUserId(); // Lấy ID thật
+    _apiUrl = 'http://10.0.2.2:5093/api/notifications/user/${userId ?? ""}';
+    await _loadData();
+  }
   IOClient _getCustomClient() {
     final httpClient = HttpClient()
       ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
@@ -90,7 +95,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _markAsRead(String id) async {
     // 1. URL API PATCH
-    final url = 'https://10.0.2.2:7203/api/notifications/$id/read';
+    final url = 'http://10.0.2.2:5093/api/notifications/$id/read';
 
     // 2. Sử dụng Client tùy chỉnh
     final client = _getCustomClient();

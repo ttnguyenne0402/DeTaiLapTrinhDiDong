@@ -15,7 +15,7 @@ namespace Backend.Services
         private const string Vnp_TmnCode = "CC55FG4O";
         private const string Vnp_HashSecret = "STYTYTIHZBSLWYQININXOAQNEZYKXGHL";
         private const string Vnp_Url = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-        private const string Vnp_ReturnUrl = "https://10.0.2.2:7203/api/payments/vnpay-return";
+        private const string Vnp_ReturnUrl = "http://10.0.2.2:5093/api/payments/vnpay-return";
         public PaymentService(IPaymentRepository paymentRepo, IInvoiceRepository invoiceRepo)
         {
             _paymentRepo = paymentRepo;

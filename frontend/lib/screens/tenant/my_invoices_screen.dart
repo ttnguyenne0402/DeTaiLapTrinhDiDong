@@ -4,7 +4,7 @@ import 'package:http/io_client.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../core/constants/app_colors.dart';
-
+import '../../services/auth_storage.dart';
 import '../../utils/database_helper.dart';
 import 'invoice_detail_screen.dart';
 class MyInvoicesScreen extends StatefulWidget {
@@ -18,13 +18,18 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
   List _invoices = [];
   bool _isLoading = true;
 
-  // URL API Backend (Sử dụng 10.0.2.2 cho máy ảo Android)
-  final String _apiUrl = 'https://10.0.2.2:7203/api/invoices/tenant/TENANT01';
+// URL API Backend
+  late String _apiUrl;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _initData();
+  }
+  Future<void> _initData() async {
+    final userId = await AuthStorage.getUserId();
+    _apiUrl = 'http://10.0.2.2:5093/api/invoices/tenant/${userId ?? ""}';
+    await _loadData();
   }
 
   // Hàm tạo Client tùy chỉnh bỏ qua lỗi SSL
@@ -51,16 +56,17 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> apiData = json.decode(response.body);
-
-        // 3. Lưu đè dữ liệu mới vào SQLite
         await DatabaseHelper.instance.insertInvoices(apiData);
-
-        // 4. Cập nhật lại UI
         if (mounted) {
           setState(() {
             _invoices = List.from(apiData);
             _isLoading = false;
           });
+        }
+      } else {
+        print("Lỗi hóa đơn từ server: ${response.statusCode} - ${response.body}");
+        if (mounted) {
+          setState(() => _isLoading = false);
         }
       }
     } catch (e) {

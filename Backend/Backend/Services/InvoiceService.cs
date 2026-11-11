@@ -48,6 +48,13 @@ namespace Backend.Services
                 Discount = invoice.Discount ?? 0,
                 Total = invoice.Total,
                 Status = invoice.Status,
+                BankAccount = invoice.BankAccount != null ? new BankAccountInfoDto
+                {
+                    BankCode = invoice.BankAccount.BankCode,
+                    BankName = invoice.BankAccount.BankName,
+                    AccountNumber = invoice.BankAccount.AccountNumber,
+                    AccountHolder = invoice.BankAccount.AccountHolder
+                } : null,
                 Items = invoice.InvoiceItems.Select(item => new InvoiceItemDTO
                 {
                     Type = item.Type,

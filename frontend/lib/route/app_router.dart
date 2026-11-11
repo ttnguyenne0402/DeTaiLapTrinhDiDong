@@ -67,8 +67,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const LandlordUtilityScreen());
       case AppRoutes.termination:
         return MaterialPageRoute(builder: (_) => ContractLiquidationScreen()); // id
-      case AppRoutes.maintenanceDetail:
-        return MaterialPageRoute(builder: (_) => MaintenanceDetailScreen()); // id
+      // case AppRoutes.maintenanceDetail:
+      //   return MaterialPageRoute(builder: (_) => MaintenanceDetailScreen()); // id
       case AppRoutes.contentModeration:
         return MaterialPageRoute(builder: (_) => const RoomApprovalDetailScreen());
       // case AppRoutes.contractDetailOwner:
