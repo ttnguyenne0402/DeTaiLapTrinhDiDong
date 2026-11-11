@@ -13,15 +13,6 @@ class MyHttpOverrides extends HttpOverrides {
   }
 }
 
-// Bỏ qua xác thực chứng chỉ SSL tự ký (self-signed cert) khi debug/phát triển local với .NET Core
-class MyHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback =
-          (X509Certificate cert, String host, int port) => true;
-  }
-}
 
 void main() {
 
@@ -36,7 +27,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
       // initialRoute: AppRoutes.invoicesManage,
       onGenerateRoute: AppRouter.generateRoute,
       title: 'Trọ Ơi',
@@ -44,7 +34,6 @@ class MyApp extends StatelessWidget {
         // Đã sửa lỗi cú pháp dấu chấm thừa trước fromSeed
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-       onGenerateRoute: AppRouter.generateRoute,
       home: LoginScreen(),
     );
   }
