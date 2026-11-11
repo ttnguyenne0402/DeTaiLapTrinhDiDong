@@ -365,8 +365,8 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => InvoiceCreateScreen(
-                                propertyId: item['id']?.toString(),       // Mã khu trọ (ví dụ: 'p1', 'p2'...)
-                                propertyName: item['name']?.toString(),   // Tên khu trọ (ví dụ: 'Chung cư Mini Q7')
+                                propertyId: item.id.toString(),       // Mã khu trọ (ví dụ: 'p1', 'p2'...)
+                                propertyName: item.name.toString(),   // Tên khu trọ (ví dụ: 'Chung cư Mini Q7')
                               ),
                             ),
                           );
@@ -397,8 +397,8 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => LandlordUtilityScreen(
-                                propertyId: item['id']?.toString(),     // Truyền ID khu trọ sang
-                                propertyName: item['name']?.toString(), // Truyền Tên khu trọ sang
+                                propertyId: item.id.toString(),     // Truyền ID khu trọ sang
+                                propertyName: item.name.toString(), // Truyền Tên khu trọ sang
                               ),
                             ),
                           );
