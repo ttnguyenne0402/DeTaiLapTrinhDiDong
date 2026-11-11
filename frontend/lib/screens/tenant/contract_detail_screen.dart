@@ -46,8 +46,8 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
 
   // Gọi API lấy chi tiết hợp đồng
   Future<void> _fetchContractDetail() async {
-    // URL API Backend (Sử dụng 10.0.2.2 cho máy ảo Android)
-    final url = 'https://10.0.2.2:7203/api/contracts/$_contractId';
+    // URL API Backend
+    final url = 'http://10.0.2.2:5093/api/contracts/$_contractId';
     print("ĐANG GỌI API: $url");
 
     final client = _getCustomClient();

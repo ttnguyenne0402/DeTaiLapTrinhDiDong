@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
-
+import '../../services/auth_storage.dart';
 import '../../core/constants/app_colors.dart';
 
 class TenantMaintenanceRequestScreen extends StatefulWidget {
@@ -36,8 +36,21 @@ class _TenantMaintenanceRequestScreenState
   bool _isSubmitting = false;
 
   // Giả lập ID người thuê hiện tại
-  final String _currentTenantId = 'TENANT01';
+  String _currentTenantId = '';
+  @override
+  void initState() {
+    super.initState();
+    _loadTenantData();
+  }
 
+  Future<void> _loadTenantData() async {
+    final userId = await AuthStorage.getUserId();
+    if (mounted) {
+      setState(() {
+        _currentTenantId = userId ?? '';
+      });
+    }
+  }
   @override
   void dispose() {
     _titleController.dispose();
@@ -162,7 +175,7 @@ class _TenantMaintenanceRequestScreenState
       final client = _getCustomClient();
       try {
         final response = await client.post(
-          Uri.parse('https://10.0.2.2:7203/api/maintenance'),
+          Uri.parse('http://10.0.2.2:5093/api/maintenance'),
           headers: {"Content-Type": "application/json"},
           body: json.encode(requestData),
         );

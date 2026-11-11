@@ -16,5 +16,6 @@ namespace Backend.DTOs
 
         // Danh sách các khoản thu (tiền phòng, điện, nước...)
         public List<InvoiceItemDTO> Items { get; set; } = new List<InvoiceItemDTO>();
+        public BankAccountInfoDto? BankAccount { get; set; }
     }
 }

@@ -411,6 +411,13 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             entity.HasOne(d => d.UtilityReading).WithMany(p => p.Invoices)
                 .HasForeignKey(d => d.UtilityReadingId)
                 .HasConstraintName("FK_invoices_readings");
+            entity.Property(e => e.BankAccountId)
+    .HasMaxLength(50)
+    .HasColumnName("bank_account_id");
+
+            entity.HasOne(d => d.BankAccount).WithMany()
+                .HasForeignKey(d => d.BankAccountId)
+                .HasConstraintName("FK_invoices_bank_accounts");
         });
 
         modelBuilder.Entity<InvoiceItem>(entity =>

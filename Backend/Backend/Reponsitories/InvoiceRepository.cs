@@ -30,6 +30,7 @@ namespace Backend.Repositories
             // Lấy chi tiết hóa đơn kèm theo danh sách các khoản thu
             return await _context.Invoices
                 .Include(i => i.InvoiceItems)
+                .Include(i => i.BankAccount)
                 .FirstOrDefaultAsync(i => i.Id == id);
         }
 
