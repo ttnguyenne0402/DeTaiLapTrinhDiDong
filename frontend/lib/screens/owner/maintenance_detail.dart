@@ -303,6 +303,36 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
   }
 
   Widget _buildImagesCard() {
+    // Lấy chuỗi base64 từ dữ liệu
+    final imageString = _detailData!['image']?.toString() ?? '';
+    Widget imageContent;
+
+    try {
+      if (imageString.isNotEmpty) {
+        // Xử lý cắt tiền tố an toàn cho cả ảnh Khách gửi và Chủ chụp
+        String cleanBase64 = imageString.contains(',')
+            ? imageString.split(',')[1]
+            : imageString;
+
+        imageContent = Image.memory(
+          base64Decode(cleanBase64),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          errorBuilder: (context, error, stackTrace) => const Center(
+            child: Text('Hình ảnh bị lỗi định dạng', style: TextStyle(color: Colors.red)),
+          ),
+        );
+      } else {
+        imageContent = const Center(
+          child: Text('Không có hình ảnh đính kèm', style: TextStyle(color: AppColors.textSecondary)),
+        );
+      }
+    } catch (e) {
+      imageContent = const Center(
+        child: Text('Lỗi giải mã hình ảnh', style: TextStyle(color: Colors.red)),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.borderLight)),
@@ -318,11 +348,12 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
           ),
           const SizedBox(height: 10),
           Container(
-            height: 150,
+            height: 200,
             width: double.infinity,
             decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)),
-            child: const Center(
-              child: Text('Hình ảnh (Đã tải lên)', style: TextStyle(color: AppColors.primaryGreen)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: imageContent,
             ),
           )
         ],

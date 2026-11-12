@@ -690,5 +690,82 @@ namespace Backend.Controllers
                 return StatusCode(500, new { message = "Lỗi khi lấy danh sách tài khoản ngân hàng", error = ex.Message });
             }
         }
+        // GET: /api/OwnerContracts/tenants/{ownerId}
+        // (Lấy danh sách người thuê nhà đang có hợp đồng active thuộc về chủ nhà)
+        [HttpGet("tenants/{ownerId}")]
+        public async Task<IActionResult> GetTenantsByOwner(string ownerId)
+        {
+            try
+            {
+                var tenants = await _context.Contracts
+                    .Include(c => c.Room)
+                        .ThenInclude(r => r.Property)
+                    .Include(c => c.Tenant)
+                    .Where(c => c.OwnerId == ownerId && c.Status == "active")
+                    .OrderByDescending(c => c.StartDate)
+                    .Select(c => new
+                    {
+                        contractId = c.Id,
+                        tenantId = c.TenantId,
+                        name = c.Tenant.Name,
+                        phone = c.Tenant.Phone ?? "",
+                        avatar = c.Tenant.Avatar ?? "", // Nếu có avatar trên DB, có thể trả về
+                        room = c.Room.Name ?? "Phòng",
+                        property = c.Room.Property.Name ?? "Khu trọ",
+                        date = c.StartDate.ToString("dd/MM/yyyy")
+                    })
+                    .ToListAsync();
+
+                return Ok(tenants);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi lấy danh sách người thuê", error = ex.Message });
+            }
+        }
+        // GET: /api/OwnerContracts/tenant-detail/{contractId}
+        [HttpGet("tenant-detail/{contractId}")]
+        public async Task<IActionResult> GetTenantDetailByContract(string contractId)
+        {
+            try
+            {
+                var contract = await _context.Contracts
+                    .Include(c => c.Tenant)
+                    .Include(c => c.Room)
+                        .ThenInclude(r => r.Property)
+                    .Include(c => c.ContractMembers)
+                    .FirstOrDefaultAsync(c => c.Id == contractId);
+
+                if (contract == null) return NotFound(new { message = "Không tìm thấy thông tin người thuê." });
+
+                return Ok(new
+                {
+                    contractId = contract.Id,
+                    contractCode = contract.ContractCode,
+                    tenantName = contract.Tenant.Name,
+                    tenantPhone = contract.Tenant.Phone ?? "Chưa cập nhật",
+                    tenantEmail = contract.Tenant.Email,
+                    tenantAvatar = contract.Tenant.Avatar,
+                    roomName = contract.Room.Name,
+                    propertyName = contract.Room.Property.Name,
+                    address = contract.Room.Property.Address,
+                    startDate = contract.StartDate.ToString("dd/MM/yyyy"),
+                    endDate = contract.EndDate.ToString("dd/MM/yyyy"),
+                    rent = contract.Rent,
+                    deposit = contract.Deposit,
+                    paymentCycle = contract.PaymentCycle == "monthly" ? "Hàng tháng" : "Hàng quý",
+                    members = contract.ContractMembers.Select(m => new {
+                        name = m.Name,
+                        phone = m.Phone,
+                        identityCard = m.IdentityCard,
+                        relationship = m.Relationship
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi lấy chi tiết người thuê", error = ex.Message });
+            }
+        }
     }
 }
