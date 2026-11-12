@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../widgets/owner/owner_drawer.dart';
@@ -25,7 +25,10 @@ class _MaintenanceManageScreenState
   List<dynamic> _maintenanceRequests = [];
   bool _isLoading = true;
   String _ownerId = '';
-
+  List<dynamic> _propertiesAndRooms = [];
+  String? _selectedPropertyId;
+  String? _selectedRoomId;
+  List<dynamic> _currentRoomsList = [];
   @override
   void initState() {
     super.initState();
@@ -47,6 +50,7 @@ class _MaintenanceManageScreenState
         _ownerId = userId ?? ''; // Có thể gán cứng 'OWNER01' để test nhanh
       });
       await _fetchMaintenanceRequests();
+      await _fetchPropertiesAndRooms();
     }
   }
 
@@ -81,6 +85,33 @@ class _MaintenanceManageScreenState
       client.close();
     }
   }
+  // Gọi API lấy danh sách Khu Trọ & Phòng để nhét vào Dropdown
+  Future<void> _fetchPropertiesAndRooms() async {
+    final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/owner/$_ownerId/properties-rooms';
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        if (mounted) {
+          setState(() {
+            _propertiesAndRooms = json.decode(response.body);
+            // Thiết lập giá trị mặc định cho Dropdown nếu có data
+            if (_propertiesAndRooms.isNotEmpty) {
+              _selectedPropertyId = _propertiesAndRooms[0]['propertyId'];
+              _currentRoomsList = _propertiesAndRooms[0]['rooms'] ?? [];
+              if (_currentRoomsList.isNotEmpty) {
+                _selectedRoomId = _currentRoomsList[0]['roomId'];
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print("Lỗi tải DS Phòng: $e");
+    } finally {
+      client.close();
+    }
+  }
   // --- KẾT THÚC PHẦN THÊM ---
   int _selectedFilterIndex = 0;
 
@@ -88,10 +119,10 @@ class _MaintenanceManageScreenState
   XFile? _selectedImage;
 
   final List<String> _filters = [
-    'Tất cả (5)',
-    'Chờ xử lý (2)',
-    'Đang sửa (1)',
-    'Đã xong (2)',
+    'Tất cả',
+    'Chờ xử lý',
+    'Đang sửa',
+    'Đã xong',
   ];
 
   // hàm chọn nguồn ảnh
@@ -160,17 +191,15 @@ class _MaintenanceManageScreenState
   }
 
   // hàm mở modal bottom sheet tạo sự cố dành cho chủ trọ ghi nhận tại chỗ
-  void _showCreateIssueBottomSheet(BuildContext context) {
+  // hàm mở modal bottom sheet tạo sự cố dành cho chủ trọ ghi nhận tại chỗ
+  void _showCreateIssueBottomSheet(BuildContext parentContext) {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
-
-    String selectedProperty = 'Khu Trọ Tân Bình 1';
-    String selectedRoom = 'Khu vực chung';
 
     _selectedImage = null;
 
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       isScrollControlled: true,
       backgroundColor: AppColors.cardSurface,
       shape: const RoundedRectangleBorder(
@@ -178,12 +207,12 @@ class _MaintenanceManageScreenState
           top: Radius.circular(24),
         ),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
+          builder: (modalContext, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                bottom: MediaQuery.of(modalContext).viewInsets.bottom + 16,
                 top: 20,
                 left: 16,
                 right: 16,
@@ -210,73 +239,56 @@ class _MaintenanceManageScreenState
                             Icons.close,
                             color: AppColors.textSecondary,
                           ),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.pop(sheetContext),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // dropdown chọn khu trọ
+                    // --- DROPDOWN KHU TRỌ ĐỘNG ---
                     DropdownButtonFormField<String>(
-                      value: selectedProperty,
+                      value: _selectedPropertyId,
                       decoration: InputDecoration(
                         labelText: 'Khu trọ',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      items: [
-                        'Khu Trọ Tân Bình 1',
-                        'Khu Trọ Bình Thạnh 2',
-                      ].map((item) {
-                        return DropdownMenuItem(
-                          value: item,
-                          child: Text(item),
+                      items: _propertiesAndRooms.map<DropdownMenuItem<String>>((prop) {
+                        return DropdownMenuItem<String>(
+                          value: prop['propertyId'].toString(),
+                          child: Text(prop['propertyName'].toString()),
                         );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) {
                           setModalState(() {
-                            selectedProperty = val;
+                            _selectedPropertyId = val;
+                            final selectedPropData = _propertiesAndRooms.firstWhere((p) => p['propertyId'] == val);
+                            _currentRoomsList = selectedPropData['rooms'] ?? [];
+                            _selectedRoomId = _currentRoomsList.isNotEmpty ? _currentRoomsList[0]['roomId'] : null;
                           });
                         }
                       },
                     ),
                     const SizedBox(height: 12),
 
-                    // dropdown chọn phòng hoặc khu vực chung
+                    // --- DROPDOWN PHÒNG ĐỘNG ---
                     DropdownButtonFormField<String>(
-                      value: selectedRoom,
+                      value: _selectedRoomId,
                       decoration: InputDecoration(
                         labelText: 'Vị trí / Phòng',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      items: [
-                        'Khu vực chung',
-                        'Phòng 101',
-                        'Phòng 201',
-                        'Phòng 302',
-                      ].map((item) {
-                        return DropdownMenuItem(
-                          value: item,
-                          child: Text(item),
+                      items: _currentRoomsList.map<DropdownMenuItem<String>>((room) {
+                        return DropdownMenuItem<String>(
+                          value: room['roomId'].toString(),
+                          child: Text(room['roomName'].toString()),
                         );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) {
-                          setModalState(() {
-                            selectedRoom = val;
-                          });
+                          setModalState(() => _selectedRoomId = val);
                         }
                       },
                     ),
@@ -286,8 +298,7 @@ class _MaintenanceManageScreenState
                     TextField(
                       controller: titleController,
                       decoration: InputDecoration(
-                        labelText:
-                        'Tiêu đề sự cố (ví dụ: Hỏng ổ khóa cổng)',
+                        labelText: 'Tiêu đề sự cố (ví dụ: Hỏng ổ khóa cổng)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -324,13 +335,8 @@ class _MaintenanceManageScreenState
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(
-                          double.infinity,
-                          48,
-                        ),
-                        side: const BorderSide(
-                          color: AppColors.primaryGreen,
-                        ),
+                        minimumSize: const Size(double.infinity, 48),
+                        side: const BorderSide(color: AppColors.primaryGreen),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -357,14 +363,8 @@ class _MaintenanceManageScreenState
                               _selectedImage = null;
                             });
                           },
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
-                          ),
-                          label: const Text(
-                            'Xóa ảnh',
-                            style: TextStyle(color: Colors.red),
-                          ),
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          label: const Text('Xóa ảnh', style: TextStyle(color: Colors.red)),
                         ),
                       ),
                     ],
@@ -376,31 +376,85 @@ class _MaintenanceManageScreenState
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (titleController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Vui lòng nhập tiêu đề sự cố',
-                                ),
-                              ),
+                        onPressed: () async {
+                          final titleText = titleController.text.trim();
+                          final descText = descriptionController.text.trim();
+
+                          if (titleText.isEmpty) {
+                            ScaffoldMessenger.of(parentContext).showSnackBar(
+                              const SnackBar(content: Text('Vui lòng nhập tiêu đề sự cố')),
+                            );
+                            return;
+                          }
+                          if (_selectedRoomId == null) {
+                            ScaffoldMessenger.of(parentContext).showSnackBar(
+                              const SnackBar(content: Text('Khu trọ này hiện không có phòng nào để báo cáo!')),
                             );
                             return;
                           }
 
-                          // hiện tại lưu sự cố chưa kết nối database/api
-                          Navigator.pop(context);
+                          // Đóng bàn phím trước để tránh lỗi animation
+                          FocusScope.of(sheetContext).unfocus();
 
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Đã ghi nhận thông tin sự cố',
+                          String? base64Image;
+                          if (_selectedImage != null) {
+                            final bytes = await File(_selectedImage!.path).readAsBytes();
+                            base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                          }
+
+                          final requestBody = {
+                            "roomId": _selectedRoomId,
+                            "title": titleText,
+                            "description": descText,
+                            "imageBase64": base64Image
+                          };
+
+                          final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/owner/$_ownerId';
+                          final client = _getCustomClient();
+
+                          try {
+                            final response = await client.post(
+                              Uri.parse(url),
+                              headers: {"Content-Type": "application/json"},
+                              body: json.encode(requestBody),
+                            );
+
+                            if (!mounted) return;
+
+                            if (response.statusCode == 200) {
+                              // Đóng BottomSheet bằng sheetContext riêng biệt
+                              if (Navigator.canPop(sheetContext)) {
+                                Navigator.pop(sheetContext);
+                              }
+
+                              // Hiển thị thông báo trên màn hình chính (this.context)
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Đã ghi nhận thông tin sự cố'),
+                                  backgroundColor: AppColors.primaryGreen,
+                                ),
+                              );
+
+                              _fetchMaintenanceRequests();
+                            } else {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Lỗi lưu sự cố: ${response.statusCode}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Lỗi kết nối mạng'),
+                                backgroundColor: Colors.red,
                               ),
-                            ),
-                          );
-
-                          titleController.dispose();
-                          descriptionController.dispose();
+                            );
+                          } finally {
+                            client.close();
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryGreen,
@@ -425,8 +479,6 @@ class _MaintenanceManageScreenState
         );
       },
     ).whenComplete(() {
-      titleController.dispose();
-      descriptionController.dispose();
       _selectedImage = null;
     });
   }
@@ -523,74 +575,85 @@ class _MaintenanceManageScreenState
                           final isPending = status == 'pending';
 
                           return Column(
-                            children: [
-                              _buildMaintenanceCard(
-                                propertyName: request['propertyName'] ?? 'Khu trọ',
-                                room: request['roomName'] ?? 'Phòng',
-                                floor: '', // Tạm ẩn tầng
-                                tenantName: request['tenantName'] ?? 'Khách thuê',
-                                tenantPhone: request['tenantPhone'] ?? '',
-                                title: request['title'] ?? 'Sự cố',
-                                description: request['description'] ?? '',
-                                timeAgo: request['createdAt'] != null
-                                    ? request['createdAt'].toString().substring(0, 10)
-                                    : '',
-                                imageCount: request['image'] != null ? 1 : 0,
+                          children: [
+                          _buildMaintenanceCard(
+                          // Các tham số cũ giữ nguyên...
+                          propertyName: request['propertyName'] ?? 'Khu trọ',
+                          room: request['roomName'] ?? 'Phòng',
+                          floor: '',
+                          tenantName: request['tenantName'] ?? 'Khách thuê',
+                          tenantPhone: request['tenantPhone'] ?? '',
+                          title: request['title'] ?? 'Sự cố',
+                          description: request['description'] ?? '',
+                          timeAgo: request['createdAt'] != null
+                          ? request['createdAt'].toString().substring(0, 10)
+                              : '',
+                          imageCount: request['image'] != null ? 1 : 0,
 
-                                // Hiển thị Priority
-                                priorityText: request['priority'] == 'urgent' ? 'Khẩn cấp'
-                                    : request['priority'] == 'high' ? 'Ưu tiên cao'
-                                    : 'Bình thường',
-                                priorityColor: request['priority'] == 'urgent' ? Colors.red
-                                    : AppColors.warningOrange,
+                          // THAY ĐỔI 1: Bổ sung tham số để hiển thị ảnh Base64
+                          base64ImageString: request['image'],
 
-                                // Hiển thị Status
-                                statusText: isPending ? 'Chờ tiếp nhận'
-                                    : isCompleted ? 'Đã hoàn thành'
-                                    : 'Đang xử lý',
-                                statusColor: isPending ? AppColors.textSecondary
-                                    : isCompleted ? AppColors.primaryGreen
-                                    : AppColors.warningOrange,
+                          priorityText: request['priority'] == 'urgent' ? 'Khẩn cấp'
+                              : request['priority'] == 'high' ? 'Ưu tiên cao'
+                              : 'Bình thường',
+                          priorityColor: request['priority'] == 'urgent' ? Colors.red
+                              : AppColors.warningOrange,
 
-                                costText: isCompleted ? 'Đã nghiệm thu' : null,
+                          statusText: isPending ? 'Chờ tiếp nhận'
+                              : isCompleted ? 'Đã hoàn thành'
+                              : 'Đang xử lý',
+                          statusColor: isPending ? AppColors.textSecondary
+                              : isCompleted ? AppColors.primaryGreen
+                              : AppColors.warningOrange,
 
-                                actionButtons: isCompleted ? const SizedBox.shrink() : Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () {},
-                                        icon: const Icon(Icons.phone, size: 16, color: AppColors.primaryGreen),
-                                        label: const Text('Gọi khách', style: TextStyle(color: AppColors.primaryGreen)),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () async {
-                                          // DÙNG MATERIAL PAGE ROUTE ĐỂ TRUYỀN ID CHẮC CHẮN 100%
-                                          await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => MaintenanceDetailScreen(
-                                                issueId: request['id'].toString(), // TRUYỀN ID VÀO ĐÂY
-                                              ),
-                                            ),
-                                          );
+                          costText: isCompleted ? 'Đã nghiệm thu' : null,
 
-                                          _fetchMaintenanceRequests();
-                                        },
-                                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
-                                        child: Text(
-                                          isPending ? 'Tiếp nhận' : 'Chi tiết',
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
+                          actionButtons: isCompleted ? const SizedBox.shrink() : Row(
+                          children: [
+                          Expanded(
+                          child: OutlinedButton.icon(
+                          // THAY ĐỔI 2: Gắn chức năng gọi điện
+                          onPressed: () async {
+                          final phone = request['tenantPhone'] ?? '';
+                          if (phone.isNotEmpty) {
+                          final Uri launchUri = Uri(scheme: 'tel', path: phone);
+                          try {
+                          await launchUrl(launchUri);
+                          } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể gọi số này.')));
+                          }
+                          }
+                          },
+                          icon: const Icon(Icons.phone, size: 16, color: AppColors.primaryGreen),
+                          label: const Text('Gọi khách', style: TextStyle(color: AppColors.primaryGreen)),
+                          ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                          child: ElevatedButton(
+                          onPressed: () async {
+                          await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                          builder: (_) => MaintenanceDetailScreen(
+                          issueId: request['id'].toString(),
+                          ),
+                          ),
+                          );
+                          _fetchMaintenanceRequests();
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+                          child: Text(
+                          isPending ? 'Tiếp nhận' : 'Chi tiết',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          ),
+                          ),
+                          ],
+                          ),
+                          ),
+                          const SizedBox(height: 16),
+                          ],
                           );
                         }).toList(),
                     ],
@@ -830,6 +893,7 @@ class _MaintenanceManageScreenState
     required String statusText,
     required Color statusColor,
     required Widget actionButtons,
+    String? base64ImageString,
     String? costText,
   }) {
     return Container(
@@ -957,6 +1021,7 @@ class _MaintenanceManageScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (imageCount > 0) ...[
+                // CẬP NHẬT PHẦN HIỂN THỊ ẢNH Ở ĐÂY ĐỂ ĐỌC ĐƯỢC CẢ 2 LOẠI BASE64
                 Container(
                   width: 70,
                   height: 70,
@@ -964,9 +1029,30 @@ class _MaintenanceManageScreenState
                     color: AppColors.lightGreen,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.image,
-                    color: AppColors.primaryGreen,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Builder(
+                      builder: (context) {
+                        try {
+                          if (base64ImageString == null || base64ImageString.isEmpty) {
+                            return const Icon(Icons.image, color: AppColors.primaryGreen);
+                          }
+                          // Nếu có tiền tố data:image, cắt bỏ phần đầu. Nếu không, lấy nguyên chuỗi
+                          String cleanBase64 = base64ImageString.contains(',')
+                              ? base64ImageString.split(',')[1]
+                              : base64ImageString;
+
+                          return Image.memory(
+                            base64Decode(cleanBase64),
+                            fit: BoxFit.cover,
+                            // Thêm errorBuilder đề phòng chuỗi Base64 bị lỗi hỏng
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.red),
+                          );
+                        } catch (e) {
+                          return const Icon(Icons.error, color: Colors.red);
+                        }
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

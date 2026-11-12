@@ -10,4 +10,17 @@ namespace Backend.DTOs
 
         public string? OwnerNote { get; set; } 
     }
+    // DTO dùng cho Chủ nhà tự tạo sự cố mới
+    public class CreateMaintenanceByOwnerDto
+    {
+        [Required]
+        public string RoomId { get; set; } = null!;
+
+        [Required]
+        public string Title { get; set; } = null!;
+
+        public string? Description { get; set; }
+
+        public string? ImageBase64 { get; set; } 
+    }
 }

@@ -128,5 +128,77 @@ namespace Backend.Controllers
                 return StatusCode(500, new { message = "Lỗi xử lý sự cố", error = ex.Message });
             }
         }
+        // 4. POST: api/OwnerMaintenance/owner/{ownerId}
+        // (Chủ nhà tự báo cáo sự cố mới)
+        [HttpPost("owner/{ownerId}")]
+        public async Task<IActionResult> CreateRequestByOwner(string ownerId, [FromBody] CreateMaintenanceByOwnerDto req)
+        {
+            try
+            {
+                // 1. Kiểm tra phòng có tồn tại không
+                var room = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == req.RoomId);
+                if (room == null) return BadRequest(new { message = "Không tìm thấy phòng." });
+
+                // 2. Xử lý logic Database: Cột tenant_id bắt buộc NOT NULL.
+                // Ta sẽ tìm người thuê đang active của phòng này. Nếu phòng trống, gán tạm ID của chủ nhà.
+                var activeContract = await _context.Contracts
+                    .FirstOrDefaultAsync(c => c.RoomId == req.RoomId && c.Status == "active");
+                string tenantId = activeContract != null ? activeContract.TenantId : ownerId;
+
+                // 3. Khởi tạo sự cố mới
+                var newRequest = new MaintenanceRequest
+                {
+                    Id = "MAINT_" + Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper(),
+                    RoomId = req.RoomId,
+                    TenantId = tenantId,
+                    Title = req.Title,
+                    Description = req.Description ?? "",
+                    Priority = "medium", // Chủ nhà tự tạo mặc định là mức "Vừa"
+                    Status = "processing", // Bỏ qua "Chờ tiếp nhận", gán thẳng Đang xử lý
+                    Image = req.ImageBase64, // Cột VARCHAR(MAX) lưu chuỗi Base64
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _context.MaintenanceRequests.Add(newRequest);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Đã tạo sự cố thành công!" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi tạo sự cố", error = ex.InnerException?.Message ?? ex.Message });
+            }
+        }
+        // 5. GET: api/OwnerMaintenance/owner/{ownerId}/properties-rooms
+        // (Lấy danh sách Khu trọ và Phòng của chủ nhà để đổ vào Dropdown lúc tạo sự cố)
+        [HttpGet("owner/{ownerId}/properties-rooms")]
+        public async Task<IActionResult> GetPropertiesAndRooms(string ownerId)
+        {
+            try
+            {
+                var properties = await _context.Properties
+                    .Where(p => p.OwnerId == ownerId && p.Status == "active")
+                    .Select(p => new
+                    {
+                        propertyId = p.Id,
+                        propertyName = p.Name,
+                        rooms = _context.Rooms
+                            .Where(r => r.PropertyId == p.Id && r.Status != "hidden")
+                            .Select(r => new
+                            {
+                                roomId = r.Id,
+                                roomName = r.Name
+                            }).ToList()
+                    })
+                    .ToListAsync();
+
+                return Ok(properties);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi nạp danh sách phòng", error = ex.Message });
+            }
+        }
     }
 }
