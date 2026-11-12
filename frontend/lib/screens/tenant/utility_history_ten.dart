@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/tenant/utility_service.dart';
 
 class TenantUtilityScreen extends StatefulWidget {
   const TenantUtilityScreen({super.key});
@@ -9,6 +10,42 @@ class TenantUtilityScreen extends StatefulWidget {
 }
 
 class _TenantUtilityScreenState extends State<TenantUtilityScreen> {
+  bool _isLoading = true;
+  String? _error;
+  String _roomName = 'Ph\u00f2ng thu\u00ea';
+  String _propertyName = 'Nh\u00e0 tr\u1ecd';
+  List<Map<String, dynamic>> _readings = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUtilityHistory();
+  }
+
+  Future<void> _loadUtilityHistory() async {
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      final data = await TenantUtilityService.getMyUtilityHistory();
+      if (!mounted) return;
+      setState(() {
+        _roomName = data['roomName']?.toString() ?? 'Ph\u00f2ng thu\u00ea';
+        _propertyName = data['propertyName']?.toString() ?? 'Nh\u00e0 tr\u1ecd';
+        _readings = (data['readings'] as List? ?? [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() { _error = error.toString().replaceFirst('Exception: ', ''); _isLoading = false; });
+    }
+  }
+
+  num _value(Map<String, dynamic>? reading, String key) => reading?[key] is num ? reading![key] as num : num.tryParse(reading?[key]?.toString() ?? '') ?? 0;
+  Map<String, dynamic>? get _latest => _readings.isEmpty ? null : _readings.first;
+  String _money(num value) => '${value.toStringAsFixed(0)}\u0111';
+  String _month(Map<String, dynamic> reading) => reading['month']?.toString() ?? '';
   void _showComplainDialog() {
     final TextEditingController reasonController = TextEditingController();
     showDialog(
@@ -96,7 +133,11 @@ class _TenantUtilityScreenState extends State<TenantUtilityScreen> {
             top: Radius.circular(24), // bo cong 2 góc trên (trái & phải)
           ),
         ),
-        child: SingleChildScrollView(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12), ElevatedButton(onPressed: _loadUtilityHistory, child: const Text('Th\u1eed l\u1ea1i'))])))
+                : SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,10 +158,16 @@ class _TenantUtilityScreenState extends State<TenantUtilityScreen> {
               _buildLatestPeriodCard(),
               const SizedBox(height: 12),
 
-              _buildPastPeriodCard('07', '07/2024', '598.400đ', '31/07/2024'),
-              const SizedBox(height: 12),
-              _buildPastPeriodCard('06', '06/2024', '569.600đ', '30/06/2024'),
-              const SizedBox(height: 20),
+              ..._readings.skip(1).map((reading) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildPastPeriodCard(
+                  _month(reading).split('/').first,
+                  _month(reading),
+                  _money(_value(reading, 'totalCost')),
+                  reading['recordedAt']?.toString().split('T').first ?? '',
+                ),
+              )),
+              const SizedBox(height: 8),
 
               // nút tải pdf & liên hệ chủ trọ
               _buildTenantBottomActions(),
@@ -138,35 +185,30 @@ class _TenantUtilityScreenState extends State<TenantUtilityScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16)),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.meeting_room, color: AppColors.primaryGreen, size: 28),
-          ),
-          const SizedBox(width: 12),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Phòng 201', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              SizedBox(height: 4),
-              Text('Khu Trọ Xanh • Đang thuê', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-            ],
-          ),
-        ],
-      ),
+      child: Row(children: [
+        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.meeting_room, color: AppColors.primaryGreen, size: 28)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(_roomName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const SizedBox(height: 4),
+          Text('$_propertyName \u2022 \u0110ang thu\u00ea', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        ])),
+      ]),
     );
   }
 
   Widget _buildAverageStats() {
-    return Row(
-      children: [
-        Expanded(child: _buildStatCard(Icons.bolt, AppColors.accentYellow, 'TB Tiêu thụ Điện', '120 kWh', '~456.000đ/tháng')),
-        const SizedBox(width: 12),
-        Expanded(child: _buildStatCard(Icons.water_drop, Colors.teal, 'TB Tiêu thụ Nước', '6.2 m³', '~155.000đ/tháng')),
-      ],
-    );
+    final recent = _readings.take(6).toList();
+    final divisor = recent.isEmpty ? 1 : recent.length;
+    final averageElectric = recent.fold<num>(0, (sum, item) => sum + _value(item, 'electricUsage')) / divisor;
+    final averageWater = recent.fold<num>(0, (sum, item) => sum + _value(item, 'waterUsage')) / divisor;
+    final electricCost = recent.fold<num>(0, (sum, item) => sum + _value(item, 'electricCost')) / divisor;
+    final waterCost = recent.fold<num>(0, (sum, item) => sum + _value(item, 'waterCost')) / divisor;
+    return Row(children: [
+      Expanded(child: _buildStatCard(Icons.bolt, AppColors.accentYellow, 'TB ti\u00eau th\u1ee5 \u0111i\u1ec7n', '${averageElectric.toStringAsFixed(1)} kWh', '${_money(electricCost)}/th\u00e1ng')),
+      const SizedBox(width: 12),
+      Expanded(child: _buildStatCard(Icons.water_drop, Colors.teal, 'TB ti\u00eau th\u1ee5 n\u01b0\u1edbc', '${averageWater.toStringAsFixed(1)} m\u00b3', '${_money(waterCost)}/th\u00e1ng')),
+    ]);
   }
 
   Widget _buildStatCard(IconData icon, Color iconColor, String title, String value, String subText) {
@@ -187,73 +229,55 @@ class _TenantUtilityScreenState extends State<TenantUtilityScreen> {
   }
 
   Widget _buildEfficiencyCard() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)),
-      child: const Row(
-        children: [
-          Icon(Icons.trending_down, color: AppColors.primaryGreen),
-          SizedBox(width: 12),
-          Expanded(child: Text('Dùng điện nước tiết kiệm hơn tháng trước 4%', style: TextStyle(fontSize: 12, color: AppColors.primaryGreen, fontWeight: FontWeight.bold))),
-        ],
-      ),
-    );
+    final previous = _readings.length > 1 ? _readings[1] : null;
+    final currentUsage = _value(_latest, 'electricUsage') + _value(_latest, 'waterUsage');
+    final previousUsage = _value(previous, 'electricUsage') + _value(previous, 'waterUsage');
+    final hasComparison = previous != null;
+    final change = previousUsage == 0 ? 0 : ((currentUsage - previousUsage) / previousUsage * 100);
+    final wentDown = change <= 0;
+    final label = hasComparison
+        ? '${wentDown ? 'Ti?u th? gi?m' : 'Ti?u th? t?ng'} ${change.abs().toStringAsFixed(1)}% so v?i k? tr??c.'
+        : 'C?n th?m d? li?u k? tr??c ?? so s?nh m?c ti?u th?.';
+    return Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)), child: Row(children: [
+      Icon(wentDown ? Icons.trending_down : Icons.trending_up, color: AppColors.primaryGreen),
+      const SizedBox(width: 12),
+      Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.primaryGreen, fontWeight: FontWeight.bold))),
+    ]));
   }
 
   Widget _buildConsumptionChartCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16)),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Biểu đồ tiêu thụ 6 tháng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          SizedBox(height: 8),
-          Text('Kỳ T08/2024: 125 kWh • 6 m³ (625.000đ)', style: TextStyle(fontSize: 12, color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
+    final chartData = _readings.take(6).toList().reversed.toList();
+    final maxElectric = chartData.fold<num>(1, (maxValue, item) => _value(item, 'electricUsage') > maxValue ? _value(item, 'electricUsage') : maxValue);
+    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Ti?u th? ?i?n 6 k? g?n nh?t', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+      const SizedBox(height: 12),
+      if (chartData.isEmpty) const Text('Ch?a c? d? li?u ch? s?.'),
+      ...chartData.map((reading) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [
+        SizedBox(width: 62, child: Text(_month(reading))),
+        Expanded(child: LinearProgressIndicator(value: (_value(reading, 'electricUsage') / maxElectric).toDouble(), minHeight: 8, color: AppColors.accentYellow, backgroundColor: AppColors.background)),
+        const SizedBox(width: 8),
+        Text('${_value(reading, 'electricUsage')} kWh', style: const TextStyle(fontSize: 11)),
+      ]))),
+    ]));
   }
 
   Widget _buildLatestPeriodCard() {
+    final reading = _latest;
+    if (reading == null) {
+      return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16)), child: const Text('Ch?a c? k? n?o ???c ghi ch? s?.'));
+    }
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primaryGreen.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Kỳ Tháng 08/2024', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              Text('625.000đ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildMeterSubCard(Icons.bolt, 'Điện: 1.420 → 1.545', '475.000đ'),
-          const SizedBox(height: 8),
-          _buildMeterSubCard(Icons.water_drop, 'Nước: 85 → 91', '150.000đ'),
-          const SizedBox(height: 12),
-
-          // nút khiếu nại dành riêng cho người thuê
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _showComplainDialog,
-              icon: const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.warningOrange),
-              label: const Text('Gửi khiếu nại / Báo sai số', style: TextStyle(color: AppColors.warningOrange, fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.warningOrange, width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.primaryGreen.withOpacity(0.3))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text('K\u1ef3 ${_month(reading)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary))), Text(_money(_value(reading, 'totalCost')), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen))]),
+        const SizedBox(height: 12),
+        _buildMeterSubCard(Icons.bolt, '\u0110i\u1ec7n: ${_value(reading, 'electricOld')} \u2192 ${_value(reading, 'electricNew')}', _money(_value(reading, 'electricCost'))),
+        const SizedBox(height: 8),
+        _buildMeterSubCard(Icons.water_drop, 'N\u01b0\u1edbc: ${_value(reading, 'waterOld')} \u2192 ${_value(reading, 'waterNew')}', _money(_value(reading, 'waterCost'))),
+        const SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: OutlinedButton.icon(onPressed: _showComplainDialog, icon: const Icon(Icons.warning_amber_rounded, size: 18, color: AppColors.warningOrange), label: const Text('G?i khi?u n?i / B?o sai s?', style: TextStyle(color: AppColors.warningOrange, fontWeight: FontWeight.bold)), style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.warningOrange, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))))),
+      ]),
     );
   }
 

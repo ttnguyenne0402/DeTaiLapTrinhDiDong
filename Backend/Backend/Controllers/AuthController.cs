@@ -9,6 +9,10 @@ using System.Text.Json;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
+using System.Net;
+using System.Text;
+using MailKit.Security;
+using MimeKit;
 
 namespace Backend.Controllers
 {
@@ -19,18 +23,21 @@ namespace Backend.Controllers
         private readonly QuanLyPhongTroContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<AuthController> _logger;
 
         public AuthController(
     QuanLyPhongTroContext context,
     IHttpClientFactory httpClientFactory,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ILogger<AuthController> logger)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _configuration = configuration;
+            _logger = logger;
         }
 
-        // 1. ĐĂNG KÝ BẰNG EMAIL/SỐ ĐIỆN THOẠI
+        // 1. Tạo tài khoản bằng email, không yêu cầu xác minh email.
         // POST /api/Auth/register
         [HttpPost("register")]
         public async Task<IActionResult> Register(
@@ -39,7 +46,8 @@ namespace Backend.Controllers
             try
             {
                 if (string.IsNullOrWhiteSpace(model.FullName) ||
-                    string.IsNullOrWhiteSpace(model.EmailOrPhone) ||
+                    string.IsNullOrWhiteSpace(model.Email) ||
+                    string.IsNullOrWhiteSpace(model.Phone) ||
                     string.IsNullOrWhiteSpace(model.Password))
                 {
                     return BadRequest(new
@@ -48,11 +56,11 @@ namespace Backend.Controllers
                     });
                 }
 
-                string emailOrPhone = model.EmailOrPhone.Trim();
+                string email = model.Email.Trim().ToLowerInvariant();
+                string phone = model.Phone.Trim();
 
                 bool existingUser = await _context.Users.AnyAsync(u =>
-                    u.Email == emailOrPhone ||
-                    u.Phone == emailOrPhone);
+                    u.Email.ToLower() == email || u.Phone == phone);
 
                 if (existingUser)
                 {
@@ -72,18 +80,12 @@ namespace Backend.Controllers
                     });
                 }
 
-                string email = emailOrPhone.Contains("@")
-                    ? emailOrPhone
-                    : $"{Guid.NewGuid():N}@phone.com";
-
                 var newUser = new User
                 {
                     Id = "USER_" + Guid.NewGuid().ToString("N")[..8],
                     Name = model.FullName.Trim(),
                     Email = email,
-                    Phone = emailOrPhone.Contains("@")
-                        ? null
-                        : emailOrPhone,
+                    Phone = phone,
                     Password = model.Password,
                     Role = role,
                     Status = "active",
@@ -96,7 +98,7 @@ namespace Backend.Controllers
 
                 return Ok(new
                 {
-                    message = "Đăng ký tài khoản thành công!",
+                    message = "Đăng ký thành công. Bạn có thể đăng nhập.",
                     data = new
                     {
                         newUser.Id,
@@ -104,7 +106,8 @@ namespace Backend.Controllers
                         newUser.Email,
                         newUser.Phone,
                         newUser.Role,
-                        newUser.Avatar
+                        newUser.Avatar,
+                        emailVerified = newUser.EmailVerifiedAt != null
                     }
                 });
             }
@@ -178,6 +181,74 @@ namespace Backend.Controllers
                     message = "Không thể xử lý đăng nhập lúc này."
                 });
             }
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword(
+            [FromBody] ForgotPasswordRequestDTO model,
+            CancellationToken cancellationToken)
+        {
+            if (!IsSmtpConfigured()) return SmtpNotConfigured();
+
+            var email = model.Email.Trim();
+            var genericResponse = new
+            {
+                message = "Nếu email thuộc tài khoản hợp lệ, mã khôi phục sẽ được gửi tới hộp thư."
+            };
+            var user = await _context.Users.FirstOrDefaultAsync(
+                u => u.Email.ToLower() == email.ToLower(), cancellationToken);
+            if (user == null || IsInternalEmail(user.Email))
+                return Ok(genericResponse);
+
+            var status = await SendOtpEmailAsync(user, "password_reset", cancellationToken);
+            return status == OtpSendStatus.Failed
+                ? SmtpUnavailable()
+                : Ok(genericResponse);
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(
+            [FromBody] ResetPasswordRequestDTO model,
+            CancellationToken cancellationToken)
+        {
+            var email = model.Email.Trim();
+            var user = await _context.Users.FirstOrDefaultAsync(
+                u => u.Email.ToLower() == email.ToLower(), cancellationToken);
+            if (user == null || IsInternalEmail(user.Email))
+                return InvalidOtp();
+
+            var now = DateTime.UtcNow;
+            var otp = await FindOtpAsync(user.Id, "password_reset", now, cancellationToken);
+            if (otp == null || !VerifyOtpHash(user.Id, "password_reset", model.Code, otp.CodeHash))
+            {
+                if (otp != null)
+                {
+                    otp.Attempts++;
+                    if (otp.Attempts >= 5) otp.UsedAt = now;
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+                return InvalidOtp();
+            }
+
+            await using var transaction = await _context.Database
+                .BeginTransactionAsync(cancellationToken);
+            var claimed = await _context.EmailOtps
+                .Where(c => c.Id == otp.Id && c.Purpose == "password_reset" &&
+                            c.UsedAt == null && c.ExpiresAt > now && c.Attempts < 5)
+                .ExecuteUpdateAsync(update => update.SetProperty(c => c.UsedAt, now),
+                    cancellationToken);
+            if (claimed != 1)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return InvalidOtp();
+            }
+
+            user.Password = model.NewPassword;
+            user.EmailVerifiedAt ??= now;
+            user.UpdatedAt = now;
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Ok(new { message = "Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới." });
         }
 
         // 3. ĐĂNG NHẬP BẰNG GOOGLE
@@ -716,6 +787,148 @@ namespace Backend.Controllers
                     message = "Không thể xử lý đăng nhập Zalo lúc này."
                 });
             }
+        }
+
+        private enum OtpSendStatus { Sent, RateLimited, Failed }
+
+        private bool IsSmtpConfigured() =>
+            !string.IsNullOrWhiteSpace(_configuration["GmailSmtp:Username"]) &&
+            !string.IsNullOrWhiteSpace(_configuration["GmailSmtp:AppPassword"]);
+
+        private IActionResult SmtpNotConfigured() =>
+            StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "Backend chưa cấu hình Gmail SMTP."
+            });
+
+        private IActionResult SmtpUnavailable() =>
+            StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                message = "Không gửi được email lúc này. Hãy kiểm tra Gmail SMTP và App Password."
+            });
+
+        private IActionResult InvalidOtp() =>
+            BadRequest(new
+            {
+                message = "Email hoặc mã xác nhận không hợp lệ, đã hết hạn hoặc đã được sử dụng."
+            });
+
+        private static bool IsInternalEmail(string email) =>
+            email.EndsWith("@phone.com", StringComparison.OrdinalIgnoreCase) ||
+            email.EndsWith("@zalo.local", StringComparison.OrdinalIgnoreCase) ||
+            email.EndsWith("@tenant.local", StringComparison.OrdinalIgnoreCase);
+
+        private async Task<OtpSendStatus> SendOtpEmailAsync(
+            User user,
+            string purpose,
+            CancellationToken cancellationToken)
+        {
+            var now = DateTime.UtcNow;
+            var hasRecentRequest = await _context.EmailOtps.AnyAsync(
+                otp => otp.UserId == user.Id && otp.Purpose == purpose &&
+                       otp.CreatedAt > now.AddSeconds(-60),
+                cancellationToken);
+            if (hasRecentRequest) return OtpSendStatus.RateLimited;
+
+            var oldOtps = await _context.EmailOtps
+                .Where(otp => otp.UserId == user.Id && otp.Purpose == purpose &&
+                              otp.UsedAt == null)
+                .ToListAsync(cancellationToken);
+            foreach (var oldOtp in oldOtps) oldOtp.UsedAt = now;
+
+            var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+            var codeHash = Convert.ToHexString(SHA256.HashData(
+                Encoding.UTF8.GetBytes($"{user.Id}:{purpose}:{code}")));
+            var otp = new EmailOtp
+            {
+                UserId = user.Id,
+                Purpose = purpose,
+                CodeHash = codeHash,
+                CreatedAt = now,
+                ExpiresAt = now.AddMinutes(10),
+                Attempts = 0
+            };
+            _context.EmailOtps.Add(otp);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            var safeName = WebUtility.HtmlEncode(user.Name);
+            var html = $"""
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#24312b">
+                  <h2>Khôi phục mật khẩu Trọ Ơi</h2>
+                  <p>Xin chào {safeName},</p>
+                  <p>Mã đặt lại mật khẩu của bạn là:</p>
+                  <p style="font-size:28px;font-weight:bold;letter-spacing:6px">{code}</p>
+                  <p>Mã có hiệu lực trong 10 phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
+                </div>
+                """;
+
+            try
+            {
+                var message = new MimeMessage();
+                var username = _configuration["GmailSmtp:Username"]!;
+                var appPassword = string.Concat(
+                    _configuration["GmailSmtp:AppPassword"]!.Where(
+                        character => !char.IsWhiteSpace(character)));
+                message.From.Add(new MailboxAddress(
+                    _configuration["GmailSmtp:FromName"] ?? "Tro Oi", username));
+                message.To.Add(MailboxAddress.Parse(user.Email));
+                message.Subject = "Mã khôi phục mật khẩu Trọ Ơi";
+                message.Body = new BodyBuilder { HtmlBody = html }.ToMessageBody();
+
+                using var smtp = new MailKit.Net.Smtp.SmtpClient
+                {
+                    Timeout = 15_000
+                };
+                var host = _configuration["GmailSmtp:Host"] ?? "smtp.gmail.com";
+                var port = int.TryParse(_configuration["GmailSmtp:Port"], out var configuredPort)
+                    ? configuredPort
+                    : 587;
+                await smtp.ConnectAsync(
+                    host, port, SecureSocketOptions.StartTls, cancellationToken);
+                await smtp.AuthenticateAsync(
+                    username,
+                    appPassword,
+                    cancellationToken);
+                await smtp.SendAsync(message, cancellationToken);
+                await smtp.DisconnectAsync(true, cancellationToken);
+                return OtpSendStatus.Sent;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Could not send {Purpose} email through Gmail SMTP.", purpose);
+            }
+
+            otp.UsedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
+            return OtpSendStatus.Failed;
+        }
+
+        private async Task<EmailOtp?> FindOtpAsync(
+            string userId,
+            string purpose,
+            DateTime now,
+            CancellationToken cancellationToken) =>
+            await _context.EmailOtps
+                .Where(otp => otp.UserId == userId && otp.Purpose == purpose &&
+                              otp.UsedAt == null && otp.ExpiresAt > now &&
+                              otp.Attempts < 5)
+                .OrderByDescending(otp => otp.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        private static bool VerifyOtpHash(
+            string userId,
+            string purpose,
+            string code,
+            string storedHash)
+        {
+            var submittedHash = SHA256.HashData(Encoding.UTF8.GetBytes(
+                $"{userId}:{purpose}:{code}"));
+            return CryptographicOperations.FixedTimeEquals(
+                submittedHash, Convert.FromHexString(storedHash));
         }
 
         // HÀM DÙNG CHUNG: TẠO JWT

@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
 import '../../utils/database_helper.dart';
 import 'invoice_detail_screen.dart';
+import '../../route/app_routes.dart';
 class MyInvoicesScreen extends StatefulWidget {
   const MyInvoicesScreen({super.key});
 
@@ -40,16 +41,8 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
   }
 
   Future<void> _loadData() async {
-    // 1. Lấy dữ liệu từ SQLite
-    final localData = await DatabaseHelper.instance.getLocalInvoices();
-    if (localData.isNotEmpty) {
-      setState(() {
-        _invoices = List.from(localData);
-        _isLoading = false;
-      });
-    }
-
-    // 2. Gọi API để lấy dữ liệu mới nhất
+    // Always load invoices for the currently signed-in tenant from the backend.
+    // The local invoice cache is not user-scoped and could show another account's data.
     final client = _getCustomClient();
     try {
       final response = await client.get(Uri.parse(_apiUrl));
@@ -96,6 +89,13 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
           'Hóa đơn & Thanh toán',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Theo d?i ?i?n n??c',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.tenantUtilityHistory),
+            icon: const Icon(Icons.electric_meter_outlined, color: Colors.white),
+          ),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,6 +132,22 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
           ),
 
           // LỊCH SỬ HÓA ĐƠN
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.tenantUtilityHistory),
+                icon: const Icon(Icons.electric_meter_outlined),
+                label: const Text('Theo d\u00f5i ch\u1ec9 s\u1ed1 \u0111i\u1ec7n n\u01b0\u1edbc'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentYellow,
+                  foregroundColor: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ),
+
           Expanded(
             child: Container(
               width: double.infinity,

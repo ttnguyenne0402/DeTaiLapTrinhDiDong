@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../../core/constants/app_colors.dart';
 import '../tenant/home_screen.dart';
 import '../owner/owner_dashboard.dart';
 import '../admin/admin_dashboard.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
@@ -19,7 +21,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with WidgetsBindingObserver {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController _emailController = TextEditingController();
@@ -34,9 +37,52 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isSocialLoading = false;
+  bool _zaloAttemptActive = false;
+  bool _zaloWasBackgrounded = false;
+  Completer<void>? _zaloReturnedToApp;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    FlutterZalo().init();
+    _loadRememberedCredentials();
+  }
+
+  Future<void> _loadRememberedCredentials() async {
+    try {
+      final credentials = await AuthStorage.getRememberedCredentials();
+      if (!mounted || credentials == null) return;
+      setState(() {
+        _emailController.text = credentials['account'] ?? '';
+        _passwordController.text = credentials['password'] ?? '';
+        _rememberMe = true;
+      });
+    } catch (error) {
+      debugPrint('[LOGIN] Không đọc được thông tin đã lưu: $error');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_zaloAttemptActive) return;
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _zaloWasBackgrounded = true;
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed &&
+        _zaloWasBackgrounded &&
+        !(_zaloReturnedToApp?.isCompleted ?? true)) {
+      _zaloReturnedToApp!.complete();
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -92,117 +138,18 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // QUÊN MẬT KHẨU
-  void _showForgotPasswordDialog() {
-    final TextEditingController controller = TextEditingController();
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardSurface,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: const Row(
-            children: [
-              Icon(
-                Icons.lock_reset_rounded,
-                color: AppColors.primaryGreen,
-                size: 25,
-              ),
-              SizedBox(width: 10),
-              Text(
-                'Quên mật khẩu',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Nhập email hoặc số điện thoại đã đăng ký để nhận mã khôi phục.',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                TextFormField(
-                  controller: controller,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: _inputDecoration(
-                    hintText: 'Email hoặc số điện thoại',
-                    prefixIcon: Icons.person_outline_rounded,
-                  ),
-                  validator: (String? value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập email hoặc SĐT';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                controller.dispose();
-              },
-              child: const Text(
-                'Hủy',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-
-                final String target = controller.text.trim();
-
-                Navigator.pop(dialogContext);
-                controller.dispose();
-
-                _showNotice('Chức năng gửi mã khôi phục chưa được kết nối.');
-
-                debugPrint('Password recovery requested: $target');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                minimumSize: const Size(105, 44),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Gửi mã',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
-        );
-      },
-    ).then((_) {
-      controller.dispose();
-    });
+  Future<void> _openForgotPasswordPage() async {
+    final didReset = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          initialAccount: _emailController.text.trim(),
+        ),
+      ),
+    );
+    if (didReset == true && mounted) {
+      _showNotice('Đặt lại mật khẩu thành công. Hãy đăng nhập lại.');
+    }
   }
 
   // ĐĂNG NHẬP THẬT KẾT NỐI VỚI BACKEND .NET & SQL SERVER
@@ -244,6 +191,15 @@ class _LoginScreenState extends State<LoginScreen> {
         accessToken: accessToken,
         name: name,
       );
+
+      if (_rememberMe) {
+        await AuthStorage.saveRememberedCredentials(
+          account: emailOrPhone,
+          password: password,
+        );
+      } else {
+        await AuthStorage.clearRememberedCredentials();
+      }
 
       if (!mounted) return;
 
@@ -390,10 +346,31 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isSocialLoading = true);
 
     try {
-      // Bước 1: Đăng nhập qua SDK Zalo
-      final bool? loginResult = await FlutterZalo().logIn();
+      final zalo = FlutterZalo();
+      _zaloAttemptActive = true;
+      _zaloWasBackgrounded = false;
+      final returnedToApp = Completer<void>();
+      _zaloReturnedToApp = returnedToApp;
+
+      final loginFuture = zalo.logIn().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () => throw Exception('Quá thời gian chờ phản hồi từ Zalo.'),
+      );
+      final bool? loginResult = await Future.any<bool?>([
+        loginFuture,
+        returnedToApp.future.then((_) async {
+          // Cho SDK một chút thời gian để gửi callback thành công khi quay lại.
+          await Future<void>.delayed(const Duration(seconds: 2));
+          return null;
+        }),
+      ]);
 
       if (!mounted) return;
+
+      if (loginResult == null) {
+        _showNotice('Đã hủy đăng nhập Zalo.', isError: true);
+        return;
+      }
 
       if (loginResult != true) {
         _showNotice(
@@ -404,7 +381,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // Bước 2: Lấy access token từ Zalo
-      final dynamic tokenResult = await FlutterZalo().getAccessToken();
+      final dynamic tokenResult = await zalo
+          .getAccessToken()
+          .timeout(const Duration(seconds: 20));
 
       final String zaloAccessToken = tokenResult?.toString().trim() ?? '';
 
@@ -490,6 +469,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
       _showNotice(e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
+      _zaloAttemptActive = false;
+      _zaloReturnedToApp = null;
       if (mounted) {
         setState(() => _isSocialLoading = false);
       }
@@ -719,15 +700,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                     color: Color(0xFFC8D1CC),
                                   ),
                                   onChanged: (bool? value) {
+                                    final shouldRemember = value ?? false;
                                     setState(() {
-                                      _rememberMe = value ?? false;
+                                      _rememberMe = shouldRemember;
                                     });
+                                    if (!shouldRemember) {
+                                      AuthStorage.clearRememberedCredentials();
+                                    }
                                   },
                                 ),
                               ),
                               const SizedBox(width: 6),
                               const Text(
-                                'Ghi nhớ đăng nhập',
+                                'Ghi nhớ mật khẩu',
                                 style: TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 12.5,
@@ -736,7 +721,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           GestureDetector(
-                            onTap: _showForgotPasswordDialog,
+                            onTap: _openForgotPasswordPage,
                             child: const Text(
                               'Quên mật khẩu?',
                               style: TextStyle(
@@ -748,7 +733,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 22),
                       SizedBox(
                         height: 53,

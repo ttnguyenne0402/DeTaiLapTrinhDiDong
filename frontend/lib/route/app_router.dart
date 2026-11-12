@@ -34,6 +34,7 @@ import '../screens/tenant/notifications_screen.dart' as tenant_notifications;
 import '../screens/tenant/home_screen.dart' as tv1_home;
 import '../screens/tenant/room_detail_screen.dart' as tv1_room_detail;
 import '../screens/tenant/tenant_maintenance_request_screen.dart';
+import '../screens/tenant/utility_history_ten.dart';
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final args = settings.arguments;
@@ -90,6 +91,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const tenant_contract_detail.ContractDetailScreen());
       case AppRoutes.tenantInvoices:
         return MaterialPageRoute(builder: (_) => const tenant_invoices.MyInvoicesScreen());
+      case AppRoutes.tenantUtilityHistory:
+        return MaterialPageRoute(builder: (_) => const TenantUtilityScreen());
       case AppRoutes.tenantInvoiceDetail:
         return MaterialPageRoute(builder: (_) => tenant_invoice_detail.InvoiceDetailScreen());
       // case AppRoutes.tenantPayment:
