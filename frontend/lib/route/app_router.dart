@@ -71,7 +71,7 @@ class AppRouter {
       // case AppRoutes.maintenanceDetail:
       //   return MaterialPageRoute(builder: (_) => MaintenanceDetailScreen()); // id
       case AppRoutes.contentModeration:
-        return MaterialPageRoute(builder: (_) => const RoomApprovalDetailScreen());
+        return MaterialPageRoute(builder: (_) => const RoomApprovalDetailScreen(),settings: settings);
       // case AppRoutes.contractDetailOwner:
       //   return MaterialPageRoute(builder: (_) => ContractDetailScreen());// id
       case AppRoutes.contractMembers:
