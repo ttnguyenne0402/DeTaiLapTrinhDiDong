@@ -5,6 +5,7 @@ import 'post_form.dart';
 import 'post_detail_owner.dart';
 import '../../services/local/sqlite_helper.dart';
 import '../../services/owner/post_service.dart';
+import '../../services/auth_storage.dart';
 
 class PostsManageScreen extends StatefulWidget {
   const PostsManageScreen({super.key});
@@ -39,7 +40,8 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
   // 1. Tải bài đăng từ SQL Server
   Future<void> _loadPostsFromSqlServer() async {
     try {
-      final list = await PostService.fetchPosts('USER_OWNER_01');
+      final ownerId = await AuthStorage.getUserId() ?? '';
+      final list = await PostService.fetchPosts(ownerId);
       if (mounted) {
         setState(() {
           _posts = list.map((p) => {

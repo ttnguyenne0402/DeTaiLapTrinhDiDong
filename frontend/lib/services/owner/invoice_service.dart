@@ -101,7 +101,7 @@ class OwnerInvoiceService {
   // Lấy danh sách hợp đồng/phòng đang thuê để chọn khi lập hóa đơn
   static Future<List<dynamic>?> getActiveContracts({String? propertyId}) async {
     try {
-      var urlStr = '$baseUrl/api/OwnerInvoices/active-contracts';
+      var urlStr = '$baseUrl/active-contracts';
       if (propertyId != null && propertyId.isNotEmpty) {
         urlStr += '?propertyId=$propertyId';
       }
@@ -123,7 +123,7 @@ class OwnerInvoiceService {
   // Lấy danh sách các phòng ghi điện nước đồng loạt
   static Future<List<dynamic>?> getRoomsUtilitySummary({String? propertyId}) async {
     try {
-      var urlStr = '$baseUrl/api/OwnerInvoices/rooms-utility-summary';
+      var urlStr = '$baseUrl/rooms-utility-summary';
       if (propertyId != null && propertyId.isNotEmpty) {
         urlStr += '?propertyId=$propertyId';
       }
@@ -144,7 +144,7 @@ class OwnerInvoiceService {
   // 2. Lấy lịch sử 12 tháng chốt số của 1 phòng
   static Future<List<dynamic>?> getRoomUtilityHistory(String roomId) async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/api/OwnerInvoices/room-utility-history/$roomId'));
+      final res = await http.get(Uri.parse('$baseUrl/room-utility-history/$roomId'));
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
       }
@@ -158,14 +158,12 @@ class OwnerInvoiceService {
   static Future<dynamic> getLiquidationDetails(String contractId) async {
     try {
       final res = await http.get(
-        Uri.parse('$baseUrl/api/OwnerContracts/$contractId/liquidation-details'),
+        Uri.parse('http://10.0.2.2:5093/api/OwnerContracts/$contractId/liquidation-details'),
         headers: {'Content-Type': 'application/json'},
       );
-
       if (res.statusCode == 200) {
         return jsonDecode(res.body);
       }
-
       print('Lỗi API: ${res.statusCode} - ${res.body}');
     } catch (e) {
       print('Lỗi gọi getLiquidationDetails: $e');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import '../../services/owner/appointment_service.dart';
+import '../../services/auth_storage.dart';
 
 class AppointmentsManageScreen extends StatefulWidget {
   const AppointmentsManageScreen({super.key});
@@ -28,7 +29,8 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
     try {
-      final list = await AppointmentService.fetchOwnerAppointments('USER_OWNER_01');
+      final ownerId = await AuthStorage.getUserId() ?? '';
+      final list = await AppointmentService.fetchOwnerAppointments(ownerId);
       if (mounted) {
         setState(() {
           _appointments = list.map((a) => {
