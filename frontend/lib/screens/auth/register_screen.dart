@@ -16,7 +16,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _emailOrPhoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
@@ -42,7 +43,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
-    _emailOrPhoneController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -70,24 +72,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await AuthService.register(
+      await AuthService.register(
         fullName: _fullNameController.text.trim(),
-        emailOrPhone: _emailOrPhoneController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
         password: _passwordController.text,
         role: _selectedRole,
       );
 
       if (!mounted) return;
 
-      _showNotice(
-        result['message']?.toString() ?? 'Đăng ký tài khoản thành công!',
-      );
-
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      _showNotice('??ng k? th?nh c?ng. Em c? th? ??ng nh?p.');
+      Navigator.pop(context);
     } catch (error) {
       if (!mounted) return;
 
@@ -404,12 +400,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
 
                 _CustomInputField(
-                  controller: _emailOrPhoneController,
-                  label: 'Email hoặc Số điện thoại',
-                  hint: 'nhanvien@gmail.com hoặc 0901234567',
+                  controller: _emailController,
+                  label: 'Email thật',
+                  hint: 'ten@gmail.com',
                   icon: Icons.alternate_email_rounded,
+                  validator: (value) {
+                    final email = value?.trim() ?? '';
+                    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                            .hasMatch(email)
+                        ? null
+                        : 'Vui lòng nhập email hợp lệ';
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                _CustomInputField(
+                  controller: _phoneController,
+                  label: 'Số điện thoại',
+                  hint: '0901234567',
+                  icon: Icons.phone_outlined,
                   validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Vui lòng nhập Email hoặc SĐT'
+                      ? 'Vui lòng nhập số điện thoại'
                       : null,
                 ),
                 const SizedBox(height: 16),
@@ -417,7 +428,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _CustomInputField(
                   controller: _passwordController,
                   label: 'Mật khẩu',
-                  hint: 'Nhập mật khẩu (tối thiểu 6 ký tự)',
+                  hint: 'Nhập mật khẩu (tối thiểu 8 ký tự)',
                   icon: Icons.lock_outline_rounded,
                   isPassword: true,
                   obscureText: _obscurePassword,
@@ -430,8 +441,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
                     }
-                    if (value.length < 6) {
-                      return 'Mật khẩu phải từ 6 ký tự trở lên';
+                    if (value.length < 8) {
+                      return 'Mật khẩu phải từ 8 ký tự trở lên';
                     }
                     return null;
                   },

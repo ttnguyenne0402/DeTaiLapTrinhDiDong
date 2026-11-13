@@ -57,6 +57,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<EmailOtp> EmailOtps { get; set; }
+
     public virtual DbSet<UtilityReading> UtilityReadings { get; set; }
 
     public virtual DbSet<ViewingAppointment> ViewingAppointments { get; set; }
@@ -990,6 +992,30 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<EmailOtp>(entity =>
+        {
+            entity.ToTable("email_otps");
+            entity.HasKey(e => e.Id).HasName("PK_email_otps");
+            entity.HasIndex(e => new { e.UserId, e.Purpose, e.CreatedAt })
+                .HasDatabaseName("IX_email_otps_user_id_purpose_created_at");
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId)
+                .HasMaxLength(50)
+                .HasColumnName("user_id");
+            entity.Property(e => e.Purpose)
+                .HasMaxLength(30)
+                .IsUnicode(false)
+                .HasColumnName("purpose");
+            entity.Property(e => e.CodeHash)
+                .HasMaxLength(64)
+                .IsUnicode(false)
+                .HasColumnName("code_hash");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(e => e.UsedAt).HasColumnName("used_at");
+            entity.Property(e => e.Attempts).HasColumnName("attempts");
         });
 
         modelBuilder.Entity<UtilityReading>(entity =>

@@ -77,7 +77,8 @@ class AuthService {
   // ĐĂNG KÝ
   static Future<Map<String, dynamic>> register({
     required String fullName,
-    required String emailOrPhone,
+    required String email,
+    required String phone,
     required String password,
     required String role,
   }) async {
@@ -93,7 +94,8 @@ class AuthService {
             },
             body: jsonEncode({
               'fullName': fullName,
-              'emailOrPhone': emailOrPhone,
+              'email': email,
+              'phone': phone,
               'password': password,
               'role': role,
             }),
@@ -106,6 +108,44 @@ class AuthService {
     } catch (e) {
       throw Exception('Không thể kết nối tới máy chủ: $e');
     }
+  }
+
+  static Future<Map<String, dynamic>> requestPasswordReset({
+    required String email,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/forgot-password'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({'email': email}),
+        )
+        .timeout(const Duration(seconds: 20));
+    return _parseResponse(response, 'Không gửi được mã khôi phục.');
+  }
+
+  static Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/reset-password'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'email': email,
+            'code': code,
+            'newPassword': newPassword,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+    return _parseResponse(response, 'Không đặt lại được mật khẩu.');
   }
 
   // ĐĂNG NHẬP GOOGLE

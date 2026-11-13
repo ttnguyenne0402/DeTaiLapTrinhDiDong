@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace Backend.Controllers
 {
@@ -116,6 +117,8 @@ namespace Backend.Controllers
                 return NotFound(new { message = "Không tìm thấy người dùng." });
 
             string email = request.Email.Trim();
+            if (!new EmailAddressAttribute().IsValid(email))
+                return BadRequest(new { message = "Email không hợp lệ." });
 
             bool emailExists = await _context.Users.AnyAsync(u =>
                 u.Email == email && u.Id != userId);
@@ -123,8 +126,12 @@ namespace Backend.Controllers
             if (emailExists)
                 return Conflict(new { message = "Email này đã được sử dụng." });
 
+            var emailChanged = !string.Equals(
+                user.Email, email, StringComparison.OrdinalIgnoreCase);
             user.Name = request.Name.Trim();
             user.Email = email;
+            if (emailChanged)
+                user.EmailVerifiedAt = null;
             user.Phone = string.IsNullOrWhiteSpace(request.Phone)
                 ? null
                 : request.Phone.Trim();
