@@ -4,6 +4,7 @@ import 'owner_dashboard.dart';
 import 'room_form.dart';
 import 'tenant_list_screen.dart';
 import '../../services/owner/room_service.dart';
+import '../../services/auth_storage.dart';
 
 // Màn hình quản lý danh sách phòng trọ của chủ trọ (kết nối trực tiếp SQL Server)
 class RoomsManageScreen extends StatefulWidget {
@@ -155,7 +156,7 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
       },
       child: FutureBuilder<List<RoomModel>>(
         key: ValueKey('$filter-$_refreshCounter'),
-        future: RoomService.fetchRooms('USER_OWNER_01', status: filter),
+        future: AuthStorage.getUserId().then((id) => RoomService.fetchRooms(id ?? '', status: filter)),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());

@@ -5,6 +5,7 @@ import '../tenant/profile_screen.dart';
 import 'tenant_list_screen.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/owner_dashboard_service.dart'; // Import service gọi API
+import '../../services/auth_storage.dart';
 
 class OwnerDashboard extends StatelessWidget {
   const OwnerDashboard({super.key});
@@ -43,7 +44,7 @@ class OwnerDashboard extends StatelessWidget {
         child: FutureBuilder<OwnerDashboardModel>(
           // Truyền đúng mã ID chủ trọ trong cơ sở dữ liệu của bạn vào đây
           //future: OwnerDashboardService.fetchDashboardData(loggedInUserId), khi đăng nhập hoàn tất sẽ như này
-          future: OwnerDashboardService.fetchDashboardData('USER_OWNER_01'),
+          future: AuthStorage.getUserId().then((id) => OwnerDashboardService.fetchDashboardData(id ?? '')),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
