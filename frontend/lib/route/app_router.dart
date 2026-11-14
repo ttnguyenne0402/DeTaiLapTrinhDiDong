@@ -35,6 +35,7 @@ import '../screens/tenant/home_screen.dart' as tv1_home;
 import '../screens/tenant/room_detail_screen.dart' as tv1_room_detail;
 import '../screens/tenant/tenant_maintenance_request_screen.dart';
 import '../screens/tenant/utility_history_ten.dart';
+import '../screens/tenant/tenant_maintenance_history_screen.dart';
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     final args = settings.arguments;
@@ -102,7 +103,9 @@ class AppRouter {
       case AppRoutes.home:
         return MaterialPageRoute(builder: (_) => const tv1_home.HomeScreen());
       // case AppRoutes.tenantMaintenanceRequest:
-      //   return MaterialPageRoute(builder: (_) => const TenantMaintenanceRequestScreen());
+      //   return MaterialPageRoute(builder: (_) => const TenantMaintenanceRequestScreen(roomId: '', roomName: ''));
+      case AppRoutes.tenantMaintenanceHistory:
+        return MaterialPageRoute(builder: (_) => const TenantMaintenanceHistoryScreen());
       case AppRoutes.roomDetail:
         final roomData = (args as Map<String, dynamic>?) ?? {};
         return MaterialPageRoute(builder: (_) => tv1_room_detail.RoomDetailScreen(room: roomData));
