@@ -14,7 +14,7 @@ class NotificationItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-    final bool isRead = notificationData['isRead'] != null;
+    final bool isRead = notificationData['isRead'] == true;
 
 
     IconData getIcon() {
