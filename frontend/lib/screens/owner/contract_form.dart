@@ -718,52 +718,89 @@ class HopDongMoi extends State<Contract_form> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _getRoomId(_selectedRoom).isNotEmpty ? _getRoomId(_selectedRoom) : null,
-                          isExpanded: true,
-                          hint: const Text('Hết phòng trống', style: TextStyle(fontSize: 13)),
-                          items: _availableRooms.map((r) {
-                            final rId = _getRoomId(r);
-                            final rText = r['displayText'] ?? '${r['roomName'] ?? r['name']} - ${r['propertyName'] ?? ''}';
-                            return DropdownMenuItem(
-                              value: rId,
-                              child: Text(rText, style: const TextStyle(fontSize: 13)),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              final chosen = _availableRooms.firstWhere(
-                                    (r) => _getRoomId(r) == val,
-                              );
-                              setState(() {
-                                _selectedRoom = Map<String, dynamic>.from(chosen);
-                                _rentPriceController.text = ((chosen['price'] ?? 0) as num).toInt().toString();
-                                _depositPriceController.text = ((chosen['deposit'] ?? 0) as num).toInt().toString();
-
-                                _selectedAppointment = null;
-                                _tenantNameController.clear();
-                                _tenantPhoneController.clear();
-                              });
-                              _fetchRoomServices(val);
-                            }
-                          },
-                        ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              color: Colors.grey[300],
+                              child: const Icon(
+                                Icons.home,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        widget.contract?['room'] ??
+                                            'Phòng 201 - Tầng 2',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      widget.contract?['area'] != null
+                                          ? '${widget.contract!['area']} m²'
+                                          : '25 m²',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  widget.contract?['address'] ??
+                                      'Khu trọ Bình Thạnh (12 phòng)',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.contract?['rentPrice'] != null
+                                      ? '${widget.contract!['rentPrice']} đ/tháng'
+                                      : '4.500.000 đ/tháng',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.brown,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-
-                    const SizedBox(height: 12),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Khách thuê phòng này', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        if (_appointmentsForSelectedRoom.isNotEmpty)
-                          Text(
-                            'Có ${_appointmentsForSelectedRoom.length} khách đặt lịch',
-                            style: const TextStyle(fontSize: 11, color: AppColors.primaryGreen, fontWeight: FontWeight.bold),
-                          ),
-                      ],
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Khu trọ áp dụng',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    ContractFormWidgets.buildDropdownField(
+                      widget.contract?['propertyName'] ??
+                          widget.contract?['address'] ??
+                          'Khu trọ Bình Thạnh (12 phòng)',
                     ),
                     const SizedBox(height: 4),
                     Container(
@@ -816,6 +853,10 @@ class HopDongMoi extends State<Contract_form> {
                           },
                         ),
                       ),
+                    ),
+                    ContractFormWidgets.buildDropdownField(
+                      widget.contract?['appointmentInfo'] ??
+                          '#AF-8823 - Nguyễn Văn An - 10:00 24/08/...',
                     ),
                   ],
                 ),

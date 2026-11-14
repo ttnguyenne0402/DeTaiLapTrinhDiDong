@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import 'owner_dashboard.dart';
@@ -6,9 +7,16 @@ import 'tenant_list_screen.dart';
 import '../../services/owner/room_service.dart';
 import '../../services/auth_storage.dart';
 
-// Màn hình quản lý danh sách phòng trọ của chủ trọ (kết nối trực tiếp SQL Server)
+// Màn hình quản lý danh sách phòng trọ (lọc theo đúng Bất động sản khi bấm từ Quản lý BĐS)
 class RoomsManageScreen extends StatefulWidget {
-  const RoomsManageScreen({super.key});
+  final String? propertyId;
+  final String? propertyName;
+
+  const RoomsManageScreen({
+    super.key,
+    this.propertyId,
+    this.propertyName,
+  });
 
   @override
   State<RoomsManageScreen> createState() => _RoomsManageScreenState();
@@ -26,6 +34,10 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String screenTitle = (widget.propertyName != null && widget.propertyName!.isNotEmpty)
+        ? 'Phòng - ${widget.propertyName}'
+        : 'Quản lý phòng';
+
     return DefaultTabController(
       length: 3,
       child: Scaffold(
@@ -44,12 +56,12 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
               onPressed: _reload,
             ),
           ],
-          title: const Text(
-            'Quản lý phòng',
-            style: TextStyle(
+          title: Text(
+            screenTitle,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
-              fontSize: 18,
+              fontSize: 17,
             ),
           ),
           centerTitle: true,
@@ -90,20 +102,24 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
             ),
             child: TabBarView(
               children: [
-                _buildRoomList('rented'), // Lọc phòng đang cho thuê
-                _buildRoomList('empty'), // Lọc phòng còn trống
-                _buildRoomList('all'), // Hiển thị tất cả
+                _buildRoomList('rented'), // Lọc phòng đang cho thuê của đúng BĐS
+                _buildRoomList('empty'),  // Lọc phòng còn trống của đúng BĐS
+                _buildRoomList('all'),    // Hiển thị tất cả phòng của đúng BĐS
               ],
             ),
           ),
         ),
 
-        // Nút thêm phòng mới
+        // Nút thêm phòng mới (gắn sẵn propertyId nếu đang ở trong 1 bất động sản cụ thể)
         floatingActionButton: FloatingActionButton(
           onPressed: () async {
             final res = await Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const RoomFormScreen()),
+              MaterialPageRoute(
+                builder: (context) => RoomFormScreen(
+                  initialPropertyId: widget.propertyId,
+                ),
+              ),
             );
             if (res == true) {
               _reload();
@@ -148,15 +164,19 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
     );
   }
 
-  // Danh sách phòng có bộ lọc theo tab kết nối trực tiếp Backend SQL Server
+  // Danh sách phòng có bộ lọc theo tab VÀ theo đúng Bất động sản được chọn
   Widget _buildRoomList(String filter) {
     return RefreshIndicator(
       onRefresh: () async {
         _reload();
       },
       child: FutureBuilder<List<RoomModel>>(
-        key: ValueKey('$filter-$_refreshCounter'),
-        future: AuthStorage.getUserId().then((id) => RoomService.fetchRooms(id ?? '', status: filter)),
+        key: ValueKey('$filter-${widget.propertyId ?? 'all'}-$_refreshCounter'),
+        future: RoomService.fetchRooms(
+          'USER_OWNER_01',
+          status: filter,
+          propertyId: widget.propertyId,
+        ),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -188,7 +208,15 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
             );
           }
 
-          final rooms = snapshot.data ?? [];
+          var rooms = snapshot.data ?? [];
+
+          // Đảm bảo chỉ hiển thị đúng phòng thuộc bất động sản đang chọn (không phân biệt hoa/thường)
+          if (widget.propertyId != null && widget.propertyId!.trim().isNotEmpty) {
+            final targetPropId = widget.propertyId!.trim().toLowerCase();
+            rooms = rooms
+                .where((r) => r.propertyId.trim().toLowerCase() == targetPropId)
+                .toList();
+          }
 
           if (rooms.isEmpty) {
             return Center(
@@ -198,7 +226,10 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
                   Icon(Icons.meeting_room_outlined, size: 56, color: Colors.grey[400]),
                   const SizedBox(height: 12),
                   Text(
-                    'Không có phòng nào trong danh mục này',
+                    widget.propertyName != null
+                        ? 'Chưa có phòng nào thuộc ${widget.propertyName} ở mục này'
+                        : 'Không có phòng nào trong danh mục này',
+                    textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                 ],
@@ -219,10 +250,46 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
     );
   }
 
+  Widget _buildRoomImage(String imgPath) {
+    final fallback = Container(
+      width: 85,
+      height: 85,
+      color: Colors.grey[200],
+      child: const Icon(Icons.apartment, color: Colors.grey),
+    );
+
+    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+      return Image.network(
+        imgPath,
+        width: 85,
+        height: 85,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    if (!imgPath.startsWith('frontend/') && !imgPath.startsWith('assets/')) {
+      final file = File(imgPath);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          width: 85,
+          height: 85,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      }
+    }
+    return Image.asset(
+      imgPath,
+      width: 85,
+      height: 85,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+
   // Thẻ hiển thị thông tin từng phòng và nút Sửa
   Widget _buildRoomCard(RoomModel room) {
-    final bool isNetwork = room.images.startsWith('http://') || room.images.startsWith('https://');
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -240,34 +307,9 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Ảnh phòng (hỗ trợ cả link Web SQL Server lẫn asset cục bộ)
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: isNetwork
-                ? Image.network(
-                    room.images,
-                    width: 85,
-                    height: 85,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 85,
-                      height: 85,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.apartment, color: Colors.grey),
-                    ),
-                  )
-                : Image.asset(
-                    room.images,
-                    width: 85,
-                    height: 85,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 85,
-                      height: 85,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.apartment, color: Colors.grey),
-                    ),
-                  ),
+            child: _buildRoomImage(room.images),
           ),
           const SizedBox(width: 14),
 
@@ -301,8 +343,6 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-
-                // Badge trạng thái phòng
                 _buildStatusBadge(room.statusText),
               ],
             ),
@@ -389,7 +429,6 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
     );
   }
 
-  // Nút điều hướng thanh dưới
   Widget _buildNavItem(
     IconData icon,
     String label,

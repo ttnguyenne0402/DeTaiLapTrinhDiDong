@@ -48,7 +48,7 @@ namespace Backend.Controllers
                     string s = status!.Trim().ToLower();
                     if (s == "upcoming")
                     {
-                        query = query.Where(v => v.Status == "pending" || v.Status == "confirmed");
+                        query = query.Where(v => v.Status == "pending" || v.Status == "confirmed" || v.Status == "rescheduled");
                     }
                     else if (s == "completed")
                     {
@@ -91,7 +91,8 @@ namespace Backend.Controllers
                     string tenantName = v.Tenant?.Name ?? "Khách liên hệ";
                     string roomName = v.Room?.Name ?? "Chưa rõ";
                     string propName = v.Room?.Property?.Name ?? "";
-                    string roomInfo = string.IsNullOrEmpty(propName) ? $"Phòng {roomName}" : $"Phòng {roomName} - {propName}";
+                    string displayRoomName = roomName.StartsWith("Phòng", StringComparison.OrdinalIgnoreCase) ? roomName : $"Phòng {roomName}";
+                    string roomInfo = string.IsNullOrEmpty(propName) ? displayRoomName : $"{displayRoomName} - {propName}";
 
                     return new OwnerAppointmentDto
                     {
@@ -100,11 +101,20 @@ namespace Backend.Controllers
                         Name = tenantName,
                         Phone = v.Phone,
                         RoomId = v.RoomId,
+                        RoomName = roomName,
+                        PropertyId = v.Room?.PropertyId ?? "",
+                        PropertyName = propName,
+                        PropertyAddress = v.Room?.Property?.Address ?? propName,
+                        RoomPrice = v.Room?.Price ?? 0,
+                        RoomDeposit = v.Room?.Deposit ?? (v.Room?.Price ?? 0),
+                        RoomArea = v.Room?.Area ?? 25,
                         RoomInfo = roomInfo,
                         Time = displayTime,
+                        RawTime = timeFormatted,
                         Date = dateStr,
                         Status = v.Status,
-                        Note = !string.IsNullOrEmpty(v.OwnerNote) ? v.OwnerNote : v.Message,
+                        Note = v.Message,
+                        OwnerNote = v.OwnerNote,
                         Avatar = string.IsNullOrEmpty(v.Tenant?.Avatar) ? "frontend/assets/images/avatarDemo.jpg" : v.Tenant.Avatar
                     };
                 }).ToList();
@@ -118,13 +128,15 @@ namespace Backend.Controllers
             }
         }
 
-        // 2. PUT: api/owner/appointments/{id}/status (Xác nhận, hoàn thành hoặc hủy lịch)
+        // 2. PUT: api/owner/appointments/{id}/status (Xác nhận, từ chối, đổi giờ, hoàn thành hoặc hủy lịch)
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(string id, [FromBody] UpdateAppointmentStatusDto dto)
         {
             try
             {
                 var appointment = await _context.ViewingAppointments
+                    .Include(v => v.Room)
+                        .ThenInclude(r => r.Property)
                     .FirstOrDefaultAsync(v => v.Id == id || v.Id.ToLower() == id.ToLower());
 
                 if (appointment == null)
@@ -137,6 +149,10 @@ namespace Backend.Controllers
                 if (input.Contains("complete") || input.Contains("xong") || input.Contains("thành"))
                 {
                     newStatus = "completed";
+                }
+                else if (input.Contains("reschedul") || input.Contains("đổi giờ") || input.Contains("dời"))
+                {
+                    newStatus = "rescheduled";
                 }
                 else if (input.Contains("từ chối") || input.Contains("reject"))
                 {
@@ -157,6 +173,23 @@ namespace Backend.Controllers
                     appointment.OwnerNote = dto.OwnerNote;
                 }
 
+                // Nếu chủ trọ đề xuất Đổi giờ (rescheduled), cập nhật ngày và giờ hẹn mới
+                if (!string.IsNullOrWhiteSpace(dto.NewDate))
+                {
+                    if (DateOnly.TryParseExact(dto.NewDate.Trim(), new[] { "yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy" }, null, System.Globalization.DateTimeStyles.None, out var parsedDate))
+                    {
+                        appointment.AppointmentDate = parsedDate;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(dto.NewTime))
+                {
+                    if (TimeOnly.TryParseExact(dto.NewTime.Trim(), new[] { "HH:mm", "H:mm", "HH:mm:ss" }, null, System.Globalization.DateTimeStyles.None, out var parsedTime))
+                    {
+                        appointment.AppointmentTime = parsedTime;
+                    }
+                }
+
                 // Dùng giờ máy chủ để khớp với giá trị mặc định GETDATE() trong SQL Server
                 var now = DateTime.Now;
                 appointment.UpdatedAt = now;
@@ -172,6 +205,55 @@ namespace Backend.Controllers
                 else if (newStatus == "cancelled" || newStatus == "rejected")
                 {
                     appointment.CancelledAt = now;
+                }
+
+                // Tự động tạo thông báo gửi về App cho Người thuê (Tenant)
+                if (!string.IsNullOrEmpty(appointment.TenantId))
+                {
+                    string roomTitle = appointment.Room != null
+                        ? $"{appointment.Room.Name} ({appointment.Room.Property?.Name})"
+                        : appointment.RoomId;
+                    string timeStr = $"{appointment.AppointmentTime:HH:mm} ngày {appointment.AppointmentDate:dd/MM/yyyy}";
+
+                    string notifTitle = "Cập nhật lịch hẹn xem phòng";
+                    string notifMessage = $"Lịch hẹn xem {roomTitle} đã được cập nhật.";
+
+                    if (newStatus == "confirmed")
+                    {
+                        notifTitle = "Lịch hẹn xem phòng đã được xác nhận";
+                        notifMessage = $"Chủ trọ đã xác nhận lịch hẹn xem {roomTitle} vào lúc {timeStr}.";
+                    }
+                    else if (newStatus == "rejected")
+                    {
+                        notifTitle = "Lịch hẹn xem phòng bị từ chối";
+                        string reason = !string.IsNullOrWhiteSpace(dto.OwnerNote) ? dto.OwnerNote : "Bận hoặc phòng đã hết";
+                        notifMessage = $"Chủ trọ đã từ chối lịch hẹn xem {roomTitle}. Lý do: {reason}.";
+                    }
+                    else if (newStatus == "rescheduled")
+                    {
+                        notifTitle = "Chủ trọ đề xuất đổi giờ xem phòng";
+                        string note = !string.IsNullOrWhiteSpace(dto.OwnerNote) ? $" Ghi chú: {dto.OwnerNote}" : "";
+                        notifMessage = $"Chủ trọ đề xuất dời lịch xem {roomTitle} sang {timeStr}.{note}";
+                    }
+                    else if (newStatus == "completed")
+                    {
+                        notifTitle = "Đã hoàn tất xem phòng";
+                        notifMessage = $"Cảm ơn bạn đã đến xem {roomTitle}. Hãy liên hệ chủ trọ nếu bạn muốn tiến hành ký hợp đồng.";
+                    }
+
+                    var tenantNotif = new Notification
+                    {
+                        Id = "NOTIF_" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
+                        UserId = appointment.TenantId,
+                        Title = notifTitle,
+                        Message = notifMessage,
+                        Type = "appointment_" + newStatus,
+                        ReferenceId = appointment.Id,
+                        ReferenceType = "viewing_appointment",
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    };
+                    _context.Notifications.Add(tenantNotif);
                 }
 
                 await _context.SaveChangesAsync();

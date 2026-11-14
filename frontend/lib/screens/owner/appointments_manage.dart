@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import '../../services/owner/appointment_service.dart';
-import '../../services/auth_storage.dart';
+import 'contract_form.dart';
 
 class AppointmentsManageScreen extends StatefulWidget {
   const AppointmentsManageScreen({super.key});
@@ -25,7 +25,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
     _loadAppointments();
   }
 
-  // Tải danh sách lịch hẹn thực tế từ SQL Server qua Backend Web API
+  // Tải danh sách lịch hẹn từ SQL Server qua API
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
     try {
@@ -37,11 +37,21 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
             'id': a.id,
             'name': a.name,
             'phone': a.phone,
+            'roomId': a.roomId,
+            'roomName': a.roomName,
+            'propertyId': a.propertyId,
+            'propertyName': a.propertyName,
+            'propertyAddress': a.propertyAddress,
+            'roomPrice': a.roomPrice,
+            'roomDeposit': a.roomDeposit,
+            'roomArea': a.roomArea,
             'roomInfo': a.roomInfo,
             'time': a.time,
+            'rawTime': a.rawTime,
             'date': a.date,
             'status': a.status,
             'note': a.note ?? 'Khách hẹn xem phòng trực tiếp',
+            'ownerNote': a.ownerNote,
             'avatar': a.avatar,
           }).toList();
           _isLoading = false;
@@ -58,8 +68,11 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
   Future<void> _updateStatus(
     Map<String, dynamic> item,
     String newStatus,
-    String successMessage,
-  ) async {
+    String successMessage, {
+    String? ownerNote,
+    String? newDate,
+    String? newTime,
+  }) async {
     final prevStatus = item['status'];
     setState(() => item['status'] = newStatus);
 
@@ -68,6 +81,9 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
       final success = await AppointmentService.updateAppointmentStatus(
         item['id'].toString(),
         newStatus,
+        ownerNote: ownerNote,
+        newDate: newDate,
+        newTime: newTime,
       );
 
       if (success) {
@@ -100,6 +116,294 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
     }
   }
 
+  // Hộp thoại Từ chối lịch hẹn kèm lý do (Bận hoặc Hết phòng)
+  Future<void> _showRejectDialog(Map<String, dynamic> item) async {
+    final reasonController = TextEditingController();
+    String selectedPreset = 'Chủ trọ bận khung giờ này';
+    reasonController.text = selectedPreset;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'Từ chối lịch xem phòng',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Khách: ${item['name']} - ${item['roomInfo']}',
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Chọn nhanh lý do:',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    'Chủ trọ bận khung giờ này',
+                    'Phòng đã hết / đã nhận cọc',
+                    'Đang bảo trì phòng',
+                  ].map((reason) {
+                    final isSelected = selectedPreset == reason;
+                    return ChoiceChip(
+                      label: Text(reason, style: const TextStyle(fontSize: 12)),
+                      selected: isSelected,
+                      selectedColor: Colors.red.shade50,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.red.shade800 : Colors.black87,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (_) {
+                        setDialogState(() {
+                          selectedPreset = reason;
+                          reasonController.text = reason;
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Lý do từ chối gửi cho khách',
+                    hintText: 'Nhập lý do từ chối...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Hủy bỏ', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text(
+                'Xác nhận từ chối',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true) {
+      final note = reasonController.text.trim().isEmpty
+          ? 'Chủ trọ bận hoặc phòng đã hết'
+          : reasonController.text.trim();
+      await _updateStatus(
+        item,
+        'rejected',
+        'Đã từ chối lịch hẹn và gửi thông báo cho khách thuê',
+        ownerNote: note,
+      );
+    }
+  }
+
+  // Hộp thoại Đổi giờ hẹn mới kèm ghi chú OwnerNote
+  Future<void> _showRescheduleDialog(Map<String, dynamic> item) async {
+    DateTime selectedDate = DateTime.tryParse(item['date'] ?? '') ??
+        DateTime.now().add(const Duration(days: 1));
+    TimeOfDay selectedTime = const TimeOfDay(hour: 9, minute: 30);
+
+    final rawTime = (item['rawTime'] ?? '').toString();
+    if (rawTime.contains(':')) {
+      final parts = rawTime.split(':');
+      final h = int.tryParse(parts[0]) ?? 9;
+      final m = int.tryParse(parts[1]) ?? 30;
+      selectedTime = TimeOfDay(hour: h, minute: m);
+    }
+
+    final noteController = TextEditingController(
+      text: item['ownerNote']?.toString() ??
+          'Khung giờ cũ mình bận, bạn xem giúp mình giờ mới này nhé!',
+    );
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final formattedDate =
+              '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}';
+          final formattedTime =
+              '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+              'Đề xuất đổi giờ xem phòng',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Khách: ${item['name']}\n${item['roomInfo']}',
+                    style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Ngày & giờ mới đề xuất:',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(formattedDate, style: const TextStyle(fontSize: 13)),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: selectedDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(const Duration(days: 90)),
+                            );
+                            if (picked != null) {
+                              setDialogState(() => selectedDate = picked);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.access_time, size: 16),
+                          label: Text(formattedTime, style: const TextStyle(fontSize: 13)),
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: ctx,
+                              initialTime: selectedTime,
+                            );
+                            if (picked != null) {
+                              setDialogState(() => selectedTime = picked);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: noteController,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Ghi chú gửi khách (OwnerNote)',
+                      hintText: 'Nhập lời nhắn đề xuất đổi lịch...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Gửi đề xuất đổi giờ',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed == true) {
+      final apiDate =
+          '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}';
+      final apiTime =
+          '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+      await _updateStatus(
+        item,
+        'rescheduled',
+        'Đã gửi đề xuất đổi giờ xem phòng cho khách thuê',
+        ownerNote: noteController.text.trim(),
+        newDate: apiDate,
+        newTime: apiTime,
+      );
+    }
+  }
+
+  String _formatVndNumber(double value) {
+    final intVal = value.toInt().toString();
+    final reg = RegExp(r'\B(?=(\d{3})+(?!\d))');
+    return intVal.replaceAllMapped(reg, (m) => '.');
+  }
+
+  // Mở thẳng form Tạo hợp đồng (Contract_form) với thông tin khách và phòng điền sẵn
+  void _openCreateContract(Map<String, dynamic> item) {
+    final double rentVal = (item['roomPrice'] as num?)?.toDouble() ?? 3500000;
+    final double depositVal = (item['roomDeposit'] as num?)?.toDouble() ?? rentVal;
+    final String formattedRent = _formatVndNumber(rentVal);
+    final String formattedDeposit = _formatVndNumber(depositVal);
+
+    final String propName = (item['propertyName'] ?? '').toString();
+    final String propAddr = (item['propertyAddress'] ?? '').toString();
+    final String fullAddress = propAddr.isNotEmpty
+        ? '$propName - $propAddr'
+        : (propName.isNotEmpty ? propName : 'Khu trọ An Khang');
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Contract_form(
+          contract: {
+            'tenantName': item['name'] ?? '',
+            'tenantPhone': item['phone'] ?? '',
+            'room': item['roomInfo'] ?? '',
+            'propertyName': propName.isNotEmpty ? propName : item['roomInfo'],
+            'address': fullAddress,
+            'rentPrice': formattedRent,
+            'depositPrice': formattedDeposit,
+            'area': item['roomArea'] != null ? item['roomArea'].toString() : '25',
+            'appointmentInfo':
+                '#${item['id']} - ${item['name']} (${item['time']})',
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -109,7 +413,10 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
   @override
   Widget build(BuildContext context) {
     final upcoming = _appointments
-        .where((a) => a['status'] == 'pending' || a['status'] == 'confirmed')
+        .where((a) =>
+            a['status'] == 'pending' ||
+            a['status'] == 'confirmed' ||
+            a['status'] == 'rescheduled')
         .toList();
     final completed = _appointments
         .where((a) => a['status'] == 'completed')
@@ -158,7 +465,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
             fontSize: 13,
           ),
           tabs: [
-            Tab(text: 'Sắp tới (${upcoming.length})'),
+            Tab(text: 'Chờ xác nhận / Sắp tới (${upcoming.length})'),
             Tab(text: 'Hoàn thành (${completed.length})'),
             Tab(text: 'Đã hủy (${cancelled.length})'),
           ],
@@ -221,7 +528,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
   }
 
   Widget _buildAppointmentCard(Map<String, dynamic> item) {
-    final String status = item['status'];
+    final String status = item['status'] ?? 'pending';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
@@ -281,11 +588,28 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                      if ((item['phone'] ?? '').toString().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'SĐT: ${item['phone']}',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
                 IconButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Đang gọi số ${item['phone']}...'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
                   icon: Icon(Icons.phone, color: AppColors.primaryGreen),
                   tooltip: 'Gọi điện',
                 ),
@@ -302,22 +626,46 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Ghi chú: ${item['note']}',
+                  'Ghi chú khách: ${item['note']}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ),
+            ],
+            if (item['ownerNote'] != null &&
+                item['ownerNote'].toString().trim().isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Text(
+                  'Phản hồi chủ trọ: ${item['ownerNote']}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange[900],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
             const SizedBox(height: 12),
             const Divider(height: 1),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                if (status == 'pending') ...[
+                if (status == 'pending' || status == 'rescheduled') ...[
                   OutlinedButton(
-                    onPressed: () => _updateStatus(item, 'cancelled', 'Hủy lịch hẹn thành công'),
+                    onPressed: () => _showRejectDialog(item),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -327,11 +675,30 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                       style: TextStyle(color: Colors.red, fontSize: 12),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _showRescheduleDialog(item),
+                    icon: const Icon(Icons.schedule, size: 15, color: Colors.orange),
+                    label: const Text(
+                      'Đổi giờ',
+                      style: TextStyle(color: Colors.orange, fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.orange),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                   ElevatedButton(
-                    onPressed: () => _updateStatus(item, 'confirmed', 'Xác nhận lịch hẹn thành công'),
+                    onPressed: () => _updateStatus(
+                      item,
+                      'confirmed',
+                      'Đã xác nhận lịch hẹn và gửi thông báo cho khách',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryGreen,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -344,21 +711,40 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                 ],
                 if (status == 'confirmed') ...[
                   OutlinedButton(
-                    onPressed: () => _updateStatus(item, 'cancelled', 'Hủy lịch hẹn thành công'),
+                    onPressed: () => _showRejectDialog(item),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.grey),
+                      side: const BorderSide(color: Colors.redAccent),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     child: const Text(
-                      'Hủy lịch',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                      'Từ chối / Hủy',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _showRescheduleDialog(item),
+                    icon: const Icon(Icons.schedule, size: 15, color: Colors.orange),
+                    label: const Text(
+                      'Đổi giờ',
+                      style: TextStyle(color: Colors.orange, fontSize: 12),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.orange),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
                   ElevatedButton.icon(
-                    onPressed: () => _updateStatus(item, 'completed', 'Cập nhật xem phòng thành công'),
+                    onPressed: () => _updateStatus(
+                      item,
+                      'completed',
+                      'Đã xác nhận khách xem phòng xong',
+                    ),
                     icon: const Icon(
                       Icons.check,
                       size: 16,
@@ -370,22 +756,62 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green[700],
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
                 ],
-                if (status == 'completed' || status == 'cancelled') ...[
+                if (status == 'completed') ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Đã hoàn tất xem phòng',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green[700],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () => _openCreateContract(item),
+                        icon: const Icon(
+                          Icons.description_outlined,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Lập hợp đồng',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGreen,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (status == 'cancelled' || status == 'rejected') ...[
                   Text(
-                    status == 'completed'
-                        ? 'Đã hoàn tất xem phòng'
+                    status == 'rejected'
+                        ? 'Đã từ chối lịch hẹn'
                         : 'Đã hủy lịch hẹn',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
-                      color: status == 'completed'
-                          ? Colors.green[700]
-                          : Colors.red,
+                      color: Colors.red,
                       fontStyle: FontStyle.italic,
                     ),
                   ),
@@ -414,10 +840,20 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
         text = const Color(0xFFE65100);
         label = 'Chờ xác nhận';
         break;
+      case 'rescheduled':
+        bg = const Color(0xFFE3F2FD);
+        text = const Color(0xFF1565C0);
+        label = 'Chờ khách duyệt giờ mới';
+        break;
       case 'completed':
         bg = const Color(0xFFE0F2F1);
         text = const Color(0xFF00695C);
         label = 'Hoàn thành';
+        break;
+      case 'rejected':
+        bg = const Color(0xFFFFEBEE);
+        text = const Color(0xFFC62828);
+        label = 'Đã từ chối';
         break;
       case 'cancelled':
       default:

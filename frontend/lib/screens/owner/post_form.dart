@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/local/sqlite_helper.dart';
 import '../../services/owner/post_service.dart';
@@ -14,6 +16,7 @@ class PostFormScreen extends StatefulWidget {
 }
 
 class _PostFormScreenState extends State<PostFormScreen> {
+  final ImagePicker _picker = ImagePicker();
   late final TextEditingController _titleController;
   late final TextEditingController _descController;
   late final TextEditingController _priceController;
@@ -24,6 +27,8 @@ class _PostFormScreenState extends State<PostFormScreen> {
   String _selectedRoomName = 'Phòng';
   bool _isLoading = false;
   bool _loadingRooms = true;
+
+  final List<String> _selectedImages = [];
 
   final List<String> amenities = [
     'Wifi',
@@ -46,18 +51,20 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
     String priceStr = '';
     if (item != null) {
-      if (item['rawPrice'] != null && item['rawPrice'] is num && (item['rawPrice'] as num) > 0) {
-        priceStr = '${(item['rawPrice'] as num).toInt()}';
+      if (item['rawPrice'] != null &&
+          item['rawPrice'] is num &&
+          (item['rawPrice'] as num) > 0) {
+        priceStr = _formatNumberDots('${(item['rawPrice'] as num).toInt()}');
       } else if (item['price'] != null) {
-        priceStr = item['price']
-            .toString()
-            .replaceAll('.', '')
-            .replaceAll(',', '')
-            .replaceAll('đ', '')
-            .replaceAll('/tháng', '')
-            .trim();
+        priceStr = _formatNumberDots(item['price'].toString());
       }
       _selectedRoomId = item['roomId'];
+
+      if (item['image'] != null && item['image'].toString().isNotEmpty) {
+        _selectedImages.add(item['image'].toString());
+      } else {
+        _selectedImages.add('frontend/assets/images/anhPhongDemo.jpg');
+      }
 
       final existingAmenities = item['amenities'];
       if (existingAmenities is List) {
@@ -77,6 +84,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
       }
     } else {
       selectedAmenities.addAll(['Wifi', 'Chỗ để xe']);
+      _selectedImages.add('frontend/assets/images/anhPhongDemo.jpg');
     }
     _priceController = TextEditingController(text: priceStr);
 
@@ -104,10 +112,12 @@ class _PostFormScreenState extends State<PostFormScreen> {
               _selectedBuildingName = first.propertyName;
               _selectedRoomName = first.name;
               if (_priceController.text.isEmpty && first.price > 0) {
-                _priceController.text = '${first.price.toInt()}';
+                _priceController.text =
+                    _formatNumberDots('${first.price.toInt()}');
               }
               if (_titleController.text.isEmpty) {
-                _titleController.text = 'Cho thuê ${first.name} - ${first.propertyName}';
+                _titleController.text =
+                    'Cho thuê ${first.name} - ${first.propertyName}';
               }
             }
           }
@@ -120,6 +130,100 @@ class _PostFormScreenState extends State<PostFormScreen> {
         setState(() => _loadingRooms = false);
       }
     }
+  }
+
+  // Mở hộp thoại chọn ảnh từ Camera hoặc Gallery
+  Future<void> _showImageSourceSheet() async {
+    if (_selectedImages.length >= 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tối đa 6 ảnh cho mỗi tin đăng')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Chọn hình ảnh tin đăng',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: AppColors.primaryGreen,
+                ),
+                title: const Text('Chụp ảnh từ Camera'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final XFile? file = await _picker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 85,
+                    );
+                    if (file != null && mounted) {
+                      setState(() {
+                        _selectedImages.remove(
+                          'frontend/assets/images/anhPhongDemo.jpg',
+                        );
+                        _selectedImages.insert(0, file.path);
+                      });
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Không thể mở Camera: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.photo_library_outlined,
+                  color: AppColors.primaryGreen,
+                ),
+                title: const Text('Chọn ảnh từ Thư viện (Gallery)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final List<XFile> files =
+                        await _picker.pickMultiImage(imageQuality: 85);
+                    if (files.isNotEmpty && mounted) {
+                      setState(() {
+                        _selectedImages.remove(
+                          'frontend/assets/images/anhPhongDemo.jpg',
+                        );
+                        for (final f in files) {
+                          if (_selectedImages.length < 6) {
+                            _selectedImages.add(f.path);
+                          }
+                        }
+                      });
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Không thể mở Thư viện ảnh: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -174,7 +278,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
               const SizedBox(height: 24),
 
               // Hình ảnh
-              _buildSectionTitle('Hình ảnh thực tế (Tối đa 6 ảnh)'),
+              _buildSectionTitle(
+                'Hình ảnh thực tế (${_selectedImages.length}/6 ảnh - Thư viện / Camera)',
+              ),
               const SizedBox(height: 8),
               _buildImagePickerUI(),
 
@@ -192,9 +298,10 @@ class _PostFormScreenState extends State<PostFormScreen> {
               const SizedBox(height: 12),
               _buildTextField(
                 'Giá thuê (đ/tháng)',
-                'VD: 3500000',
+                'VD: 3.500.000',
                 controller: _priceController,
                 keyboardType: TextInputType.number,
+                isCurrency: true,
               ),
               const SizedBox(height: 12),
               _buildTextField(
@@ -223,9 +330,8 @@ class _PostFormScreenState extends State<PostFormScreen> {
                       color: isSelected
                           ? AppColors.primaryGreen
                           : Colors.grey[700],
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                     backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
@@ -271,6 +377,22 @@ class _PostFormScreenState extends State<PostFormScreen> {
     );
   }
 
+  String _formatNumberDots(String input) {
+    final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
+    final numVal = int.tryParse(digits);
+    if (numVal == null || numVal <= 0) return '';
+    return numVal.toString().replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (m) => '.',
+        );
+  }
+
+  String _formatDraftPrice(String input) {
+    final formatted = _formatNumberDots(input);
+    if (formatted.isEmpty) return 'Thỏa thuận';
+    return '$formattedđ/tháng';
+  }
+
   // Thanh nút bấm khi Chỉnh sửa tin
   Widget _buildEditBottomBar() {
     final item = widget.initialData!;
@@ -285,7 +407,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
             : () async {
                 if (_titleController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Vui lòng nhập tiêu đề tin đăng')),
+                    const SnackBar(
+                      content: Text('Vui lòng nhập tiêu đề tin đăng'),
+                    ),
                   );
                   return;
                 }
@@ -295,18 +419,22 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
                 setState(() => _isLoading = true);
 
+                final imagesToSave = _selectedImages.isNotEmpty
+                    ? _selectedImages
+                    : ['frontend/assets/images/anhPhongDemo.jpg'];
+
                 bool success = false;
                 if (isSqlite && item['sqliteId'] != null) {
-                  await SqliteHelper.instance.updateDraftPost(item['sqliteId'], {
+                  await SqliteHelper.instance
+                      .updateDraftPost(item['sqliteId'], {
                     'room_id': _selectedRoomId,
                     'building_name': _selectedBuildingName,
                     'room_name': _selectedRoomName,
                     'title': _titleController.text.trim(),
                     'description': _descController.text.trim(),
-                    'price': _priceController.text.trim().isNotEmpty
-                        ? '${_priceController.text.trim()}đ/tháng'
-                        : 'Thỏa thuận',
+                    'price': _formatDraftPrice(_priceController.text),
                     'amenities': selectedAmenities.join(','),
+                    'image': imagesToSave.first,
                   });
                   success = true;
                 } else {
@@ -322,6 +450,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
                     'description': _descController.text.trim(),
                     'price': cleanPrice,
                     'amenities': selectedAmenities,
+                    'images': imagesToSave,
                     'status': item['status'] ?? 'pending',
                   });
                 }
@@ -357,7 +486,10 @@ class _PostFormScreenState extends State<PostFormScreen> {
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               )
             : const Text(
                 'CẬP NHẬT TIN ĐĂNG',
@@ -383,7 +515,11 @@ class _PostFormScreenState extends State<PostFormScreen> {
                 : () async {
                     if (_titleController.text.trim().isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Vui lòng nhập tiêu đề trước khi lưu nháp')),
+                        const SnackBar(
+                          content: Text(
+                            'Vui lòng nhập tiêu đề trước khi lưu nháp',
+                          ),
+                        ),
                       );
                       return;
                     }
@@ -393,18 +529,19 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
                     setState(() => _isLoading = true);
 
-                    // LƯU BẢN NHÁP VÀO CSDL SQLITE CỦA THIẾT BỊ
+                    final firstImg = _selectedImages.isNotEmpty
+                        ? _selectedImages.first
+                        : 'frontend/assets/images/anhPhongDemo.jpg';
+
                     await SqliteHelper.instance.insertDraftPost({
                       'room_id': _selectedRoomId,
                       'building_name': _selectedBuildingName,
                       'room_name': _selectedRoomName,
                       'title': _titleController.text.trim(),
                       'description': _descController.text.trim(),
-                      'price': _priceController.text.trim().isNotEmpty
-                          ? '${_priceController.text.trim()}đ/tháng'
-                          : 'Thỏa thuận',
+                      'price': _formatDraftPrice(_priceController.text),
                       'amenities': selectedAmenities.join(','),
-                      'image': 'frontend/assets/images/anhPhongDemo.jpg',
+                      'image': firstImg,
                       'created_at': DateTime.now().toString().substring(0, 10),
                     });
 
@@ -420,16 +557,16 @@ class _PostFormScreenState extends State<PostFormScreen> {
                     navigator.pop(true);
                   },
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: AppColors.primaryGreen),
+              side: const BorderSide(color: AppColors.primaryGreen),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: Text(
-              'LƯU NHÁP (SQLITE)',
+            child: const Text(
+              'LƯU NHÁP',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: AppColors.primaryGreen,
               ),
@@ -447,7 +584,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
                 : () async {
                     if (_titleController.text.trim().isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Vui lòng nhập tiêu đề tin đăng')),
+                        const SnackBar(
+                          content: Text('Vui lòng nhập tiêu đề tin đăng'),
+                        ),
                       );
                       return;
                     }
@@ -457,7 +596,8 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
                     setState(() => _isLoading = true);
 
-                    final targetRoomId = _selectedRoomId ?? (_rooms.isNotEmpty ? _rooms.first.id : 'room_101');
+                    final targetRoomId = _selectedRoomId ??
+                        (_rooms.isNotEmpty ? _rooms.first.id : 'room_101');
 
                     final cleanPrice = double.tryParse(_priceController.text
                             .replaceAll('.', '')
@@ -465,7 +605,10 @@ class _PostFormScreenState extends State<PostFormScreen> {
                             .trim()) ??
                         0;
 
-                    // GỬI TIN ĐĂNG LÊN MÁY CHỦ BACKEND (LƯU VÀO SQL SERVER)
+                    final imagesToSave = _selectedImages.isNotEmpty
+                        ? _selectedImages
+                        : ['frontend/assets/images/anhPhongDemo.jpg'];
+
                     final success = await PostService.createPost({
                       'roomId': targetRoomId,
                       'title': _titleController.text.trim(),
@@ -474,7 +617,7 @@ class _PostFormScreenState extends State<PostFormScreen> {
                       'amenities': selectedAmenities,
                       'status': 'pending',
                       'submitNote': 'Gửi duyệt từ ứng dụng di động',
-                      'images': ['frontend/assets/images/anhPhongDemo.jpg'],
+                      'images': imagesToSave,
                     });
 
                     if (!mounted) return;
@@ -491,7 +634,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
                     } else {
                       messenger.showSnackBar(
                         const SnackBar(
-                          content: Text('Tạo tin đăng thất bại. Vui lòng thử lại!'),
+                          content: Text(
+                            'Tạo tin đăng thất bại. Vui lòng thử lại!',
+                          ),
                           backgroundColor: Colors.red,
                         ),
                       );
@@ -503,9 +648,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
               size: 16,
             ),
             label: const Text(
-              'GỬI DUYỆT (SQL SERVER)',
+              'GỬI DUYỆT',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
@@ -526,7 +671,12 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
   Widget _buildRoomDropdown() {
     if (_loadingRooms) {
-      return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(8.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
     if (_rooms.isEmpty) {
@@ -570,9 +720,12 @@ class _PostFormScreenState extends State<PostFormScreen> {
                 _selectedRoomId = val;
                 _selectedBuildingName = found.propertyName;
                 _selectedRoomName = found.name;
-                _priceController.text = found.price > 0 ? '${found.price.toInt()}' : _priceController.text;
+                _priceController.text = found.price > 0
+                    ? _formatNumberDots('${found.price.toInt()}')
+                    : _priceController.text;
                 if (widget.initialData == null) {
-                  _titleController.text = 'Cho thuê ${found.name} - ${found.propertyName}';
+                  _titleController.text =
+                      'Cho thuê ${found.name} - ${found.propertyName}';
                 }
               });
             }
@@ -599,11 +752,23 @@ class _PostFormScreenState extends State<PostFormScreen> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     TextEditingController? controller,
+    bool isCurrency = false,
   }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      onChanged: isCurrency && controller != null
+          ? (val) {
+              final formatted = _formatNumberDots(val);
+              if (formatted != val) {
+                controller.value = TextEditingValue(
+                  text: formatted,
+                  selection: TextSelection.collapsed(offset: formatted.length),
+                );
+              }
+            }
+          : null,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -625,73 +790,123 @@ class _PostFormScreenState extends State<PostFormScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primaryGreen),
+          borderSide: const BorderSide(color: AppColors.primaryGreen),
         ),
       ),
     );
   }
 
+  Widget _buildPreviewThumbnail(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            const Icon(Icons.broken_image, color: Colors.grey),
+      );
+    }
+    if (path.startsWith('frontend/') || path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            const Icon(Icons.image, color: Colors.grey),
+      );
+    }
+    return Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) =>
+          const Icon(Icons.image, color: Colors.grey),
+    );
+  }
+
   Widget _buildImagePickerUI() {
-    return Row(
-      children: [
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            color: Colors.white,
+    return SizedBox(
+      height: 100,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          InkWell(
+            onTap: _showImageSourceSheet,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppColors.primaryGreen,
-              style: BorderStyle.solid,
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add_a_photo, color: AppColors.primaryGreen, size: 28),
-              const SizedBox(height: 8),
-              Text(
-                'Thêm ảnh',
-                style: TextStyle(
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
                   color: AppColors.primaryGreen,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  style: BorderStyle.solid,
+                  width: 1.5,
                 ),
               ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 100,
-            height: 100,
-            color: Colors.grey[200],
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  'frontend/assets/images/anhPhongDemo.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.image, color: Colors.grey),
-                ),
-                const Positioned(
-                  top: 4,
-                  right: 4,
-                  child: CircleAvatar(
-                    radius: 12,
-                    backgroundColor: Colors.black54,
-                    child: Icon(Icons.close, size: 14, color: Colors.white),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_a_photo,
+                    color: AppColors.primaryGreen,
+                    size: 28,
                   ),
-                ),
-              ],
+                  SizedBox(height: 8),
+                  Text(
+                    'Thêm ảnh',
+                    style: TextStyle(
+                      color: AppColors.primaryGreen,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          ..._selectedImages.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final path = entry.value;
+            return Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  color: Colors.grey[200],
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _buildPreviewThumbnail(path),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedImages.removeAt(idx);
+                            });
+                          },
+                          child: const CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Colors.black54,
+                            child: Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }
