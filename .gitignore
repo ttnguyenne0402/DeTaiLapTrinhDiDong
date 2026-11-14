@@ -51,3 +51,7 @@ app.*.map.json
 *.user
 *.userosscache
 *.sln.docstates
+# Bỏ qua các file nén dung lượng lớn
+*.rar
+*.zip
+accessories_images/
