@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'owner_dashboard.dart';
 import 'owner_profile_screen.dart';
+import 'owner_notifications_screen.dart';
 import 'property_form.dart';
 import 'rooms_manage.dart';
 import 'tenant_list_screen.dart';
@@ -24,6 +26,19 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
     setState(() {});
   }
 
+  Future<void> _openPropertyRooms(PropertyModel item) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RoomsManageScreen(
+          propertyId: item.id,
+          propertyName: item.name,
+        ),
+      ),
+    );
+    _refreshList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -44,7 +59,15 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
           actions: [
             IconButton(
               icon: const Icon(Icons.notifications_none, color: Colors.white),
-              onPressed: () {},
+              tooltip: 'Thông báo',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OwnerNotificationsScreen(),
+                  ),
+                );
+              },
             ),
             const SizedBox(width: 10),
             CircleAvatar(
@@ -199,6 +222,46 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
     );
   }
 
+  Widget _buildPropertyImage(String imgPath) {
+    final fallback = Container(
+      color: Colors.grey[200],
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.apartment, size: 44, color: Colors.grey),
+          SizedBox(height: 4),
+          Text(
+            'Chưa có ảnh',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+
+    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+      return Image.network(
+        imgPath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    if (!imgPath.startsWith('frontend/') && !imgPath.startsWith('assets/')) {
+      final file = File(imgPath);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      }
+    }
+    return Image.asset(
+      imgPath,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+
   Widget _buildPropertyCard(BuildContext context, PropertyModel item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -207,228 +270,183 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: SizedBox(
-              height: 140,
-              width: double.infinity,
-              child: Stack(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _openPropertyRooms(item),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: SizedBox(
+                height: 140,
+                width: double.infinity,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _buildPropertyImage(item.image),
+                    ),
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: _buildStatusBadge(item.status),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Positioned.fill(
-                    child: (item.image.startsWith('http://') || item.image.startsWith('https://'))
-                        ? Image.network(
-                            item.image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: Colors.grey[200],
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.apartment, size: 44, color: Colors.grey),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Chưa có ảnh',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : Image.asset(
-                            item.image,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: Colors.grey[200],
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.apartment, size: 44, color: Colors.grey),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Chưa có ảnh',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  Text(
+                    item.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
                   ),
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: _buildStatusBadge(item.status),
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          item.address,
+                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem('Tổng phòng', '${item.totalRooms}'),
+                      _buildStatItem(
+                        'Đang thuê',
+                        '${item.rentedRooms}',
+                        color: Colors.green[700],
+                      ),
+                      _buildStatItem(
+                        'Còn trống',
+                        '${item.emptyRooms}',
+                        color: Colors.orange[800],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const InvoiceCreateScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.bolt,
+                            size: 16,
+                            color: Colors.amber,
+                          ),
+                          label: const Text(
+                            'Ghi điện nước',
+                            style: TextStyle(fontSize: 12, color: Colors.black87),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const LandlordUtilityScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.bar_chart,
+                            size: 16,
+                            color: Colors.blue,
+                          ),
+                          label: const Text(
+                            'Xem tiêu thụ',
+                            style: TextStyle(fontSize: 12, color: Colors.black87),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openPropertyRooms(item),
+                      icon: Icon(
+                        Icons.door_sliding_outlined,
+                        size: 18,
+                        color: primaryColor,
+                      ),
+                      label: Text(
+                        'Quản lý danh sách phòng',
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: primaryColor),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.location_on_outlined,
-                      size: 16,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        item.address,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStatItem('Tổng phòng', '${item.totalRooms}'),
-                    _buildStatItem(
-                      'Đang thuê',
-                      '${item.rentedRooms}',
-                      color: Colors.green[700],
-                    ),
-                    _buildStatItem(
-                      'Còn trống',
-                      '${item.emptyRooms}',
-                      color: Colors.orange[800],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const InvoiceCreateScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.bolt,
-                          size: 16,
-                          color: Colors.amber,
-                        ),
-                        label: const Text(
-                          'Ghi điện nước',
-                          style: TextStyle(fontSize: 12, color: Colors.black87),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.grey.shade300),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const LandlordUtilityScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.bar_chart,
-                          size: 16,
-                          color: Colors.blue,
-                        ),
-                        label: const Text(
-                          'Xem tiêu thụ',
-                          style: TextStyle(fontSize: 12, color: Colors.black87),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.grey.shade300),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RoomsManageScreen(),
-                        ),
-                      );
-                    },
-                    icon: Icon(
-                      Icons.door_sliding_outlined,
-                      size: 18,
-                      color: primaryColor,
-                    ),
-                    label: Text(
-                      'Quản lý danh sách phòng',
-                      style: TextStyle(
-                        color: primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: primaryColor),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

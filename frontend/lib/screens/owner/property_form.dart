@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/property_service.dart';
 
@@ -12,6 +14,7 @@ class PropertyFormScreen extends StatefulWidget {
 class _PropertyFormScreenState extends State<PropertyFormScreen> {
   final Color primaryColor = const Color(0xFF1B5E55);
   final _formKey = GlobalKey<FormState>();
+  final ImagePicker _picker = ImagePicker();
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
@@ -20,9 +23,90 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   final TextEditingController _roomsController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 
+  final List<String> _selectedImages = [];
   String _selectedStatus = 'Đang hoạt động';
-  String _selectedType = 'rooming_house';
+  final String _selectedType = 'rooming_house';
   bool _isLoading = false;
+
+  // Chọn ảnh từ Camera hoặc Thư viện (Gallery)
+  Future<void> _showImageSourceSheet() async {
+    if (_selectedImages.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tối đa 5 ảnh cho mỗi tòa nhà')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Chọn hình ảnh Bất động sản',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(Icons.camera_alt_outlined, color: primaryColor),
+                title: const Text('Chụp ảnh từ Camera'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final XFile? file = await _picker.pickImage(
+                      source: ImageSource.camera,
+                      imageQuality: 85,
+                    );
+                    if (file != null && mounted) {
+                      setState(() => _selectedImages.insert(0, file.path));
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Không thể mở Camera: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library_outlined, color: primaryColor),
+                title: const Text('Chọn ảnh từ Thư viện (Gallery)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final List<XFile> files =
+                        await _picker.pickMultiImage(imageQuality: 85);
+                    if (files.isNotEmpty && mounted) {
+                      setState(() {
+                        for (final f in files) {
+                          if (_selectedImages.length < 5) {
+                            _selectedImages.add(f.path);
+                          }
+                        }
+                      });
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Không thể mở Thư viện ảnh: $e')),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
@@ -33,12 +117,14 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         'name': _nameController.text.trim(),
         'type': _selectedType,
         'address': _addressController.text.trim(),
-        'district': _districtController.text.trim(), // Lấy dữ liệu quận động
-        'ward': _wardController.text.trim(),         // Lấy dữ liệu phường động
+        'district': _districtController.text.trim(),
+        'ward': _wardController.text.trim(),
         'totalRooms': int.tryParse(_roomsController.text.trim()) ?? 1,
         'status': _selectedStatus == 'Đang hoạt động' ? 'active' : 'inactive',
         'description': _descController.text.trim(),
-        'image': 'frontend/assets/images/anhPhongDemo.jpg',
+        'image': _selectedImages.isNotEmpty
+            ? _selectedImages.first
+            : 'frontend/assets/images/anhPhongDemo.jpg',
       };
 
       try {
@@ -70,6 +156,17 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         }
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _addressController.dispose();
+    _districtController.dispose();
+    _wardController.dispose();
+    _roomsController.dispose();
+    _descController.dispose();
+    super.dispose();
   }
 
   @override
@@ -114,7 +211,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionTitle('Hình ảnh Tòa nhà / Bất động sản'),
+                        _buildSectionTitle(
+                          'Hình ảnh Tòa nhà / Bất động sản (Thư viện / Camera)',
+                        ),
                         const SizedBox(height: 8),
                         _buildImagePickerSection(),
                         const SizedBox(height: 20),
@@ -127,7 +226,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                               label: 'Tên Tòa nhà / Dãy trọ',
                               hint: 'VD: Chung cư Mini Q7',
                               icon: Icons.apartment_outlined,
-                              validator: (val) => val == null || val.isEmpty ? 'Vui lòng nhập tên' : null,
+                              validator: (val) => val == null || val.isEmpty
+                                  ? 'Vui lòng nhập tên'
+                                  : null,
                             ),
                             const SizedBox(height: 16),
                             _buildTextField(
@@ -135,7 +236,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                               label: 'Địa chỉ chi tiết',
                               hint: 'VD: 123 Nguyễn Thị Thập',
                               icon: Icons.location_on_outlined,
-                              validator: (val) => val == null || val.isEmpty ? 'Vui lòng nhập địa chỉ' : null,
+                              validator: (val) => val == null || val.isEmpty
+                                  ? 'Vui lòng nhập địa chỉ'
+                                  : null,
                             ),
                             const SizedBox(height: 16),
                             Row(
@@ -146,7 +249,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                                     label: 'Quận / Huyện',
                                     hint: 'VD: Quận 7',
                                     icon: Icons.map_outlined,
-                                    validator: (val) => val == null || val.isEmpty ? 'Nhập quận' : null,
+                                    validator: (val) => val == null || val.isEmpty
+                                        ? 'Nhập quận'
+                                        : null,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -156,7 +261,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                                     label: 'Phường / Xã',
                                     hint: 'VD: Tân Quy',
                                     icon: Icons.location_city_outlined,
-                                    validator: (val) => val == null || val.isEmpty ? 'Nhập phường' : null,
+                                    validator: (val) => val == null || val.isEmpty
+                                        ? 'Nhập phường'
+                                        : null,
                                   ),
                                 ),
                               ],
@@ -205,7 +312,7 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, -4),
                       ),
@@ -265,7 +372,7 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -318,37 +425,103 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   }
 
   Widget _buildImagePickerSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: primaryColor.withOpacity(0.1),
-            child: Icon(Icons.add_a_photo_outlined, color: primaryColor),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Thêm hình ảnh tổng quan tòa nhà',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: _showImageSourceSheet,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: primaryColor.withValues(alpha: 0.4),
+                style: BorderStyle.solid,
+              ),
+            ),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: primaryColor.withValues(alpha: 0.1),
+                  child: Icon(Icons.add_a_photo_outlined, color: primaryColor),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Bấm để chọn ảnh từ Thư viện hoặc Chụp ảnh',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Đã chọn ${_selectedImages.length}/5 ảnh',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            'Hỗ trợ JPG, PNG (Tối đa 5 ảnh)',
-            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+        ),
+        if (_selectedImages.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _selectedImages.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, idx) {
+                final path = _selectedImages[idx];
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 92,
+                    height: 92,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.file(
+                          File(path),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.image,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedImages.removeAt(idx);
+                              });
+                            },
+                            child: const CircleAvatar(
+                              radius: 11,
+                              backgroundColor: Colors.black54,
+                              child: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
-      ),
+      ],
     );
   }
 

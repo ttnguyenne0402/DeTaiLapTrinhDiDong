@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../route/app_routes.dart';
 import '../../screens/auth/login_screen.dart';
+import '../../screens/owner/owner_dashboard.dart';
 import '../../screens/owner/contracts_manage.dart';
 import '../../screens/owner/invoices_manage..dart';
 import '../../screens/owner/maintenance_manage.dart';
 import '../../screens/owner/posts_manage.dart';
-import '../../screens/owner/utility_readings.dart';
 import '../../screens/owner/properties_manage.dart';
 import '../../screens/owner/appointments_manage.dart';
 import '../../screens/owner/services_manage.dart';
-import '../../screens/owner/utility_readings.dart';
+import '../../screens/owner/owner_notifications_screen.dart';
 
 class OwnerDrawer extends StatelessWidget {
   /// Mã định danh màn hình hiện tại để làm nổi bật :
@@ -158,7 +157,7 @@ class OwnerDrawer extends StatelessWidget {
                   },
                 ),
 
-                // 7. Quản lý Dịch vụ & Bảng giá (MỚI THÊM)
+                // 7. Quản lý Dịch vụ & Bảng giá
                 _buildDrawerItem(
                   context: context,
                   icon: Icons.room_service_outlined,
@@ -172,6 +171,26 @@ class OwnerDrawer extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (context) => const ServicesManageScreen(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+
+                // 8. Thông báo của Chủ trọ
+                _buildDrawerItem(
+                  context: context,
+                  icon: Icons.notifications_active_outlined,
+                  title: 'Thông báo của bạn',
+                  subtitle: 'Lịch xem phòng, duyệt tin, báo hỏng, thanh toán...',
+                  isActive: currentRoute == 'notifications',
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (currentRoute != 'notifications') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const OwnerNotificationsScreen(),
                         ),
                       );
                     }
@@ -241,12 +260,14 @@ class OwnerDrawer extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
+                        color: Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child:const Icon(Icons.logout_rounded,
+                      child: const Icon(
+                        Icons.logout_rounded,
                         color: Colors.red,
-                        size: 20,)
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -308,14 +329,20 @@ class OwnerDrawer extends StatelessWidget {
                 ),
                 child: CircleAvatar(
                   radius: 28,
-                  backgroundColor: Color(0xFF2C7D73),
-                  backgroundImage: AssetImage(
+                  backgroundColor: const Color(0xFF2C7D73),
+                  backgroundImage: const AssetImage(
                     'frontend/assets/images/avatarDemo.jpg',
                   ),
-                  child:InkWell(onTap: (){
-                    Navigator.pushNamed(context, AppRoutes.OwnerDashboard);
-                  },
-
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OwnerDashboard(),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -343,7 +370,7 @@ class OwnerDrawer extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.9),
+                            color: Colors.orange.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Text(
@@ -372,7 +399,7 @@ class OwnerDrawer extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
+              color: Colors.white.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Row(
@@ -426,7 +453,9 @@ class OwnerDrawer extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
-        color: isActive ? primaryColor.withOpacity(0.08) : Colors.transparent,
+        color: isActive
+            ? primaryColor.withValues(alpha: 0.08)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
       ),
       child: ListTile(
@@ -436,7 +465,9 @@ class OwnerDrawer extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: isActive ? primaryColor : primaryColor.withOpacity(0.08),
+            color: isActive
+                ? primaryColor
+                : primaryColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -457,7 +488,7 @@ class OwnerDrawer extends StatelessWidget {
           subtitle,
           style: TextStyle(
             color: isActive
-                ? primaryColor.withOpacity(0.8)
+                ? primaryColor.withValues(alpha: 0.8)
                 : const Color(0xFF78909C),
             fontSize: 11,
           ),

@@ -36,14 +36,14 @@ namespace Backend.Controllers
                 // 2. Thống kê số lượng các chỉ số chính (ngắn gọn bằng LINQ CountAsync)
                 var rentedRooms = await _context.Rooms.CountAsync(r => roomIds.Contains(r.Id) && r.Status == "rented");
                 var emptyRooms = await _context.Rooms.CountAsync(r => roomIds.Contains(r.Id) && r.Status == "available");
-                var scheduledAppointments = await _context.ViewingAppointments.CountAsync(v => roomIds.Contains(v.RoomId) && (v.Status == "confirmed" || v.Status == "pending"));
+                var scheduledAppointments = await _context.ViewingAppointments.CountAsync(v => roomIds.Contains(v.RoomId) && (v.Status == "confirmed" || v.Status == "pending" || v.Status == "rescheduled"));
                 var repairRequests = await _context.MaintenanceRequests.CountAsync(m => roomIds.Contains(m.RoomId) && m.Status == "pending");
 
                 // 3. Lấy danh sách lịch xem phòng sắp tới
                 var rawAppointments = await (from v in _context.ViewingAppointments
                                              join r in _context.Rooms on v.RoomId equals r.Id
                                              join u in _context.Users on v.TenantId equals u.Id
-                                             where roomIds.Contains(v.RoomId) && (v.Status == "confirmed" || v.Status == "pending")
+                                             where roomIds.Contains(v.RoomId) && (v.Status == "confirmed" || v.Status == "pending" || v.Status == "rescheduled")
                                              orderby v.AppointmentDate, v.AppointmentTime
                                              select new
                                              {
@@ -52,16 +52,16 @@ namespace Backend.Controllers
                                                  name = u.Name,
                                                  roomName = r.Name,
                                                  phone = v.Phone,
-                                                 status = v.Status == "confirmed" ? "Đã xác nhận" : "Chờ xác nhận"
+                                                 status = v.Status == "confirmed" ? "Đã xác nhận" : (v.Status == "rescheduled" ? "Đã đổi giờ" : "Chờ xác nhận")
                                              })
                                              .Take(5)
                                              .ToListAsync(); 
 
                 // Format lại chuỗi thời gian ở phía client C# cho an toàn tuyệt đối
                 var upcomingAppointments = rawAppointments.Select(v => new {
-                    time = v.date.ToString("dd/MM/yyyy") + ", " + v.timeSpan.ToString(@"hh\:mm"),
+                    time = v.date.ToString("dd/MM/yyyy") + ", " + v.timeSpan.ToString("HH:mm"),
                     name = v.name,
-                    roomInfo = "Phòng " + v.roomName,
+                    roomInfo = v.roomName.StartsWith("Phòng", StringComparison.OrdinalIgnoreCase) ? v.roomName : "Phòng " + v.roomName,
                     status = v.status,
                     phone = v.phone
                 }).ToList();

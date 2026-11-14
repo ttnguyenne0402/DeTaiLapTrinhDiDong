@@ -40,7 +40,6 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             'unit': s.unit,
             'icon': _getIconData(s.icon),
             'iconName': s.icon,
-            'iconColor': _getIconColor(s.icon),
             'isMandatory': s.isMandatory,
             'status': s.status,
             'description': s.description,
@@ -79,23 +78,6 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
         return Icons.local_laundry_service;
       default:
         return Icons.miscellaneous_services;
-    }
-  }
-
-  Color _getIconColor(String icon) {
-    switch (icon.toLowerCase()) {
-      case 'bolt':
-        return Colors.amber[700]!;
-      case 'water_drop':
-        return Colors.blue[600]!;
-      case 'wifi':
-        return Colors.green[600]!;
-      case 'cleaning_services':
-        return Colors.orange[700]!;
-      case 'elevator':
-        return Colors.purple[600]!;
-      default:
-        return AppColors.primaryGreen;
     }
   }
 
@@ -154,10 +136,10 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryGreen.withOpacity(0.08),
+                          color: AppColors.primaryGreen.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.primaryGreen.withOpacity(0.2),
+                            color: AppColors.primaryGreen.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
@@ -249,14 +231,6 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
           );
           if (result == true) {
             _loadServices();
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Đã cập nhật dịch vụ từ SQL Server!'),
-                  backgroundColor: AppColors.primaryGreen,
-                ),
-              );
-            }
           }
         },
         backgroundColor: Colors.orange,

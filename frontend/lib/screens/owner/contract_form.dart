@@ -489,9 +489,11 @@ class HopDongMoi extends State<Contract_form> {
                                         ),
                                       ),
                                     ),
-                                    const Text(
-                                      '25 m²',
-                                      style: TextStyle(
+                                    Text(
+                                      widget.contract?['area'] != null
+                                          ? '${widget.contract!['area']} m²'
+                                          : '25 m²',
+                                      style: const TextStyle(
                                         fontSize: 11,
                                         color: AppColors.textSecondary,
                                       ),
@@ -508,8 +510,9 @@ class HopDongMoi extends State<Contract_form> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  widget.contract?['rentPrice'] ??
-                                      '4.500.000 đ/tháng',
+                                  widget.contract?['rentPrice'] != null
+                                      ? '${widget.contract!['rentPrice']} đ/tháng'
+                                      : '4.500.000 đ/tháng',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.brown,
@@ -532,7 +535,9 @@ class HopDongMoi extends State<Contract_form> {
                       ),
                     ),
                     ContractFormWidgets.buildDropdownField(
-                      'Khu trọ Bình Thạnh (12 phòng)',
+                      widget.contract?['propertyName'] ??
+                          widget.contract?['address'] ??
+                          'Khu trọ Bình Thạnh (12 phòng)',
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -557,7 +562,8 @@ class HopDongMoi extends State<Contract_form> {
                       ),
                     ),
                     ContractFormWidgets.buildDropdownField(
-                      '#AF-8823 - Nguyễn Văn An - 10:00 24/08/...',
+                      widget.contract?['appointmentInfo'] ??
+                          '#AF-8823 - Nguyễn Văn An - 10:00 24/08/...',
                     ),
                   ],
                 ),
