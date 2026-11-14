@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/contract_form_w.dart';
+import '../../services/owner/contract_service.dart';
 
 class Contract_form extends StatefulWidget {
   final Map<String, dynamic>? contract;
@@ -18,8 +19,67 @@ class Contract_form extends StatefulWidget {
 
 class HopDongMoi extends State<Contract_form> {
   bool _agreeTerms = false;
+  bool _isLoadingData = false;
 
-  // Controller quản lý dữ liệu nhập từ các ô TextField
+  // Dữ liệu phòng trống & Lịch hẹn
+  List<dynamic> _availableRooms = [];
+  Map<String, dynamic>? _selectedRoom;
+
+  List<dynamic> _appointments = [];
+  Map<String, dynamic>? _selectedAppointment; // null = Khách vãng lai
+
+  // Dịch vụ áp dụng & Dịch vụ còn lại trong CSDL
+  List<dynamic> _appliedServices = [];
+  List<dynamic> _availableOtherServices = [];
+
+  // Lấy ID chuẩn của một object phòng bất kỳ
+  String _getRoomId(Map<dynamic, dynamic>? room) {
+    if (room == null) return '';
+    return (room['roomId'] ?? room['RoomId'] ?? room['id'] ?? room['Id'])?.toString().trim() ?? '';
+  }
+
+  // Lọc lịch hẹn của đúng phòng đang chọn (bắt mọi định dạng ID)
+  List<dynamic> get _appointmentsForSelectedRoom {
+    final currentRoomId = _getRoomId(_selectedRoom);
+    if (currentRoomId.isEmpty) return [];
+
+    final filtered = _appointments.where((a) {
+      if (a is! Map) return false;
+      final aptRoomId = (a['roomId'] ?? a['RoomId'] ?? a['room_id'] ?? a['id'] ?? a['Id'])?.toString().trim();
+      return aptRoomId != null && aptRoomId.toLowerCase() == currentRoomId.toLowerCase();
+    }).toList();
+
+    // Nếu đang mở bản nháp mà lịch hẹn đã chọn chưa nằm trong danh sách lọc thì đưa vào đầu
+    if (_selectedAppointment != null) {
+      final selectedId = (_selectedAppointment!['id'] ?? _selectedAppointment!['Id'])?.toString();
+      final exists = filtered.any((a) => (a['id'] ?? a['Id'])?.toString() == selectedId);
+      if (!exists) {
+        filtered.insert(0, _selectedAppointment);
+      }
+    }
+
+    return filtered;
+  }
+
+  // Kỳ thanh toán
+  String _selectedPaymentCycle = 'Hàng tháng (Từ ngày 01 đến 05)';
+  final List<String> _paymentCycles = [
+    'Hàng tháng (Từ ngày 01 đến 05)',
+    'Hàng quý (3 tháng / lần)',
+    'Nửa năm (6 tháng / lần)',
+  ];
+
+  // Danh mục nội quy phòng trọ
+  final List<String> _houseRules = [
+    'Giữ gìn an ninh trật tự chung; không gây ồn ào, hát karaoke sau 23h00.',
+    'Thanh toán tiền thuê phòng và phí dịch vụ đúng hạn từ ngày 01 đến ngày 05 hàng tháng.',
+    'Tuyệt đối nghiêm cấm tàng trữ, sử dụng chất cấm, pháo nổ hoặc vũ khí trái phép.',
+    'Giữ gìn vệ sinh chung, bỏ rác đúng nơi và đúng khung giờ quy định của dãy trọ.',
+    'Bảo quản tài sản, thiết bị phòng; không tự ý khoan đục, thay đổi kết cấu xây dựng.',
+    'Người ở ngoài qua đêm phải thông báo trước với chủ trọ để khai báo tạm trú theo quy định pháp luật.',
+    'Báo trước tối thiểu 30 ngày trước khi trả phòng để được đối soát và hoàn tiền cọc.',
+  ];
+
   late final TextEditingController _tenantNameController;
   late final TextEditingController _tenantPhoneController;
   late final TextEditingController _cccdController;
@@ -37,19 +97,12 @@ class HopDongMoi extends State<Contract_form> {
   late final SignatureController _ownerSignatureController;
   late final SignatureController _tenantSignatureController;
 
-  bool get _isDraft => widget.contract?['status'] == 'Bản nháp';
+  bool get _isDraft => widget.contract?['status'] == 'Bản nháp' || widget.contract?['status'] == 'draft';
+  bool get _isPendingSignature => widget.contract?['status'] == 'Chờ ký' || widget.contract?['status'] == 'pending';
+  bool get _isActive => widget.contract?['status'] == 'Đang hiệu lực' || widget.contract?['status'] == 'active';
 
-  bool get _isPendingSignature =>
-      widget.contract?['status'] == 'Chờ ký';
-
-  bool get _isActive => widget.contract?['status'] == 'Đang hiệu lực';
-
-  bool get _ownerHasSigned =>
-      _ownerSignatureController.points.isNotEmpty;
-
-  bool get _tenantHasSigned =>
-      _tenantSignatureController.points.isNotEmpty;
-
+  bool get _ownerHasSigned => _ownerSignatureController.points.isNotEmpty;
+  bool get _tenantHasSigned => _tenantSignatureController.points.isNotEmpty;
   bool get _bothSigned => _ownerHasSigned && _tenantHasSigned;
 
   String get _title {
@@ -68,41 +121,23 @@ class HopDongMoi extends State<Contract_form> {
 
     final c = widget.contract;
 
-    _tenantNameController = TextEditingController(
-      text: c?['tenantName'] ?? 'Nguyễn Văn An',
-    );
-    _tenantPhoneController = TextEditingController(
-      text: c?['tenantPhone'] ?? '0908123456',
-    );
-    _cccdController = TextEditingController(
-      text: c?['cccd'] ?? '079098001234',
-    );
-    _issueDateController = TextEditingController(
-      text: c?['issueDate'] ?? '12/04/2021',
-    );
-    _issuePlaceController = TextEditingController(
-      text: c?['issuePlace'] ?? 'Cục CSQLHC về trật tự xã hội',
-    );
+    _tenantNameController = TextEditingController(text: c?['tenantName'] ?? '');
+    _tenantPhoneController = TextEditingController(text: c?['tenantPhone'] ?? '');
+    _cccdController = TextEditingController(text: c?['cccd'] ?? '');
+    _issueDateController = TextEditingController(text: c?['issueDate'] ?? '12/04/2021');
+    _issuePlaceController = TextEditingController(text: c?['issuePlace'] ?? 'Cục CSQLHC về trật tự xã hội');
 
-    _startDateController = TextEditingController(
-      text: c?['startDate'] ?? '01/09/2024',
-    );
-    _endDateController = TextEditingController(
-      text: c?['endDate'] ?? '31/08/2025',
-    );
+    _startDateController = TextEditingController(text: c?['startDate'] ?? '01/11/2026');
+    _endDateController = TextEditingController(text: c?['endDate'] ?? '31/10/2027');
     _rentPriceController = TextEditingController(
-      text: (c?['rentPrice'] ?? '4.500.000').replaceAll('đ', '').trim(),
+      text: (c?['rentPrice'] ?? '3500000').toString().replaceAll('đ', '').replaceAll('.', '').trim(),
     );
     _depositPriceController = TextEditingController(
-      text: (c?['depositPrice'] ?? '9.000.000').replaceAll('đ', '').trim(),
+      text: (c?['depositPrice'] ?? '3500000').toString().replaceAll('đ', '').replaceAll('.', '').trim(),
     );
 
-    _electricIndexController = TextEditingController(
-      text: c?['electricIndex'] ?? '1420',
-    );
-    _waterIndexController = TextEditingController(
-      text: c?['waterIndex'] ?? '85',
-    );
+    _electricIndexController = TextEditingController(text: c?['electricIndex'] ?? '1420');
+    _waterIndexController = TextEditingController(text: c?['waterIndex'] ?? '85');
 
     _ownerSignatureController = SignatureController(
       penStrokeWidth: 2.5,
@@ -118,6 +153,128 @@ class HopDongMoi extends State<Contract_form> {
 
     _ownerSignatureController.addListener(_refreshSignatureState);
     _tenantSignatureController.addListener(_refreshSignatureState);
+
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() => _isLoadingData = true);
+    final rooms = await ContractService.getAvailableRooms();
+    final apts = await ContractService.getAppointments();
+
+    debugPrint('--> [LOG] Số phòng trống: ${rooms.length} | Số lịch hẹn: ${apts.length}');
+
+    if (mounted) {
+      setState(() {
+        _availableRooms = rooms;
+        _appointments = apts;
+        _isLoadingData = false;
+
+        final c = widget.contract;
+
+        if (c != null) {
+          final targetRoomId = (c['roomId'] ?? c['RoomId'])?.toString().trim();
+          final targetRoomText = (c['room'] ?? c['Room'] ?? c['roomName'])?.toString().trim();
+          final targetAptId = (c['viewingAppointmentId'] ?? c['ViewingAppointmentId'])?.toString().trim();
+          final targetPhone = (c['tenantPhone'] ?? c['TenantPhone'])?.toString().trim();
+
+          // 1. Tìm lại lịch hẹn
+          Map<String, dynamic>? matchedApt;
+          if (targetAptId != null && targetAptId.isNotEmpty) {
+            final found = _appointments.firstWhere(
+                  (a) => (a['id'] ?? a['Id'] ?? a['appointmentId'])?.toString().trim() == targetAptId,
+              orElse: () => null,
+            );
+            if (found != null) matchedApt = Map<String, dynamic>.from(found);
+          }
+
+          if (matchedApt == null && targetPhone != null && targetPhone.isNotEmpty) {
+            final found = _appointments.firstWhere(
+                  (a) => (a['tenantPhone'] ?? a['TenantPhone'] ?? a['phone'])?.toString().trim() == targetPhone,
+              orElse: () => null,
+            );
+            if (found != null) matchedApt = Map<String, dynamic>.from(found);
+          }
+
+          if (matchedApt != null) {
+            _selectedAppointment = matchedApt;
+          }
+
+          // 2. Tìm đúng phòng tương ứng
+          final expectedRoomId = targetRoomId ?? (matchedApt != null ? (matchedApt['roomId'] ?? matchedApt['RoomId']) : null)?.toString();
+
+          final matchedRoom = _availableRooms.firstWhere(
+                (r) {
+              final rId = _getRoomId(r);
+              final rName = (r['roomName'] ?? r['name'])?.toString() ?? '';
+              if (expectedRoomId != null && expectedRoomId.isNotEmpty && rId.toLowerCase() == expectedRoomId.toLowerCase()) {
+                return true;
+              }
+              if (targetRoomText != null && targetRoomText.isNotEmpty && targetRoomText.contains(rName)) {
+                return true;
+              }
+              return false;
+            },
+            orElse: () => _availableRooms.isNotEmpty ? _availableRooms.first : null,
+          );
+
+          if (matchedRoom != null) {
+            _selectedRoom = Map<String, dynamic>.from(matchedRoom);
+          }
+        } else if (_availableRooms.isNotEmpty) {
+          _selectedRoom = Map<String, dynamic>.from(_availableRooms.first);
+        }
+
+        // 3. Tải dịch vụ cho phòng đã chọn
+        if (_selectedRoom != null) {
+          final roomId = _getRoomId(_selectedRoom);
+          if (c == null) {
+            _rentPriceController.text = ((_selectedRoom!['price'] ?? 0) as num).toInt().toString();
+            _depositPriceController.text = ((_selectedRoom!['deposit'] ?? 0) as num).toInt().toString();
+          }
+          if (roomId.isNotEmpty) {
+            _fetchRoomServices(roomId);
+          }
+        }
+      });
+    }
+  }
+
+  // Tự nạp dịch vụ khi chọn phòng
+  Future<void> _fetchRoomServices(String roomId) async {
+    try {
+      final result = await ContractService.getRoomServices(roomId);
+      if (result is Map && mounted) {
+        final defaultsRaw = (result['defaultServices'] ?? result['DefaultServices']) as List<dynamic>? ?? [];
+        final othersRaw = (result['otherServices'] ?? result['OtherServices']) as List<dynamic>? ?? [];
+
+        setState(() {
+          _appliedServices = defaultsRaw.map((item) {
+            final m = Map<String, dynamic>.from(item as Map);
+            final rawPrice = m['price'] ?? m['Price'];
+            return {
+              'serviceId': m['serviceId'] ?? m['ServiceId'] ?? '',
+              'name': m['name'] ?? m['Name'] ?? '',
+              'unit': m['unit'] ?? m['Unit'] ?? '',
+              'price': rawPrice != null ? (rawPrice as num).toDouble() : 0.0,
+              'selected': true,
+            };
+          }).toList();
+
+          _availableOtherServices = othersRaw.map((item) {
+            final m = Map<String, dynamic>.from(item as Map);
+            final rawPrice = m['price'] ?? m['Price'];
+            return {
+              'serviceId': m['serviceId'] ?? m['ServiceId'] ?? '',
+              'name': m['name'] ?? m['Name'] ?? '',
+              'unit': m['unit'] ?? m['Unit'] ?? '',
+              'price': rawPrice != null && (rawPrice as num) > 0 ? (rawPrice as num).toDouble() : 50000.0,
+              'selected': false,
+            };
+          }).toList();
+        });
+      }
+    } catch (_) {}
   }
 
   void _refreshSignatureState() {
@@ -145,10 +302,134 @@ class HopDongMoi extends State<Contract_form> {
     super.dispose();
   }
 
-  Map<String, dynamic> _contractData(String status) {
-    return {
-      ...?widget.contract,
-      'status': status,
+  Future<void> _selectDate(TextEditingController controller) async {
+    DateTime initial = DateTime.now();
+    try {
+      final parts = controller.text.split('/');
+      if (parts.length == 3) {
+        initial = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
+      }
+    } catch (_) {}
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(primary: AppColors.primaryGreen),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final d = picked.day.toString().padLeft(2, '0');
+      final m = picked.month.toString().padLeft(2, '0');
+      final y = picked.year.toString();
+      setState(() {
+        controller.text = '$d/$m/$y';
+      });
+    }
+  }
+
+  // Thêm dịch vụ khác từ CSDL
+  void _showAddServiceFromDbDialog() {
+    if (_availableOtherServices.isEmpty) {
+      _showMessage('Không còn dịch vụ nào khác trong cơ sở dữ liệu.');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thêm dịch vụ từ hệ thống', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _availableOtherServices.length,
+            itemBuilder: (context, index) {
+              final srv = _availableOtherServices[index];
+              return ListTile(
+                title: Text(srv['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                subtitle: Text('Đơn vị: ${srv['unit']}'),
+                trailing: const Icon(Icons.add_circle, color: AppColors.primaryGreen),
+                onTap: () {
+                  setState(() {
+                    _appliedServices.add({
+                      'serviceId': srv['serviceId'],
+                      'name': srv['name'],
+                      'unit': srv['unit'],
+                      'price': (srv['price'] as num?)?.toDouble() ?? 50000.0,
+                      'selected': true,
+                    });
+                    _availableOtherServices.removeAt(index);
+                  });
+                  Navigator.pop(ctx);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+        ],
+      ),
+    );
+  }
+
+  // Xóa bản nháp
+  Future<void> _deleteDraft() async {
+    final contractId = widget.contract?['id'] ?? widget.contract?['code'];
+    if (contractId == null) {
+      _showMessage('Không tìm thấy mã hợp đồng để xóa.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Xóa bản nháp?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text('Bản nháp hợp đồng này sẽ bị xóa vĩnh viễn khỏi hệ thống.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xác nhận xóa', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final success = await ContractService.deleteDraftContract(contractId.toString());
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã xóa bản nháp thành công!')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        _showMessage('Không thể xóa bản nháp này.');
+      }
+    }
+  }
+
+  // 1. Lưu bản nháp
+  Future<void> _saveDraft() async {
+    final body = {
+      'viewingAppointmentId': _selectedAppointment?['id'] ?? _selectedAppointment?['Id'],
+      'roomId': _getRoomId(_selectedRoom),
       'tenantName': _tenantNameController.text.trim(),
       'tenantPhone': _tenantPhoneController.text.trim(),
       'cccd': _cccdController.text.trim(),
@@ -156,30 +437,32 @@ class HopDongMoi extends State<Contract_form> {
       'issuePlace': _issuePlaceController.text.trim(),
       'startDate': _startDateController.text.trim(),
       'endDate': _endDateController.text.trim(),
-      'duration': '📅 ${_startDateController.text.trim()} - ${_endDateController.text.trim()}',
-      'rentPrice': '${_rentPriceController.text.trim()}đ',
-      'depositPrice': '${_depositPriceController.text.trim()}đ',
-      'electricIndex': _electricIndexController.text.trim(),
-      'waterIndex': _waterIndexController.text.trim(),
-      'termsAccepted': _agreeTerms,
-      'ownerSigned': _ownerHasSigned,
-      'tenantSigned': _tenantHasSigned,
+      'rentPrice': double.tryParse(_rentPriceController.text.replaceAll('.', '').trim()) ?? 0,
+      'depositPrice': double.tryParse(_depositPriceController.text.replaceAll('.', '').trim()) ?? 0,
+      'electricIndex': int.tryParse(_electricIndexController.text.trim()) ?? 0,
+      'waterIndex': int.tryParse(_waterIndexController.text.trim()) ?? 0,
+      'status': 'draft',
+      'services': _appliedServices.where((s) => s['selected'] == true).toList(),
     };
+
+    final success = await ContractService.createContract(body);
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu bản nháp vào hệ thống!')),
+      );
+      Navigator.pop(context, true);
+    } else {
+      _showMessage('Lỗi khi lưu bản nháp.');
+    }
   }
 
-  Future<void> _saveDraft() async {
-    final result = _contractData('Bản nháp');
-    Navigator.pop(context, result);
-  }
-
+  // 2. Hoàn tất & Gửi ký
   Future<void> _completeContract() async {
-    //1.kiểm tra họ tên
     if (_tenantNameController.text.trim().isEmpty) {
       _showMessage('Vui lòng nhập họ và tên khách thuê.');
       return;
     }
 
-    //2.kiểm tra số điện thoại (10 chữ số, bắt đầu bằng 0)
     final phone = _tenantPhoneController.text.trim();
     final phoneRegex = RegExp(r'^0[0-9]{9}$');
     if (!phoneRegex.hasMatch(phone)) {
@@ -187,14 +470,12 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
-    //3.kiểm tra CCCD (chuẩn 12 chữ số)
     final cccd = _cccdController.text.trim();
     if (cccd.length != 12 || int.tryParse(cccd) == null) {
       _showMessage('Số CCCD không hợp lệ (phải đủ 12 chữ số).');
       return;
     }
 
-    //4.kiểm tra ngày cấp & nơi cấp
     if (_issueDateController.text.trim().isEmpty) {
       _showMessage('Vui lòng nhập ngày cấp CCCD.');
       return;
@@ -204,7 +485,6 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
-    //5.kiểm tra giá thuê và tiền cọc
     final rentPrice = double.tryParse(_rentPriceController.text.replaceAll('.', '').trim()) ?? 0;
     if (rentPrice <= 0) {
       _showMessage('Giá thuê hàng tháng phải lớn hơn 0đ.');
@@ -217,30 +497,41 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
-    //6.kiểm tra chỉ số điện nước ban đầu
-    if (_electricIndexController.text.trim().isEmpty || int.tryParse(_electricIndexController.text.trim()) == null) {
-      _showMessage('Chỉ số điện ban đầu không hợp lệ.');
-      return;
-    }
-    if (_waterIndexController.text.trim().isEmpty || int.tryParse(_waterIndexController.text.trim()) == null) {
-      _showMessage('Chỉ số nước ban đầu không hợp lệ.');
-      return;
-    }
-
-    //7.iểm tra xác nhận nội quy
     if (!_agreeTerms) {
-      _showMessage('Vui lòng xác nhận đã phổ biến nội quy cho khách thuê.');
+      _showMessage('Vui lòng xác nhận đồng thuận với các quy định trọ.');
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã gửi liên kết ký hợp đồng tới email khách thuê!')),
-    );
+    final body = {
+      'viewingAppointmentId': _selectedAppointment?['id'] ?? _selectedAppointment?['Id'],
+      'roomId': _getRoomId(_selectedRoom),
+      'tenantName': _tenantNameController.text.trim(),
+      'tenantPhone': _tenantPhoneController.text.trim(),
+      'cccd': _cccdController.text.trim(),
+      'issueDate': _issueDateController.text.trim(),
+      'issuePlace': _issuePlaceController.text.trim(),
+      'startDate': _startDateController.text.trim(),
+      'endDate': _endDateController.text.trim(),
+      'rentPrice': rentPrice,
+      'depositPrice': depositPrice,
+      'electricIndex': int.tryParse(_electricIndexController.text.trim()) ?? 0,
+      'waterIndex': int.tryParse(_waterIndexController.text.trim()) ?? 0,
+      'status': 'pending',
+      'services': _appliedServices.where((s) => s['selected'] == true).toList(),
+    };
 
-    final result = _contractData('Chờ ký');
-    Navigator.pop(context, result);
+    final success = await ContractService.createContract(body);
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã tạo hợp đồng và gửi ký thành công!')),
+      );
+      Navigator.pop(context, true);
+    } else {
+      _showMessage('Lỗi khi tạo hợp đồng.');
+    }
   }
 
+  // 3. Ký hợp đồng
   Future<void> _signContract() async {
     if (!_agreeTerms) {
       _showMessage('Vui lòng đồng ý với điều khoản hợp đồng.');
@@ -257,7 +548,7 @@ class HopDongMoi extends State<Contract_form> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Xác nhận ký hợp đồng'),
         content: const Text(
-          'Hai bên đã ký và đồng ý điều khoản. '
+          'Hai bên đã ký và đồng ý các điều khoản nội quy. '
               'Bạn có chắc chắn muốn xác nhận hợp đồng không?',
         ),
         actions: [
@@ -266,19 +557,12 @@ class HopDongMoi extends State<Contract_form> {
             child: const Text('Hủy'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text(
-              'Xác nhận',
-              style: TextStyle(color: Colors.white),
-
-            ),
+            child: const Text('Xác nhận', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
-
     );
 
     if (confirmed != true || !mounted) return;
@@ -291,19 +575,86 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
-    final result = <String, dynamic>{
-      ..._contractData('Đang hiệu lực'),
-      'ownerSignature': base64Encode(ownerBytes),
-      'tenantSignature': base64Encode(tenantBytes),
-      'signedAt': DateTime.now().toIso8601String(),
-    };
+    final contractId = widget.contract?['code'] ?? widget.contract?['id'];
+    if (contractId == null) {
+      _showMessage('Không tìm thấy mã hợp đồng để ký.');
+      return;
+    }
 
-    Navigator.pop(context, result);
+    final success = await ContractService.signContract(
+      contractId: contractId.toString(),
+      ownerSignatureBase64: base64Encode(ownerBytes),
+      tenantSignatureBase64: base64Encode(tenantBytes),
+    );
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hợp đồng đã ký thành công và có hiệu lực!')),
+      );
+      Navigator.pop(context, true);
+    } else {
+      _showMessage('Lỗi khi lưu chữ ký hợp đồng.');
+    }
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showRulesDetailDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.gavel, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('Quy định & Nội quy trọ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Các điều khoản chung bắt buộc áp dụng đối với tất cả thành viên lưu trú:',
+                  style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                ..._houseRules.asMap().entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${entry.key + 1}. ',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryGreen),
+                        ),
+                        Expanded(
+                          child: Text(
+                            entry.value,
+                            style: const TextStyle(fontSize: 13, height: 1.35),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đã hiểu', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -316,142 +667,54 @@ class HopDongMoi extends State<Contract_form> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(
-            Icons.arrow_back,
-            size: 26,
-            color: Colors.white,
-          ),
+          icon: const Icon(Icons.arrow_back, size: 26, color: Colors.white),
         ),
         title: Text(
           _title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.white,
+          if (_isDraft)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.white),
+              tooltip: 'Xóa bản nháp',
+              onPressed: _deleteDraft,
             ),
-          ),
-          const SizedBox(width: 16),
-          const CircleAvatar(
-            backgroundColor: Colors.white24,
-            radius: 16,
-            child: Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 16),
         ],
       ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.background,
-          borderRadius: const BorderRadius.only(
+          borderRadius: BorderRadius.only(
             topLeft: Radius.circular(20),
             topRight: Radius.circular(20),
           ),
         ),
-        child: SingleChildScrollView(
+        child: _isLoadingData
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Tiến độ thiết lập hợp đồng',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.lightGreen,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _isPendingSignature
-                          ? 'Chờ ký'
-                          : _isActive
-                          ? 'Đang hiệu lực'
-                          : _isDraft
-                          ? 'Bản nháp'
-                          : 'Bước 6/6 Hoàn chỉnh',
-                      style: const TextStyle(
-                        color: AppColors.primaryGreen,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 4,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: _isPendingSignature
-                      ? Colors.blue
-                      : AppColors.accentYellow,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    _isPendingSignature
-                        ? Icons.edit_document
-                        : Icons.verified_outlined,
-                    size: 14,
-                    color: AppColors.primaryGreen,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      _isPendingSignature
-                          ? 'Hợp đồng đã hoàn tất, đang chờ xác nhận ký.'
-                          : 'Dữ liệu đã tự động điền từ Lịch hẹn chốt cọc',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
               // 1. NGUỒN TẠO VÀ LIÊN KẾT PHÒNG
               ContractFormWidgets.buildSectionCard(
                 step: '1',
-                title: 'Nguồn tạo & Liên kết phòng',
-                subtitle: 'Xác định cơ sở và căn phòng ký kết',
+                title: 'Chọn phòng & Nguồn người thuê',
+                subtitle: 'Chọn phòng trống trước, sau đó chọn khách hẹn hoặc nhập khách vãng lai',
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text('Chọn phòng còn trống', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: AppColors.lightGreen,
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
@@ -539,26 +802,56 @@ class HopDongMoi extends State<Contract_form> {
                           widget.contract?['address'] ??
                           'Khu trọ Bình Thạnh (12 phòng)',
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Phòng thuê',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
-                    ),
-                    ContractFormWidgets.buildDropdownField(
-                      widget.contract?['room'] ??
-                          'Phòng 201 - Tầng 2 (Giá niêm yết: 4.500.000)',
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Liên kết lịch xem phòng',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedAppointment?['id'] ?? _selectedAppointment?['Id'] ?? 'walkin',
+                          isExpanded: true,
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'walkin',
+                              child: Text('Khách trực tiếp / Vãng lai (Tự gõ thông tin)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            ),
+                            ..._appointmentsForSelectedRoom.map((a) {
+                              final aptId = (a['id'] ?? a['Id']).toString();
+                              final name = a['tenantName'] ?? a['TenantName'] ?? 'Khách xem phòng';
+                              final phone = a['tenantPhone'] ?? a['TenantPhone'] ?? '';
+                              return DropdownMenuItem(
+                                value: aptId,
+                                child: Text(
+                                  'Lịch hẹn: $name ($phone)',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            if (val == 'walkin') {
+                              setState(() {
+                                _selectedAppointment = null;
+                                _tenantNameController.clear();
+                                _tenantPhoneController.clear();
+                              });
+                            } else {
+                              final match = _appointmentsForSelectedRoom.firstWhere(
+                                    (a) => (a['id'] ?? a['Id']).toString() == val,
+                              );
+                              setState(() {
+                                _selectedAppointment = Map<String, dynamic>.from(match);
+                                _tenantNameController.text = match['tenantName'] ?? match['TenantName'] ?? '';
+                                _tenantPhoneController.text = match['tenantPhone'] ?? match['TenantPhone'] ?? '';
+                              });
+                            }
+                          },
+                        ),
                       ),
                     ),
                     ContractFormWidgets.buildDropdownField(
@@ -573,202 +866,62 @@ class HopDongMoi extends State<Contract_form> {
               ContractFormWidgets.buildSectionCard(
                 step: '2',
                 title: 'Thông tin Người thuê & Ở ghép',
-                subtitle: 'Chủ thể ký và người đồng ký tạm trú',
+                subtitle: 'Chủ thể ký hợp đồng',
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.lightGreen,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'NGƯỜI ĐỨNG TÊN HỢP ĐỒNG',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.textPrimary,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'Chủ thuê',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ContractFormWidgets.buildTextField(
-                                  'Họ và tên',
-                                  _tenantNameController.text,
-                                  false,
-                                  controller: _tenantNameController,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ContractFormWidgets.buildTextField(
-                                  'Số điện thoại',
-                                  _tenantPhoneController.text,
-                                  false,
-                                  controller: _tenantPhoneController,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ContractFormWidgets.buildTextField(
-                                  'Số CCCD / CMND',
-                                  _cccdController.text,
-                                  false,
-                                  controller: _cccdController,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ContractFormWidgets.buildTextField(
-                                  'Ngày cấp',
-                                  _issueDateController.text,
-                                  false,
-                                  controller: _issueDateController,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ContractFormWidgets.buildTextField(
-                            'Nơi cấp',
-                            _issuePlaceController.text,
-                            false,
-                            controller: _issuePlaceController,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text(
-                          'Thành viên đi cùng (Khai báo tạm trú)',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
+                      children: [
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Họ và tên khách',
+                            controller: _tenantNameController,
+                            hint: 'Nguyễn Văn An',
                           ),
                         ),
-                        Text(
-                          '1 người',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Số điện thoại',
+                            controller: _tenantPhoneController,
+                            hint: '0908123456',
+                            keyboardType: TextInputType.phone,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.lightGreen,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Text(
-                              'LH',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
-                              ),
-                            ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildInputField(
+                            label: 'Số CCCD (12 số)',
+                            controller: _cccdController,
+                            hint: '079098001234',
+                            keyboardType: TextInputType.number,
                           ),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Lê Thị Hoa',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  'CCCD: 079199005678 • Vợ/Bạn',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildDateField(
+                            label: 'Ngày cấp',
+                            controller: _issueDateController,
+                            onTap: () => _selectDate(_issueDateController),
                           ),
-                          const Icon(
-                            Icons.close,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.person_add, size: 16),
-                      label: const Text(
-                        'Thêm người ở cùng',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.lightGreen,
-                        minimumSize: const Size(double.infinity, 36),
-                        side: BorderSide.none,
-                        foregroundColor: AppColors.textPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
+                    _buildInputField(
+                      label: 'Nơi cấp',
+                      controller: _issuePlaceController,
+                      hint: 'Cục CSQLHC về trật tự xã hội',
                     ),
                   ],
                 ),
               ),
 
-              // 3. THỜI HẠN VÀ TIỀN
+              // 3. THỜI HẠN VÀ TIỀN PHÒNG
               ContractFormWidgets.buildSectionCard(
                 step: '3',
                 title: 'Thời hạn & Tiền phòng, Đặt cọc',
@@ -779,40 +932,18 @@ class HopDongMoi extends State<Contract_form> {
                     Row(
                       children: [
                         Expanded(
-                          child: ContractFormWidgets.buildTextField(
-                            'Ngày bắt đầu',
-                            _startDateController.text,
-                            true,
-                            suffixIcon: Icons.calendar_today,
+                          child: _buildDateField(
+                            label: 'Ngày bắt đầu',
                             controller: _startDateController,
+                            onTap: () => _selectDate(_startDateController),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: ContractFormWidgets.buildTextField(
-                            'Ngày kết thúc',
-                            _endDateController.text,
-                            true,
-                            suffixIcon: Icons.calendar_today,
+                          child: _buildDateField(
+                            label: 'Ngày kết thúc',
                             controller: _endDateController,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Thời hạn hợp đồng: 12 tháng',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
+                            onTap: () => _selectDate(_endDateController),
                           ),
                         ),
                       ],
@@ -821,242 +952,237 @@ class HopDongMoi extends State<Contract_form> {
                     Row(
                       children: [
                         Expanded(
-                          child: ContractFormWidgets.buildTextField(
-                            'Giá thuê hàng tháng',
-                            _rentPriceController.text,
-                            true,
-                            suffixText: 'đ',
+                          child: _buildInputField(
+                            label: 'Giá thuê hàng tháng (VNĐ)',
                             controller: _rentPriceController,
+                            hint: '3500000',
+                            keyboardType: TextInputType.number,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: ContractFormWidgets.buildTextField(
-                            'Tiền đặt cọc (Deposit)',
-                            _depositPriceController.text,
-                            true,
-                            suffixText: 'đ',
+                          child: _buildInputField(
+                            label: 'Tiền đặt cọc (VNĐ)',
                             controller: _depositPriceController,
+                            hint: '3500000',
+                            keyboardType: TextInputType.number,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    const Row(
-                      children: [
-                        Icon(Icons.check_circle, size: 14, color: Colors.green),
-                        SizedBox(width: 4),
-                        Text(
-                          'Đã thu đủ cọc ngày 25/08/2024',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Spacer(),
-                        Text(
-                          'Đã xác nhận',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Kỳ thanh toán tiền trọ',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textSecondary,
+                    const SizedBox(height: 10),
+                    const Text('Kỳ thanh toán tiền trọ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    ContractFormWidgets.buildDropdownField(
-                      'Hàng tháng (Từ ngày 01 đến 05)',
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedPaymentCycle,
+                          isExpanded: true,
+                          items: _paymentCycles.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13)))).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedPaymentCycle = val);
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              // 4. ĐIỆN NƯỚC
+              // 4. CHỈ SỐ BÀN GIAO & DỊCH VỤ ÁP DỤNG
               ContractFormWidgets.buildSectionCard(
                 step: '4',
-                title: 'Chỉ số điện nước ban đầu bàn giao',
-                subtitle: 'Chốt mốc bàn giao thiết bị phòng',
+                title: 'Chỉ số ban đầu & Dịch vụ áp dụng',
+                subtitle: 'Chốt mốc bàn giao thiết bị và các khoản phí dịch vụ',
                 content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Expanded(
-                          child: _buildUtilityBox(
+                          child: _buildInputField(
+                            label: 'Số điện ban đầu (kWh)',
                             controller: _electricIndexController,
-                            icon: Icons.flash_on,
-                            title: 'Điện ban đầu',
-                            unit: 'kWh',
-                            iconColor: AppColors.accentYellow,
+                            hint: '1420',
+                            keyboardType: TextInputType.number,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: _buildUtilityBox(
+                          child: _buildInputField(
+                            label: 'Số nước ban đầu (m³)',
                             controller: _waterIndexController,
-                            icon: Icons.water_drop,
-                            title: 'Nước ban đầu',
-                            unit: 'm³',
-                            iconColor: Colors.blue,
+                            hint: '85',
+                            keyboardType: TextInputType.number,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.lightGreen,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Ngày chốt chỉ số bàn giao:',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Dịch vụ áp dụng cho phòng:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                        InkWell(
+                          onTap: _showAddServiceFromDbDialog,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                            child: Row(
+                              children: [
+                                Icon(Icons.add_circle_outline, size: 16, color: AppColors.primaryGreen),
+                                SizedBox(width: 4),
+                                Text('Thêm dịch vụ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                              ],
                             ),
                           ),
-                          Text(
-                            '01/09/2024',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // 5. DỊCH VỤ
-              ContractFormWidgets.buildSectionCard(
-                step: '5',
-                title: 'Bảng dịch vụ áp dụng riêng',
-                subtitle: 'Thời giá dịch vụ bám theo phòng 201',
-                content: Column(
-                  children: [
-                    ContractFormWidgets.buildServiceRow(
-                      Icons.flash_on,
-                      'Điện sinh hoạt',
-                      '3.800 đ / kWh',
-                    ),
-                    ContractFormWidgets.buildServiceRow(
-                      Icons.water_drop,
-                      'Nước sinh hoạt',
-                      '35.000 đ / m³',
-                    ),
-                    ContractFormWidgets.buildServiceRow(
-                      Icons.wifi,
-                      'Internet / Wifi',
-                      '100.000 đ / phòng / tháng',
-                    ),
-                    ContractFormWidgets.buildServiceRow(
-                      Icons.cleaning_services,
-                      'Phí vệ sinh, rác',
-                      '50.000 đ / phòng',
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 6),
-                    OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text(
-                        'Thêm dịch vụ khác',
-                        style: TextStyle(fontSize: 12),
+                    if (_appliedServices.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text('Chưa có dịch vụ nào được nạp.', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.lightGreen,
-                        minimumSize: const Size(double.infinity, 36),
-                        side: BorderSide.none,
-                        foregroundColor: AppColors.textPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
+                    Column(
+                      children: _appliedServices.map((srv) {
+                        final isSelected = srv['selected'] == true;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.green.shade50 : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: isSelected ? AppColors.primaryGreen.withOpacity(0.5) : Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: isSelected,
+                                activeColor: AppColors.primaryGreen,
+                                onChanged: (val) {
+                                  setState(() => srv['selected'] = val ?? false);
+                                },
+                              ),
+                              Expanded(
+                                child: Text(
+                                  srv['name'] ?? '',
+                                  style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+                                ),
+                              ),
+                              Text(
+                                '${((srv['price'] ?? 0) as num).toInt()}đ / ${srv['unit']}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? AppColors.primaryGreen : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
                 ),
               ),
 
-              // 6. ĐIỀU KHOẢN
+              // 5. ĐIỀU KHOẢN VÀ NỘI QUY PHÒNG TRỌ
               ContractFormWidgets.buildSectionCard(
-                step: '6',
+                step: '5',
                 title: 'Điều khoản hợp đồng & Quy định trọ',
-                subtitle: 'Các cam kết an toàn & nội quy phòng trọ',
+                subtitle: 'Cam kết an ninh, nề nếp và trách nhiệm đôi bên',
                 content: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.lightGreen,
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.shade200),
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ContractFormWidgets.buildRuleItem(
-                            Icons.security,
-                            'An toàn PCCC:',
-                            'Nghiêm cấm đun nấu bằng bếp gas, tắt toàn bộ thiết bị điện có công suất lớn khi ra khỏi phòng.',
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.rule, size: 18, color: Colors.amber.shade900),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Tóm tắt quy chế nhà trọ',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                  ),
+                                ],
+                              ),
+                              GestureDetector(
+                                onTap: _showRulesDetailDialog,
+                                child: const Text(
+                                  'Chi tiết',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primaryGreen,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 6),
-                          ContractFormWidgets.buildRuleItem(
-                            Icons.access_time,
-                            'Giờ giấc & Trật tự:',
-                            'Cửa đóng tự động lúc 22:30. Giữ yên lặng chung sau 22:00, không tổ chức tiệc tùng gây mất trật tự.',
-                          ),
-                          const SizedBox(height: 6),
-                          ContractFormWidgets.buildRuleItem(
-                            Icons.policy,
-                            'Chính sách hoàn cọc:',
-                            'Khách thuê muốn chấm dứt hợp đồng phải thông báo trước tối thiểu 30 ngày để nhận hoàn lại 100% tiền cọc.',
-                          ),
-                          const SizedBox(height: 8),
+                          const Divider(height: 12),
+                          ..._houseRules.take(3).map((rule) => Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('• ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                Expanded(
+                                  child: Text(
+                                    rule,
+                                    style: const TextStyle(fontSize: 11.5, color: Colors.black87),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )),
+                          if (_houseRules.length > 3)
+                            GestureDetector(
+                              onTap: _showRulesDetailDialog,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  '+ Còn ${_houseRules.length - 3} quy định khác (Bấm để xem)...',
+                                  style: const TextStyle(fontSize: 11, color: Colors.black54, fontStyle: FontStyle.italic),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: Checkbox(
-                            value: _agreeTerms,
-                            activeColor: AppColors.primaryGreen,
-                            onChanged: (value) {
-                              setState(() {
-                                _agreeTerms = value ?? false;
-                              });
-                            },
-                          ),
+                        Checkbox(
+                          value: _agreeTerms,
+                          activeColor: AppColors.primaryGreen,
+                          onChanged: (val) => setState(() => _agreeTerms = val ?? false),
                         ),
-                        const SizedBox(width: 8),
                         const Expanded(
                           child: Text(
-                            'Tôi đã phổ biến và gửi kèm bộ Nội quy cho khách thuê.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textPrimary,
-                            ),
+                            'Tôi và bên thuê cam kết đã đọc, hiểu rõ và đồng ý tuân thủ toàn bộ điều khoản & nội quy trên.',
+                            style: TextStyle(fontSize: 12, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
@@ -1067,9 +1193,7 @@ class HopDongMoi extends State<Contract_form> {
 
               const SizedBox(height: 16),
 
-              // 7. KHU VỰC KÝ
               if (_isPendingSignature) _buildSignatureSection(),
-
               if (_isActive) _buildActiveContractInfo(),
 
               const SizedBox(height: 16),
@@ -1082,77 +1206,65 @@ class HopDongMoi extends State<Contract_form> {
     );
   }
 
-  Widget _buildUtilityBox({
+  Widget _buildInputField({
+    required String label,
     required TextEditingController controller,
-    required IconData icon,
-    required String title,
-    required String unit,
-    required Color iconColor,
+    required String hint,
+    TextInputType keyboardType = TextInputType.text,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: AppColors.lightGreen,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: iconColor),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+        const SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.normal),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primaryGreen)),
           ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: controller,
-                  keyboardType: TextInputType.number,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField({
+    required String label,
+    required TextEditingController controller,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+        const SizedBox(height: 4),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: IgnorePointer(
+            child: TextField(
+              controller: controller,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                suffixIcon: const Icon(Icons.calendar_month, size: 18, color: AppColors.primaryGreen),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
               ),
-              const SizedBox(width: 6),
-              Text(
-                unit,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1172,168 +1284,40 @@ class HopDongMoi extends State<Contract_form> {
             children: [
               Icon(Icons.draw_outlined, color: Colors.blue.shade700),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Xác nhận ký hợp đồng',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
+              const Text('Ký xác nhận hợp đồng điện tử', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Cả chủ trọ và người thuê cần ký vào vùng tương ứng bên dưới.',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          _buildSignatureBox(
-            title: 'Chữ ký chủ trọ',
-            controller: _ownerSignatureController,
-            hasSigned: _ownerHasSigned,
-          ),
-
-          const SizedBox(height: 14),
-
-          _buildSignatureBox(
-            title: 'Chữ ký người thuê',
-            controller: _tenantSignatureController,
-            hasSigned: _tenantHasSigned,
-          ),
-
-          const SizedBox(height: 14),
-
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: Checkbox(
-                    value: _agreeTerms,
-                    onChanged: (value) {
-                      setState(() {
-                        _agreeTerms = value ?? false;
-                      });
-                    },
-                    activeColor: AppColors.primaryGreen,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Tôi xác nhận thông tin chính xác và đồng ý với điều khoản hợp đồng.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          Text(
-            'Trạng thái: ${_ownerHasSigned ? "Chủ trọ đã ký" : "Chủ trọ chưa ký"} • ${_tenantHasSigned ? "Người thuê đã ký" : "Người thuê chưa ký"}',
-            style: TextStyle(
-              fontSize: 11,
-              color: _bothSigned ? Colors.green.shade700 : Colors.orange.shade800,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          const SizedBox(height: 12),
+          _buildSignatureBox(title: 'Chữ ký chủ trọ', controller: _ownerSignatureController, hasSigned: _ownerHasSigned),
+          const SizedBox(height: 12),
+          _buildSignatureBox(title: 'Chữ ký khách thuê', controller: _tenantSignatureController, hasSigned: _tenantHasSigned),
         ],
       ),
     );
   }
 
-  // hàm thiết kế ô ký
-  Widget _buildSignatureBox({
-    required String title,
-    required SignatureController controller,
-    required bool hasSigned,
-  }) {
+  Widget _buildSignatureBox({required String title, required SignatureController controller, required bool hasSigned}) {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: hasSigned ? Colors.green : Colors.grey.shade300,
-        ),
-      ),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: hasSigned ? Colors.green : Colors.grey.shade300)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Icon(
-                hasSigned ? Icons.check_circle : Icons.edit,
-                size: 17,
-                color: hasSigned ? Colors.green : Colors.grey,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 140,
-            width: double.infinity,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Signature(
-              controller: controller,
-              backgroundColor: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Vẽ chữ ký vào khung trên',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: AppColors.textSecondary,
-                ),
-              ),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
               TextButton.icon(
-                onPressed: () {
-                  controller.clear();
-                },
-                icon: const Icon(Icons.refresh, size: 15),
-                label: const Text(
-                  'Ký lại',
-                  style: TextStyle(fontSize: 11),
-                ),
+                onPressed: () => controller.clear(),
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('Ký lại', style: TextStyle(fontSize: 11)),
               ),
             ],
+          ),
+          Container(
+            height: 120,
+            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(6)),
+            child: Signature(controller: controller, backgroundColor: Colors.white),
           ),
         ],
       ),
@@ -1342,26 +1326,13 @@ class HopDongMoi extends State<Contract_form> {
 
   Widget _buildActiveContractInfo() {
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.lightGreen,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200),
-      ),
+      decoration: BoxDecoration(color: AppColors.lightGreen, borderRadius: BorderRadius.circular(12)),
       child: const Row(
         children: [
           Icon(Icons.verified, color: Colors.green),
           SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Hợp đồng đang có hiệu lực. Mọi khoản tiền thuê, điện nước và dịch vụ sẽ được tính theo hợp đồng này.',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
+          Expanded(child: Text('Hợp đồng đang có hiệu lực pháp lý.', style: TextStyle(fontSize: 12))),
         ],
       ),
     );
@@ -1369,58 +1340,13 @@ class HopDongMoi extends State<Contract_form> {
 
   Widget _buildBottomButtons() {
     if (_isPendingSignature) {
-      final canSign = _agreeTerms && _bothSigned;
-
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: canSign ? _signContract : null,
-          icon: const Icon(Icons.draw, size: 18, color: Colors.white),
-          label: Text(
-            canSign
-                ? 'Xác nhận ký hợp đồng'
-                : 'Cần đủ 2 chữ ký và đồng ý điều khoản',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryGreen,
-            disabledBackgroundColor: Colors.grey.shade400,
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_isActive) {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: _showTerminateDialog,
-          icon: const Icon(
-            Icons.assignment_return_outlined,
-            size: 18,
-            color: Colors.white,
-          ),
-          label: const Text(
-            'Thanh lý hợp đồng',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.shade700,
-            padding: const EdgeInsets.symmetric(vertical: 13),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
+          onPressed: (_agreeTerms && _bothSigned) ? _signContract : null,
+          icon: const Icon(Icons.draw, color: Colors.white),
+          label: const Text('Xác nhận ký hợp đồng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, padding: const EdgeInsets.symmetric(vertical: 12)),
         ),
       );
     }
@@ -1428,80 +1354,21 @@ class HopDongMoi extends State<Contract_form> {
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton.icon(
+          child: OutlinedButton(
             onPressed: _saveDraft,
-            icon: const Icon(Icons.save_outlined, size: 16),
-            label: const Text(
-              'Lưu bản nháp',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              side: const BorderSide(color: AppColors.primaryGreen),
-              foregroundColor: AppColors.primaryGreen,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+            child: const Text('Lưu bản nháp', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: ElevatedButton.icon(
+          child: ElevatedButton(
             onPressed: _completeContract,
-            icon: const Icon(Icons.check, size: 16, color: Colors.white),
-            label: const Text(
-              'Hoàn tất & Gửi ký',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, padding: const EdgeInsets.symmetric(vertical: 12)),
+            child: const Text('Hoàn tất & Gửi ký', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ),
         ),
       ],
-    );
-  }
-
-  void _showTerminateDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Thanh lý hợp đồng'),
-        content: const Text(
-          'Bạn muốn chuyển hợp đồng này sang trạng thái đã thanh lý?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final result = {
-                ..._contractData('Đã thanh lý'),
-                'terminatedAt': DateTime.now().toIso8601String(),
-              };
-              Navigator.pop(dialogContext);
-              Navigator.pop(this.context, result);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-            ),
-            child: const Text(
-              'Thanh lý',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

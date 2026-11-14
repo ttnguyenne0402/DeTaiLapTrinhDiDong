@@ -28,10 +28,12 @@ abstract class AppRoutes {
   static const String tenantContracts = '/tenant/contracts';
   static const String tenantContractDetail = '/tenant/contracts/detail';
   static const String tenantInvoices = '/tenant/invoices';
+  static const String tenantUtilityHistory = '/tenant/utility-history';
   static const String tenantInvoiceDetail = '/tenant/invoices/detail';
   static const String tenantPayment = '/tenant/payment';
   static const String tenantNotifications = '/tenant/notifications';
   static const String home = '/home';
   static const String roomDetail = '/room-detail';
   static const String tenantMaintenanceRequest = '/tenant/maintenance/request';
+  static const String tenantMaintenanceHistory = '/tenant/maintenance/history';
 }

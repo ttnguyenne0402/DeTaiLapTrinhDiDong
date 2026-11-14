@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
+import '../../utils/database_helper.dart';
 import '../../widgets/tenant/notification_item.dart';
+import 'dart:io';
+import 'package:http/io_client.dart';
+import '../../services/auth_storage.dart';
+import '../../utils/database_helper.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -12,40 +19,106 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
 
-  List<Map<String, dynamic>> dummyNotifications = [
-    {
-      'id': 'NOTIF-001',
-      'title': 'Hóa đơn tháng 10/2026 đã được tạo',
-      'message': 'Chủ nhà vừa phát hành hóa đơn mới. Vui lòng kiểm tra và thanh toán trước ngày 05/10/2026.',
-      'type': 'invoice',
-      'read_at': null,
-      'created_at': '10 phút trước',
-    },
-    {
-      'id': 'NOTIF-002',
-      'title': 'Lịch hẹn xem phòng đã được duyệt',
-      'message': 'Chủ nhà đã đồng ý lịch xem phòng 101 vào lúc 09:00 ngày 20/09/2026. Vui lòng đến đúng giờ.',
-      'type': 'viewing_appointment',
-      'read_at': null,
-      'created_at': '2 giờ trước',
-    },
-    {
-      'id': 'NOTIF-003',
-      'title': 'Cập nhật sự cố sửa chữa',
-      'message': 'Yêu cầu "Hư ống nước nhà vệ sinh" của bạn đang được xử lý (Processing). Thợ sẽ đến trong chiều nay.',
-      'type': 'maintenance',
-      'read_at': '2026-09-28 14:00:00',
-      'created_at': 'Hôm qua',
-    },
-    {
-      'id': 'NOTIF-004',
-      'title': 'Hợp đồng thuê phòng sắp hết hạn',
-      'message': 'Hợp đồng phòng 202 của bạn sẽ hết hạn vào ngày 30/10/2026. Vui lòng liên hệ Chủ nhà nếu muốn gia hạn.',
-      'type': 'contract',
-      'read_at': '2026-09-25 09:00:00',
-      'created_at': '5 ngày trước',
-    },
-  ];
+  List _notifications = [];
+  bool _isLoading = true;
+
+
+  late String _apiUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+  }
+  Future<void> _initData() async {
+    final userId = await AuthStorage.getUserId(); // Lấy ID thật
+    _apiUrl = 'http://10.0.2.2:5093/api/notifications/user/${userId ?? ""}';
+    await _loadData();
+  }
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
+
+
+
+  Future<void> _loadData() async {
+    // 1. Lấy dữ liệu từ SQLite (Hiển thị ngay lập tức)
+    final localData = await DatabaseHelper.instance.getLocalNotifications();
+    if (localData.isNotEmpty) {
+      setState(() {
+        _notifications = localData.map((e) =><String, dynamic> {
+          ...e,
+          'isRead': e['isRead'] == 1
+        }).toList();
+        _isLoading = false;
+      });
+    }
+
+    // 2. Gọi API để lấy dữ liệu mới nhất
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(Uri.parse(_apiUrl));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> apiData = json.decode(response.body);
+
+        // 3. Lưu đè dữ liệu mới vào SQLite
+        await DatabaseHelper.instance.insertNotifications(apiData);
+
+        // 4. Cập nhật lại UI
+        if (mounted) {
+          setState(() {
+            _notifications = List.from(apiData);
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      // Bắt lỗi nếu không có mạng. Lúc này UI vẫn hiển thị được dữ liệu từ localData
+      print("Lỗi khi lấy thông báo từ server: $e");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } finally {
+      // Luôn đóng client để giải phóng bộ nhớ
+      client.close();
+    }
+  }
+
+
+  // HÀM ĐÁNH DẤU ĐÃ ĐỌC THÔNG BÁO
+
+  Future<void> _markAsRead(String id) async {
+    // 1. URL API PATCH
+    final url = 'http://10.0.2.2:5093/api/notifications/$id/read';
+
+    // 2. Sử dụng Client tùy chỉnh
+    final client = _getCustomClient();
+
+    try {
+      final response = await client.patch(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        // 3. Nếu server thành công, cập nhật UI và lưu lại vào SQLite
+        setState(() {
+          final index = _notifications.indexWhere((n) => n['id'] == id);
+          if (index != -1) {
+            _notifications[index]['isRead'] = true;
+          }
+        });
+        await DatabaseHelper.instance.insertNotifications(_notifications);
+      }
+    } catch (e) {
+      print("Lỗi đánh dấu đã đọc: $e");
+    } finally {
+      client.close();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +137,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
-
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 AppRoutes.home,
@@ -74,16 +146,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           },
         ),
         actions: [
-
           IconButton(
             icon: const Icon(Icons.checklist, color: Colors.white),
             tooltip: 'Đánh dấu đã đọc tất cả',
-            onPressed: () {
-              setState(() {
-                for (var notif in dummyNotifications) {
-                  notif['read_at'] = DateTime.now().toString();
+            onPressed: () async {
+              final unreadNotifs = _notifications.where((n) => n['isRead'] == false).toList();
+
+              if (unreadNotifs.isNotEmpty) {
+                setState(() => _isLoading = true);
+
+                for (var notif in unreadNotifs) {
+                  await _markAsRead(notif['id']);
                 }
-              });
+                setState(() => _isLoading = false);
+              }
             },
           ),
         ],
@@ -96,7 +172,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ),
         child: ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: dummyNotifications.isEmpty
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _notifications.isEmpty
               ? const Center(
             child: Text(
               'Bạn không có thông báo nào.',
@@ -104,23 +182,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
           )
               : ListView.separated(
-            itemCount: dummyNotifications.length,
+            itemCount: _notifications.length,
             separatorBuilder: (context, index) => const Divider(
               height: 1,
               color: AppColors.lightGreen,
             ),
             itemBuilder: (context, index) {
-              final notif = dummyNotifications[index];
+              final notif = _notifications[index];
               return NotificationItem(
                 notificationData: notif,
                 onTap: () {
-
-                  if (notif['read_at'] == null) {
-                    setState(() {
-                      notif['read_at'] = DateTime.now().toString();
-                    });
+                  if (notif['isRead'] == false) {
+                    _markAsRead(notif['id']);
                   }
-
 
                   switch (notif['type']) {
                     case 'invoice':
@@ -132,19 +206,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     case 'contract':
                       Navigator.pushNamed(context, '/tenant/contracts/detail');
                       break;
-
-                  // MAINTENANCE SẼ DO TV4 LÀM NÊN TẠM THỜI CHƯA CÓ ROUTE CỤ THỂ CỦA TENANT
+                    case 'maintenance':
+                      Navigator.pushNamed(context, AppRoutes.tenantMaintenanceHistory);
+                      break;
                   }
-
-                  // TUẦN 7 VIẾT LỆNH ĐIỀU HƯỚNG
-
                 },
               );
             },
           ),
         ),
       ),
-
     );
   }
 }

@@ -7,6 +7,9 @@ import 'properties_manage.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'contract_form.dart';
 import 'tenant_list_screen.dart';
+import '../../services/owner/contract_service.dart';
+import '../../screens/owner/termination_screen.dart';
+
 
 class Contracts_manager extends StatefulWidget {
   const Contracts_manager({super.key});
@@ -19,485 +22,303 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
   String _selectedRole = "Tất cả";
   String _searchKeyword = "";
 
-  // dữ liệu mẫu
-  final List<Map<String, dynamic>> contracts = [
-    {
-      'status': 'Đang hiệu lực',
-      'room': 'Phòng 201 • Tầng 2',
-      'address': 'Khu trọ Bình Thạnh • 35 m²',
-      'code': 'HD-2024-P201',
-      'timeText': 'Còn 6 tháng',
-      'tenantName': 'Nguyễn Văn An',
-      'tenantPhone': '0908 123 456',
-      'rentPrice': '4.500.000đ',
-      'depositPrice': '9.000.000đ',
-      'duration': '📅 01/03/2024 - 28/02/2025',
-      'cycleText': 'Kỳ thu: Ngày 05',
-      'noteText': '2 người ở ghép (An, Hoa • Đã khai báo tạm trú)',
-    },
-    {
-      'status': 'Sắp hết hạn',
-      'room': 'Phòng 302 • Tầng 3',
-      'address': 'Khu trọ Bình Thạnh • Ban công',
-      'code': 'HD-2024-P302',
-      'timeText': 'Hết hạn sau 5 ngày!',
-      'tenantName': 'Trần Thị Bích',
-      'tenantPhone': '0933 555 789',
-      'rentPrice': '5.200.000đ',
-      'depositPrice': '10.400.000đ',
-      'duration': '📅 15/09/2023 - 15/09/2024',
-      'cycleText': 'Cần xử lý hoàn cọc',
-      'noteText': 'Đang chờ xử lý gia hạn / thanh lý',
-    },
-    {
-      'status': 'Bản nháp',
-      'room': 'Phòng 105 • Studio',
-      'address': 'Chưa kích hoạt hiệu lực',
-      'code': 'HD-2024-P105',
-      'timeText': 'Tạo từ lịch hẹn #AP-8823',
-      'tenantName': 'Phạm Hoàng Nam',
-      'tenantPhone': 'Chờ điền CCCD & ngày dọn vào',
-      'rentPrice': '6.000.000đ',
-      'depositPrice': '6.000.000đ',
-      'duration': '📅 Chưa hoàn tất',
-      'cycleText': 'Chưa thiết lập',
-      'noteText': 'Hợp đồng đang ở trạng thái bản nháp',
-    },
-    {
-      'status': 'Chờ ký',
-      'room': 'Phòng 108 • Tầng 1',
-      'address': 'Khu trọ Bình Thạnh • 30 m²',
-      'code': 'HD-2024-P108',
-      'timeText': 'Đang chờ khách thuê ký',
-      'tenantName': 'Lê Minh Tuấn',
-      'tenantPhone': '0912 345 678',
-      'rentPrice': '5.000.000đ',
-      'depositPrice': '10.000.000đ',
-      'duration': '📅 01/10/2024 - 30/09/2025',
-      'cycleText': 'Kỳ thu: Ngày 05',
-      'noteText': 'Chủ trọ đã hoàn tất hợp đồng, chờ người thuê ký',
-    },
-  ];
+  List<dynamic> _contracts = [];
+  int _activeCount = 0;
+  double _expectedRevenue = 0;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchContracts();
+  }
+
+  // Tải danh sách hợp đồng thực tế từ API Backend
+  Future<void> _fetchContracts() async {
+    setState(() => _isLoading = true);
+    try {
+      final res = await ContractService.getContracts(
+        status: _selectedRole,
+        search: _searchKeyword,
+      );
+      setState(() {
+        _contracts = res.contracts;
+        _activeCount = res.activeCount;
+        _expectedRevenue = res.expectedRevenue;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint("Lỗi nạp danh sách hợp đồng: $e");
+    }
+  }
+
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filteredContracts = contracts.where((contract) {
-      final matchesRole = (_selectedRole == "Tất cả") || (contract['status'] == _selectedRole);
-      final code = (contract['code'] ?? '').toString().toLowerCase();
-      final name = (contract['tenantName'] ?? '').toString().toLowerCase();
-      final phone = (contract['tenantPhone'] ?? '').toString().toLowerCase();
-
-      final matchesSearch = _searchKeyword.isEmpty ||
-          code.contains(_searchKeyword) ||
-          name.contains(_searchKeyword) ||
-          phone.contains(_searchKeyword);
-
-      return matchesSearch && matchesRole;
-
-    }).toList();
-
-    final activeCount = contracts.where(
-          (contract) => contract['status'] == 'Đang hiệu lực',
-    ).length;
-
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
-
-      drawer: OwnerDrawer(
-        currentRoute: 'contracts',
-      ),
-
+      drawer: const OwnerDrawer(currentRoute: 'contracts'),
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         title: const Text(
           'Quản lý hợp đồng',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(
-              Icons.notifications,
-              color: Colors.white,
-            ),
+            icon: const Icon(Icons.notifications, color: Colors.white),
           ),
           const SizedBox(width: 16),
           const CircleAvatar(
             backgroundColor: Colors.white24,
             radius: 16,
-            child: Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: Icon(Icons.person, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 16),
         ],
       ),
-
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async{
-          final result = await Navigator.push<Map<String, dynamic>>(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const Contract_form(),
-              ),
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const Contract_form()),
           );
-
-          if(result != null && mounted){
-            setState(() {
-              final newContract = {
-                'code': 'HD-${DateTime.now().year}-P${DateTime.now().millisecondsSinceEpoch % 1000}',
-                'room': result['room'] ?? 'Phòng 201 • Tầng 2',
-                'address': result['address'] ?? 'Khu trọ Bình Thạnh • 35 m²',
-                'tenantName': result['tenantName'] ?? 'Chưa xác định',
-                'tenantPhone': result['tenantPhone'] ?? 'Chưa có SĐT',
-                'rentPrice': result['rentPrice'] ?? '4.500.000đ',
-                'depositPrice': result['depositPrice'] ?? '9.000.000đ',
-                'duration': '📅 01/10/2026 - 30/09/2027',
-                'cycleText': 'Kỳ thu: Ngày 05',
-                'noteText': result['status'] == 'Chờ ký'
-                    ? 'Chủ trọ đã gửi ký, chờ khách thuê xác nhận'
-                    : 'Bản nháp lưu tạm',
-                'timeText': result['status'] == 'Chờ ký'
-                    ? 'Chờ ký'
-                    : 'Bản nháp mới tạo',
-                ...result,
-              };
-              contracts.insert(0, newContract);
-            });
-            _showMessage('Đã tạo hợp đồng mới thành công!');
+          if (result == true && mounted) {
+            _fetchContracts();
           }
-
-
         },
         backgroundColor: const Color(0xFFFFA726),
         elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         label: const Text(
           "Tạo hợp đồng",
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 12),
         ),
       ),
-
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: AppColors.background,
-          borderRadius: const BorderRadius.only(
+          borderRadius: BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 20,
-            bottom: 120,
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-
-              // tìm kiếm
-              TextField(
-                onChanged: (value){
-                   setState(() {
-                     _searchKeyword = value.toLowerCase().trim();
-                   });
-                },
-                decoration: InputDecoration(
-                  hintText:
-                  'Tìm mã HĐ, tên hoặc SĐT khách thuê...',
-                  hintStyle: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: Colors.grey,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding:
-                  const EdgeInsets.symmetric(vertical: 0),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
+        child: RefreshIndicator(
+          onRefresh: _fetchContracts,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 20, bottom: 120),
+            child: Column(
+              children: [
+                // 1. Ô tìm kiếm
+                TextField(
+                  onChanged: (value) {
+                    _searchKeyword = value.toLowerCase().trim();
+                    _fetchContracts();
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Tìm mã HĐ, tên hoặc SĐT khách thuê...',
+                    hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: Colors.grey.shade300,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: AppColors.primaryGreen,
-                      width: 1.5,
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primaryGreen, width: 1.5),
                     ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 10),
+                const SizedBox(height: 10),
 
-              // thống kê
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 1.5,
+                // 2. Thẻ thống kê
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryGreen,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white, width: 1.5),
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Text(
-                                'HỢP ĐỒNG',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'HỢP ĐỒNG',
+                                  style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
                                 ),
-                              ),
-                              Icon(
-                                Icons.shield_outlined,
-                                color: Colors.white54,
-                                size: 18,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '$activeCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+                                Icon(Icons.shield_outlined, color: Colors.white54, size: 18),
+                              ],
                             ),
-                          ),
-                          const Text(
-                            'Đang hoạt động',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
+                            const SizedBox(height: 8),
+                            Text(
+                              '$_activeCount',
+                              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 1.5,
+                            const Text(
+                              'Đang hoạt động',
+                              style: TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                          ],
                         ),
                       ),
-                      child: const Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'DOANH THU DỰ KIẾN',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'DOANH THU DỰ KIẾN',
+                              style: TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.bold),
                             ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            '72.500.000đ',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_formatCurrency(_expectedRevenue)}đ',
+                              style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
                             ),
-                          ),
-                          Text(
-                            'Tổng tiền thuê / tháng',
-                            style: TextStyle(
-                              color: Colors.black45,
-                              fontSize: 11,
+                            const Text(
+                              'Tổng tiền thuê / tháng',
+                              style: TextStyle(color: Colors.black45, fontSize: 11),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 10),
-
-              // bộ lọc
-              SizedBox(
-                height: 42,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      "Tất cả",
-                      "Đang hiệu lực",
-                      "Sắp hết hạn",
-                      "Chờ ký",
-                      "Bản nháp",
-                    ].map((role) {
-                      final select =
-                          _selectedRole == role;
-
-                      return Padding(
-                        padding:
-                        const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(role),
-                          selected: select,
-                          selectedColor:
-                          AppColors.primaryGreen,
-                          backgroundColor:
-                          AppColors.background,
-                          side: BorderSide.none,
-                          showCheckmark: false,
-                          shape: RoundedRectangleBorder(
-                            borderRadius:
-                            BorderRadius.circular(26),
-                          ),
-                          labelStyle: TextStyle(
-                            color: select
-                                ? AppColors.background
-                                : Colors.grey,
-                            fontSize: 13,
-                            fontWeight: select
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() {
-                                _selectedRole = role;
-                              });
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                  ],
                 ),
-              ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
-              // danh sách hợp đồng
-              ...filteredContracts.map(
-                    (contract) => Padding(
-                  padding:
-                  const EdgeInsets.only(bottom: 16),
-                  child: _buildContractCard(contract),
-                ),
-              ),
-
-              if (filteredContracts.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Text(
-                    'Không có hợp đồng phù hợp',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
+                // 3. Tab bộ lọc
+                SizedBox(
+                  height: 42,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        "Tất cả",
+                        "Đang hiệu lực",
+                        "Sắp hết hạn",
+                        "Chờ ký",
+                        "Bản nháp",
+                      ].map((role) {
+                        final select = _selectedRole == role;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(role),
+                            selected: select,
+                            selectedColor: AppColors.primaryGreen,
+                            backgroundColor: AppColors.background,
+                            side: BorderSide.none,
+                            showCheckmark: false,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                            labelStyle: TextStyle(
+                              color: select ? AppColors.background : Colors.grey,
+                              fontSize: 13,
+                              fontWeight: select ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() => _selectedRole = role);
+                                _fetchContracts();
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
                 ),
-            ],
+
+                const SizedBox(height: 16),
+
+                // 4. Danh sách hợp đồng
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: CircularProgressIndicator(),
+                  )
+                else if (_contracts.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Text('Không có hợp đồng phù hợp', style: TextStyle(color: AppColors.textSecondary)),
+                  )
+                else
+                  ..._contracts.map(
+                        (contract) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildContractCard(contract),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
-
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
         child: Row(
-          mainAxisAlignment:
-          MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(
-              Icons.home,
-              'Trang chủ',
-              true,
-                  () {},
-            ),
-            _buildNavItem(
-              Icons.apartment,
-              'Tòa nhà',
-              false,
-                  () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                    const PropertiesManageScreen(),
-                  ),
-                );
-              },
-            ),
+            _buildNavItem(Icons.home, 'Trang chủ', true, () {}),
+            _buildNavItem(Icons.apartment, 'Tòa nhà', false, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PropertiesManageScreen()),
+              );
+            }),
             const SizedBox(width: 40),
-            _buildNavItem(
-              Icons.people_outline,
-              'Người thuê',
-              false,
-                  () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TenantListScreen(),
-                        ),);
-                  },
-            ),
-            _buildNavItem(
-              Icons.person_outline,
-              'Cá nhân',
-              false,
-                  () {},
-            ),
+            _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TenantListScreen()),
+              );
+            }),
+            _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContractCard(
-      Map<String, dynamic> contract) {
-    final status = contract['status'];
+  Widget _buildContractCard(dynamic contract) {
+    final status = contract['status'] ?? '';
+
 
     Color statusBgColor;
     Color statusTextColor;
@@ -511,7 +332,6 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       timeColor = Colors.green;
       primaryBtnText = 'Thanh lý';
       primaryBtnColor = AppColors.primaryGreen;
-
     } else if (status == 'Sắp hết hạn') {
       statusBgColor = Colors.orange.shade100;
       statusTextColor = const Color(0xFFE68A00);
@@ -533,135 +353,102 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
     }
 
     return ContractCard(
-      room: contract['room'],
-      address: contract['address'],
+      room: contract['room'] ?? '',
+      address: contract['address'] ?? '',
       status: status,
       statusBgColor: statusBgColor,
       statusTextColor: statusTextColor,
-      code: contract['code'],
-      timeText: contract['timeText'],
+      code: contract['code'] ?? '',
+      timeText: contract['timeText'] ?? '',
       timeColor: timeColor,
-      tenantName: contract['tenantName'],
-      tenantPhone: contract['tenantPhone'],
-      rentPrice: contract['rentPrice'],
-      depositPrice: contract['depositPrice'],
-      duration: contract['duration'],
-      cycleText: contract['cycleText'],
-      noteText: contract['noteText'],
+      tenantName: contract['tenantName'] ?? '',
+      tenantPhone: contract['tenantPhone'] ?? '',
+      rentPrice: contract['rentPrice'] ?? '',
+      depositPrice: contract['depositPrice'] ?? '',
+      duration: contract['duration'] ?? '',
+      cycleText: contract['cycleText'] ?? '',
+      noteText: contract['noteText'] ?? '',
       primaryBtnText: primaryBtnText,
       primaryBtnColor: primaryBtnColor,
-
-      // xem chi tiết
       onTapDetail: () {
-        Navigator.push(context, MaterialPageRoute(builder: (context)=>ContractDetailScreen(contract: contract,)));
-      },
+        final status = contract['status'] ?? '';
 
-      // nút chính
+
+        if (status == 'Bản nháp' || status == 'draft') {
+          _openContract(Map<String, dynamic>.from(contract));
+          return;
+        }
+
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ContractDetailScreen(contract: Map<String, dynamic>.from(contract)),
+          ),
+        );
+      },
       onTapPrimaryBtn: () {
-        _handlePrimaryButton(contract);
+        _handlePrimaryButton(Map<String, dynamic>.from(contract));
       },
     );
   }
 
-
-
-
   Future<void> _openContract(Map<String, dynamic> contract) async {
-    final result = await Navigator.push<Map<String, dynamic>>(context, MaterialPageRoute(
-        builder: (context) => Contract_form(contract: contract,)
-    ));
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => Contract_form(contract: contract)),
+    );
 
-    if(result != null && mounted){
-      setState(() {
-        final index = contracts.indexWhere((c) => c['code'] == result['code']);
-        if(index != -1){
-          contracts[index] ={
-            ...contracts[index],
-            ...result,
-            if (result['status'] == 'Chờ ký')
-              'timeText': 'Đang chờ các bên ký'
-            else if (result['status'] == 'Đang hiệu lực')
-              'timeText': 'Hợp đồng đã có hiệu lực',
-          };
-        }
-      });
-      if (result['status'] == 'Chờ ký') {
-        _showMessage('Đã gửi liên kết ký hợp đồng tới email khách thuê!');
-      } else if (result['status'] == 'Đang hiệu lực') {
-        _showMessage('Hợp đồng đã được kích hoạt hiệu lực!');
-      } else {
-        _showMessage('Đã lưu bản nháp hợp đồng!');
-      }
+    if (result == true && mounted) {
+      _fetchContracts();
     }
-
-
   }
 
-  void _handlePrimaryButton(
-      Map<String, dynamic> contract) {
+  void _handlePrimaryButton(Map<String, dynamic> contract) {
     final status = contract['status'];
-
     if (status == 'Đang hiệu lực') {
-      Navigator.pushNamed(context, AppRoutes.termination);
-    } else if (status == 'Sắp hết hạn') {
-      _showMessage(
-        'Mở chức năng gia hạn hợp đồng',
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ContractLiquidationScreen(
+            contractId: contract['id']?.toString(),
+          ),
+        ),
       );
-    } else if (status == 'Chờ ký') {
-      _openContract(contract);
-    } else if (status == 'Bản nháp') {
+    } else if (status == 'Sắp hết hạn') {
+      _showMessage('Mở chức năng gia hạn hợp đồng');
+    } else {
       _openContract(contract);
     }
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: isActive ? AppColors.primaryGreen : Colors.grey),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: isActive ? AppColors.primaryGreen : Colors.grey,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-}
-
-Widget _buildNavItem(
-    IconData icon,
-    String label,
-    bool isActive,
-    VoidCallback onTap,
-    ) {
-  return InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(12),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 4.0,
-        horizontal: 8.0,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: isActive
-                ? AppColors.primaryGreen
-                : Colors.grey,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: isActive
-                  ? AppColors.primaryGreen
-                  : Colors.grey,
-              fontWeight: isActive
-                  ? FontWeight.bold
-                  : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
 }

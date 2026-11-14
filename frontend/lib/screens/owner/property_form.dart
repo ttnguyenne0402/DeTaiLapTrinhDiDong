@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/property_service.dart';
+import '../../services/auth_storage.dart';
 
 class PropertyFormScreen extends StatefulWidget {
   const PropertyFormScreen({super.key});
@@ -111,9 +112,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-
+      final ownerId = await AuthStorage.getUserId();
       final data = {
-        'ownerId': 'USER_OWNER_01',
+        'ownerId': ownerId.toString().trim(),
         'name': _nameController.text.trim(),
         'type': _selectedType,
         'address': _addressController.text.trim(),

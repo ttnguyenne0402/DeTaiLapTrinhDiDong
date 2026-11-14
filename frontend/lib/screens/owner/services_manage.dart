@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import '../../services/owner/service_service.dart';
 import 'service_form.dart';
+import '../../services/auth_storage.dart';
 
 class ServicesManageScreen extends StatefulWidget {
   const ServicesManageScreen({super.key});
@@ -29,7 +30,8 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
       _errorMessage = null;
     });
     try {
-      final list = await ServiceManagementService.fetchServices('USER_OWNER_01');
+      final ownerId = await AuthStorage.getUserId() ?? '';
+      final list = await ServiceManagementService.fetchServices(ownerId);
       if (mounted) {
         setState(() {
           _services = list.map((s) => {

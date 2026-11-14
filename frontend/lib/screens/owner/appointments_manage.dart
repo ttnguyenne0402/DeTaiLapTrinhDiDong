@@ -29,7 +29,8 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
   Future<void> _loadAppointments() async {
     setState(() => _isLoading = true);
     try {
-      final list = await AppointmentService.fetchOwnerAppointments('USER_OWNER_01');
+      final ownerId = await AuthStorage.getUserId() ?? '';
+      final list = await AppointmentService.fetchOwnerAppointments(ownerId);
       if (mounted) {
         setState(() {
           _appointments = list.map((a) => {

@@ -11,6 +11,9 @@ import '../../core/constants/app_colors.dart';
 import 'utility_history.dart';
 import 'utility_readings.dart';
 import '../../services/owner/property_service.dart';
+import 'owner_profile_screen.dart';
+import '../../services/auth_storage.dart';
+
 
 class PropertiesManageScreen extends StatefulWidget {
   const PropertiesManageScreen({super.key});
@@ -174,7 +177,7 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                 );
               }),
               _buildNavItem(Icons.apartment, 'Tòa nhà', true, () {}),
-              const SizedBox(width: 40),
+              const SizedBox(width: 40), // Khoảng trống chừa chỗ cho nút thêm (+) ở giữa
               _buildNavItem(Icons.people_outline, 'Người thuê', false, () {
                 Navigator.push(
                   context,
@@ -183,7 +186,14 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                   ),
                 );
               }),
-              _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
+              _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OwnerProfileScreen(), // Điều hướng đúng trang profile chủ trọ
+                  ),
+                );
+              }),
             ],
           ),
         ),
@@ -193,7 +203,7 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
 
   Widget _buildPropertyList(String filter) {
     return FutureBuilder<List<PropertyModel>>(
-      future: PropertyService.fetchProperties('USER_OWNER_01', filter),
+      future: AuthStorage.getUserId().then((id) => PropertyService.fetchProperties(id ?? '', filter)),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());

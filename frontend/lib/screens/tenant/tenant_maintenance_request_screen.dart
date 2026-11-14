@@ -1,11 +1,21 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import '../../services/auth_storage.dart';
 import '../../core/constants/app_colors.dart';
 
 class TenantMaintenanceRequestScreen extends StatefulWidget {
-  const TenantMaintenanceRequestScreen({super.key});
+  final String roomId;
+  final String roomName;
+
+  const TenantMaintenanceRequestScreen({
+    super.key,
+    required this.roomId,
+    required this.roomName,
+  });
 
   @override
   State<TenantMaintenanceRequestScreen> createState() =>
@@ -19,12 +29,28 @@ class _TenantMaintenanceRequestScreenState
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  // Mức độ ưu tiên tương ứng DB: low, medium, high, urgent
   String _selectedPriority = 'medium';
 
   final ImagePicker _imagePicker = ImagePicker();
   XFile? _selectedImage;
+  bool _isSubmitting = false;
 
+  // Giả lập ID người thuê hiện tại
+  String _currentTenantId = '';
+  @override
+  void initState() {
+    super.initState();
+    _loadTenantData();
+  }
+
+  Future<void> _loadTenantData() async {
+    final userId = await AuthStorage.getUserId();
+    if (mounted) {
+      setState(() {
+        _currentTenantId = userId ?? '';
+      });
+    }
+  }
   @override
   void dispose() {
     _titleController.dispose();
@@ -32,7 +58,14 @@ class _TenantMaintenanceRequestScreenState
     super.dispose();
   }
 
-  // Chọn nguồn ảnh (Camera hoặc Thư viện)
+  // Khởi tạo Client bỏ qua SSL
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
   void _showImageSourcePicker() {
     showModalBottomSheet(
       context: context,
@@ -84,7 +117,7 @@ class _TenantMaintenanceRequestScreenState
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: source,
-        imageQuality: 80,
+        imageQuality: 70,
       );
       if (image != null && mounted) {
         setState(() {
@@ -99,7 +132,18 @@ class _TenantMaintenanceRequestScreenState
     }
   }
 
-  void _submitRequest() {
+  // Chuyển đổi File ảnh thành chuỗi Base64
+  Future<String?> _imageToBase64(File imageFile) async {
+    try {
+      final bytes = await imageFile.readAsBytes();
+      return base64Encode(bytes);
+    } catch (e) {
+      print("Lỗi chuyển đổi ảnh: $e");
+      return null;
+    }
+  }
+
+  Future<void> _submitRequest() async {
     FocusScope.of(context).unfocus();
 
     if (_formKey.currentState!.validate()) {
@@ -114,28 +158,72 @@ class _TenantMaintenanceRequestScreenState
         return;
       }
 
-      // Xử lý gọi API ở đây...
-      print("Tiêu đề: ${_titleController.text}");
-      print("Mô tả: ${_descriptionController.text}");
-      print("Ưu tiên: $_selectedPriority");
-      print("Ảnh: ${_selectedImage!.path}");
+      setState(() => _isSubmitting = true);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Gửi yêu cầu sửa chữa thành công! Chủ nhà sẽ sớm tiếp nhận."),
-          backgroundColor: AppColors.primaryGreen,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Chuyển ảnh thành Base64
+      String? base64Image = await _imageToBase64(File(_selectedImage!.path));
 
-      Navigator.pop(context);
+      final requestData = {
+        "roomId": widget.roomId,
+        "tenantId": _currentTenantId,
+        "title": _titleController.text.trim(),
+        "description": _descriptionController.text.trim(),
+        "priority": _selectedPriority,
+        "image": base64Image, // Gửi chuỗi Base64
+      };
+
+      final client = _getCustomClient();
+      try {
+        final response = await client.post(
+          Uri.parse('http://10.0.2.2:5093/api/maintenance'),
+          headers: {"Content-Type": "application/json"},
+          body: json.encode(requestData),
+        );
+
+        if (response.statusCode == 201) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Gửi yêu cầu sửa chữa thành công!"),
+                backgroundColor: AppColors.primaryGreen,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            Navigator.pop(context);
+          }
+        } else {
+          print("Lỗi server: ${response.body}");
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Gửi thất bại. Vui lòng thử lại."),
+                backgroundColor: Colors.redAccent,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        print("Lỗi kết nối: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Không thể kết nối đến máy chủ."),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        client.close();
+        if (mounted) setState(() => _isSubmitting = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Màu nền Scaffold chuẩn AppColors.primaryGreen để đồng bộ AppBar
       backgroundColor: AppColors.primaryGreen,
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
@@ -154,9 +242,9 @@ class _TenantMaintenanceRequestScreenState
           ),
         ),
       ),
-      // Container chính bọc body tạo viền bo tròn
       body: Container(
         width: double.infinity,
+        height: double.infinity,
         decoration: const BoxDecoration(
           color: AppColors.background,
           borderRadius: BorderRadius.vertical(
@@ -175,10 +263,8 @@ class _TenantMaintenanceRequestScreenState
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
-                      // Thông tin phòng (Read-only)
                       _buildRoomInfoCard(),
                       const SizedBox(height: 24),
-
                       const Text(
                         "THÔNG TIN SỰ CỐ",
                         style: TextStyle(
@@ -188,8 +274,6 @@ class _TenantMaintenanceRequestScreenState
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Tiêu đề sự cố
                       _buildLabel('Tiêu đề sự cố *'),
                       TextFormField(
                         controller: _titleController,
@@ -205,8 +289,6 @@ class _TenantMaintenanceRequestScreenState
                         },
                       ),
                       const SizedBox(height: 16),
-
-                      // Mức độ ưu tiên
                       _buildLabel('Mức độ ưu tiên *'),
                       DropdownButtonFormField<String>(
                         value: _selectedPriority,
@@ -218,21 +300,22 @@ class _TenantMaintenanceRequestScreenState
                           DropdownMenuItem(value: 'low', child: Text('Thấp (Không gấp)')),
                           DropdownMenuItem(value: 'medium', child: Text('Bình thường')),
                           DropdownMenuItem(value: 'high', child: Text('Cao (Ảnh hưởng sinh hoạt)')),
-                          DropdownMenuItem(value: 'urgent', child: Text('Khẩn cấp (Nguy hiểm/Tràn nước)', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
+                          DropdownMenuItem(
+                              value: 'urgent',
+                              child: Text('Khẩn cấp (Nguy hiểm/Tràn nước)',
+                                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
                         ],
                         onChanged: (val) {
                           if (val != null) setState(() => _selectedPriority = val);
                         },
                       ),
                       const SizedBox(height: 16),
-
-                      // Mô tả chi tiết
                       _buildLabel('Mô tả chi tiết *'),
                       TextFormField(
                         controller: _descriptionController,
                         maxLines: 4,
                         decoration: _buildInputDecoration(
-                          hint: 'Vui lòng mô tả chi tiết tình trạng bạn đang gặp phải để thợ chuẩn bị vật tư...',
+                          hint: 'Vui lòng mô tả chi tiết tình trạng...',
                           icon: null,
                         ),
                         validator: (value) {
@@ -243,8 +326,6 @@ class _TenantMaintenanceRequestScreenState
                         },
                       ),
                       const SizedBox(height: 24),
-
-                      // Hình ảnh
                       const Text(
                         "HÌNH ẢNH HIỆN TRƯỜNG *",
                         style: TextStyle(
@@ -260,8 +341,6 @@ class _TenantMaintenanceRequestScreenState
                   ),
                 ),
               ),
-
-              // Nút Gửi yêu cầu ghim ở đáy
               _buildBottomAction(),
             ],
           ),
@@ -279,12 +358,11 @@ class _TenantMaintenanceRequestScreenState
           border: Border.all(color: AppColors.borderLight),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withOpacity(0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             )
-          ]
-      ),
+          ]),
       child: Row(
         children: [
           Container(
@@ -296,18 +374,20 @@ class _TenantMaintenanceRequestScreenState
             child: const Icon(Icons.home_work, color: AppColors.primaryGreen, size: 24),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Phòng 302 • Tầng 3', // Mock data
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  widget.roomName,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Khu Trọ Tân Bình 1', // Mock data
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  'Mã phòng: ${widget.roomId}',
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -367,7 +447,7 @@ class _TenantMaintenanceRequestScreenState
         height: 150,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: AppColors.lightGreen.withValues(alpha: 0.5),
+          color: AppColors.lightGreen.withOpacity(0.5),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.primaryGreen, width: 1, style: BorderStyle.solid),
         ),
@@ -430,7 +510,7 @@ class _TenantMaintenanceRequestScreenState
         color: AppColors.cardSurface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, -4),
           )
@@ -441,7 +521,7 @@ class _TenantMaintenanceRequestScreenState
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _submitRequest,
+            onPressed: _isSubmitting ? null : _submitRequest,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryGreen,
               shape: RoundedRectangleBorder(
@@ -449,7 +529,12 @@ class _TenantMaintenanceRequestScreenState
               ),
               elevation: 0,
             ),
-            child: const Text(
+            child: _isSubmitting
+                ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text(
               'GỬI YÊU CẦU SỬA CHỮA',
               style: TextStyle(
                 color: Colors.white,

@@ -2,11 +2,15 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../widgets/owner/owner_drawer.dart';
-
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import '../../services/auth_storage.dart';
+import 'maintenance_detail.dart';
 class MaintenanceManageScreen extends StatefulWidget {
   const MaintenanceManageScreen({super.key});
 
@@ -17,16 +21,108 @@ class MaintenanceManageScreen extends StatefulWidget {
 
 class _MaintenanceManageScreenState
     extends State<MaintenanceManageScreen> {
+  // --- BIẾN MỚI THÊM ĐỂ GỌI API ---
+  List<dynamic> _maintenanceRequests = [];
+  bool _isLoading = true;
+  String _ownerId = '';
+  List<dynamic> _propertiesAndRooms = [];
+  String? _selectedPropertyId;
+  String? _selectedRoomId;
+  List<dynamic> _currentRoomsList = [];
+  @override
+  void initState() {
+    super.initState();
+    _loadOwnerData(); // Gọi hàm load data khi vừa mở trang
+  }
+
+  // Khởi tạo Custom Client bỏ qua SSL
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
+  // Lấy Owner ID từ bộ nhớ và gọi API
+  Future<void> _loadOwnerData() async {
+    final userId = await AuthStorage.getUserId();
+    if (mounted) {
+      setState(() {
+        _ownerId = userId ?? ''; // Có thể gán cứng 'OWNER01' để test nhanh
+      });
+      await _fetchMaintenanceRequests();
+      await _fetchPropertiesAndRooms();
+    }
+  }
+
+  // Gọi API lấy danh sách sự cố của Chủ nhà
+  Future<void> _fetchMaintenanceRequests() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/owner/$_ownerId';
+    final client = _getCustomClient();
+
+    try {
+      final response = await client.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        if (mounted) {
+          setState(() {
+            _maintenanceRequests = data;
+            _isLoading = false;
+          });
+        }
+      } else {
+        print("Lỗi server: ${response.statusCode}");
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Lỗi kết nối: $e");
+      if (mounted) setState(() => _isLoading = false);
+    } finally {
+      client.close();
+    }
+  }
+  // Gọi API lấy danh sách Khu Trọ & Phòng để nhét vào Dropdown
+  Future<void> _fetchPropertiesAndRooms() async {
+    final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/owner/$_ownerId/properties-rooms';
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        if (mounted) {
+          setState(() {
+            _propertiesAndRooms = json.decode(response.body);
+            // Thiết lập giá trị mặc định cho Dropdown nếu có data
+            if (_propertiesAndRooms.isNotEmpty) {
+              _selectedPropertyId = _propertiesAndRooms[0]['propertyId'];
+              _currentRoomsList = _propertiesAndRooms[0]['rooms'] ?? [];
+              if (_currentRoomsList.isNotEmpty) {
+                _selectedRoomId = _currentRoomsList[0]['roomId'];
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print("Lỗi tải DS Phòng: $e");
+    } finally {
+      client.close();
+    }
+  }
+  // --- KẾT THÚC PHẦN THÊM ---
   int _selectedFilterIndex = 0;
 
   final ImagePicker _imagePicker = ImagePicker();
   XFile? _selectedImage;
 
   final List<String> _filters = [
-    'Tất cả (5)',
-    'Chờ xử lý (2)',
-    'Đang sửa (1)',
-    'Đã xong (2)',
+    'Tất cả',
+    'Chờ xử lý',
+    'Đang sửa',
+    'Đã xong',
   ];
 
   // hàm chọn nguồn ảnh
@@ -95,17 +191,15 @@ class _MaintenanceManageScreenState
   }
 
   // hàm mở modal bottom sheet tạo sự cố dành cho chủ trọ ghi nhận tại chỗ
-  void _showCreateIssueBottomSheet(BuildContext context) {
+  // hàm mở modal bottom sheet tạo sự cố dành cho chủ trọ ghi nhận tại chỗ
+  void _showCreateIssueBottomSheet(BuildContext parentContext) {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
-
-    String selectedProperty = 'Khu Trọ Tân Bình 1';
-    String selectedRoom = 'Khu vực chung';
 
     _selectedImage = null;
 
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       isScrollControlled: true,
       backgroundColor: AppColors.cardSurface,
       shape: const RoundedRectangleBorder(
@@ -113,12 +207,12 @@ class _MaintenanceManageScreenState
           top: Radius.circular(24),
         ),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
+          builder: (modalContext, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                bottom: MediaQuery.of(modalContext).viewInsets.bottom + 16,
                 top: 20,
                 left: 16,
                 right: 16,
@@ -145,73 +239,56 @@ class _MaintenanceManageScreenState
                             Icons.close,
                             color: AppColors.textSecondary,
                           ),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.pop(sheetContext),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
-                    // dropdown chọn khu trọ
+                    // --- DROPDOWN KHU TRỌ ĐỘNG ---
                     DropdownButtonFormField<String>(
-                      value: selectedProperty,
+                      value: _selectedPropertyId,
                       decoration: InputDecoration(
                         labelText: 'Khu trọ',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      items: [
-                        'Khu Trọ Tân Bình 1',
-                        'Khu Trọ Bình Thạnh 2',
-                      ].map((item) {
-                        return DropdownMenuItem(
-                          value: item,
-                          child: Text(item),
+                      items: _propertiesAndRooms.map<DropdownMenuItem<String>>((prop) {
+                        return DropdownMenuItem<String>(
+                          value: prop['propertyId'].toString(),
+                          child: Text(prop['propertyName'].toString()),
                         );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) {
                           setModalState(() {
-                            selectedProperty = val;
+                            _selectedPropertyId = val;
+                            final selectedPropData = _propertiesAndRooms.firstWhere((p) => p['propertyId'] == val);
+                            _currentRoomsList = selectedPropData['rooms'] ?? [];
+                            _selectedRoomId = _currentRoomsList.isNotEmpty ? _currentRoomsList[0]['roomId'] : null;
                           });
                         }
                       },
                     ),
                     const SizedBox(height: 12),
 
-                    // dropdown chọn phòng hoặc khu vực chung
+                    // --- DROPDOWN PHÒNG ĐỘNG ---
                     DropdownButtonFormField<String>(
-                      value: selectedRoom,
+                      value: _selectedRoomId,
                       decoration: InputDecoration(
                         labelText: 'Vị trí / Phòng',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      items: [
-                        'Khu vực chung',
-                        'Phòng 101',
-                        'Phòng 201',
-                        'Phòng 302',
-                      ].map((item) {
-                        return DropdownMenuItem(
-                          value: item,
-                          child: Text(item),
+                      items: _currentRoomsList.map<DropdownMenuItem<String>>((room) {
+                        return DropdownMenuItem<String>(
+                          value: room['roomId'].toString(),
+                          child: Text(room['roomName'].toString()),
                         );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) {
-                          setModalState(() {
-                            selectedRoom = val;
-                          });
+                          setModalState(() => _selectedRoomId = val);
                         }
                       },
                     ),
@@ -221,8 +298,7 @@ class _MaintenanceManageScreenState
                     TextField(
                       controller: titleController,
                       decoration: InputDecoration(
-                        labelText:
-                        'Tiêu đề sự cố (ví dụ: Hỏng ổ khóa cổng)',
+                        labelText: 'Tiêu đề sự cố (ví dụ: Hỏng ổ khóa cổng)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -259,13 +335,8 @@ class _MaintenanceManageScreenState
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(
-                          double.infinity,
-                          48,
-                        ),
-                        side: const BorderSide(
-                          color: AppColors.primaryGreen,
-                        ),
+                        minimumSize: const Size(double.infinity, 48),
+                        side: const BorderSide(color: AppColors.primaryGreen),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -292,14 +363,8 @@ class _MaintenanceManageScreenState
                               _selectedImage = null;
                             });
                           },
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
-                          ),
-                          label: const Text(
-                            'Xóa ảnh',
-                            style: TextStyle(color: Colors.red),
-                          ),
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          label: const Text('Xóa ảnh', style: TextStyle(color: Colors.red)),
                         ),
                       ),
                     ],
@@ -311,31 +376,85 @@ class _MaintenanceManageScreenState
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (titleController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Vui lòng nhập tiêu đề sự cố',
-                                ),
-                              ),
+                        onPressed: () async {
+                          final titleText = titleController.text.trim();
+                          final descText = descriptionController.text.trim();
+
+                          if (titleText.isEmpty) {
+                            ScaffoldMessenger.of(parentContext).showSnackBar(
+                              const SnackBar(content: Text('Vui lòng nhập tiêu đề sự cố')),
+                            );
+                            return;
+                          }
+                          if (_selectedRoomId == null) {
+                            ScaffoldMessenger.of(parentContext).showSnackBar(
+                              const SnackBar(content: Text('Khu trọ này hiện không có phòng nào để báo cáo!')),
                             );
                             return;
                           }
 
-                          // hiện tại lưu sự cố chưa kết nối database/api
-                          Navigator.pop(context);
+                          // Đóng bàn phím trước để tránh lỗi animation
+                          FocusScope.of(sheetContext).unfocus();
 
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Đã ghi nhận thông tin sự cố',
+                          String? base64Image;
+                          if (_selectedImage != null) {
+                            final bytes = await File(_selectedImage!.path).readAsBytes();
+                            base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                          }
+
+                          final requestBody = {
+                            "roomId": _selectedRoomId,
+                            "title": titleText,
+                            "description": descText,
+                            "imageBase64": base64Image
+                          };
+
+                          final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/owner/$_ownerId';
+                          final client = _getCustomClient();
+
+                          try {
+                            final response = await client.post(
+                              Uri.parse(url),
+                              headers: {"Content-Type": "application/json"},
+                              body: json.encode(requestBody),
+                            );
+
+                            if (!mounted) return;
+
+                            if (response.statusCode == 200) {
+                              // Đóng BottomSheet bằng sheetContext riêng biệt
+                              if (Navigator.canPop(sheetContext)) {
+                                Navigator.pop(sheetContext);
+                              }
+
+                              // Hiển thị thông báo trên màn hình chính (this.context)
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Đã ghi nhận thông tin sự cố'),
+                                  backgroundColor: AppColors.primaryGreen,
+                                ),
+                              );
+
+                              _fetchMaintenanceRequests();
+                            } else {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Lỗi lưu sự cố: ${response.statusCode}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Lỗi kết nối mạng'),
+                                backgroundColor: Colors.red,
                               ),
-                            ),
-                          );
-
-                          titleController.dispose();
-                          descriptionController.dispose();
+                            );
+                          } finally {
+                            client.close();
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryGreen,
@@ -360,8 +479,6 @@ class _MaintenanceManageScreenState
         );
       },
     ).whenComplete(() {
-      titleController.dispose();
-      descriptionController.dispose();
       _selectedImage = null;
     });
   }
@@ -420,205 +537,131 @@ class _MaintenanceManageScreenState
                 ),
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    // thẻ tổng quan báo cáo chi phí sự cố
-                    _buildSummaryCard(),
-                    const SizedBox(height: 16),
-
-                    // thanh tìm kiếm sự cố
-                    _buildSearchBar(),
-                    const SizedBox(height: 12),
-
-                    // danh sách chip lọc trạng thái
-                    _buildFilterChips(),
-                    const SizedBox(height: 16),
-
-                    // thẻ sự cố phòng 302 - trạng thái chờ tiếp nhận
-                    if (_selectedFilterIndex == 0 ||
-                        _selectedFilterIndex == 1) ...[
-                      _buildMaintenanceCard(
-                        propertyName: 'Khu Trọ Tân Bình 1',
-                        room: 'Phòng 302',
-                        floor: 'Tầng 3',
-                        tenantName: 'Trần Thị Bích',
-                        tenantPhone: '0933 555 799',
-                        title:
-                        'Rò rỉ ống nước bồn rửa chén gây tràn sàn',
-                        description:
-                        'Nước rỉ mạnh từ co nối bên dưới bồn, chảy tràn ra sàn gỗ phòng khách.',
-                        timeAgo: '15 phút trước',
-                        imageCount: 2,
-                        priorityText: 'Khẩn cấp',
-                        priorityColor: Colors.red,
-                        statusText: 'Chờ tiếp nhận',
-                        statusColor: AppColors.textSecondary,
-                        actionButtons: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {},
-                                icon: const Icon(
-                                  Icons.phone,
-                                  size: 16,
-                                  color: AppColors.primaryGreen,
-                                ),
-                                label: const Text(
-                                  'Gọi khách',
-                                  style: TextStyle(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: AppColors.primaryGreen,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, AppRoutes.maintenanceDetail);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryGreen,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Tiếp nhận',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen))
+                    : RefreshIndicator(
+                  onRefresh: _fetchMaintenanceRequests,
+                  color: AppColors.primaryGreen,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _buildSummaryCard(),
                       const SizedBox(height: 16),
-                    ],
-
-                    // thẻ sự cố phòng 201 - trạng thái đang xử lý
-                    if (_selectedFilterIndex == 0 ||
-                        _selectedFilterIndex == 2) ...[
-                      _buildMaintenanceCard(
-                        propertyName: 'Khu Trọ Bình Thạnh 2',
-                        room: 'Phòng 201',
-                        floor: 'Tầng 2',
-                        tenantName: 'Nguyễn Văn An',
-                        tenantPhone: '0908 123 456',
-                        title: 'Máy lạnh không mát, chớp đèn báo lỗi',
-                        description:
-                        'Đã bật 18 độ quạt gió mạnh 1 tiếng nhưng chỉ ra gió thường, phòng rất ngột ngạt.',
-                        timeAgo: 'Báo lúc 09:30 hôm nay',
-                        imageCount: 1,
-                        priorityText: 'Ưu tiên cao',
-                        priorityColor: AppColors.warningOrange,
-                        statusText: 'Đang xử lý',
-                        statusColor: AppColors.warningOrange,
-                        actionButtons:Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {},
-                                icon: const Icon(
-                                  Icons.phone,
-                                  size: 16,
-                                  color: AppColors.primaryGreen,
-                                ),
-                                label: const Text(
-                                  'Gọi khách',
-                                  style: TextStyle(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: AppColors.primaryGreen,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, AppRoutes.maintenanceDetail);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryGreen,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Tiếp nhận',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildSearchBar(),
+                      const SizedBox(height: 12),
+                      _buildFilterChips(),
                       const SizedBox(height: 16),
-                    ],
 
-                    // thẻ sự cố phòng 105 - trạng thái đã hoàn thành
-                    if (_selectedFilterIndex == 0 ||
-                        _selectedFilterIndex == 3) ...[
-                      _buildMaintenanceCard(
-                        propertyName: 'Khu Trọ Tân Bình 1',
-                        room: 'Phòng 105',
-                        floor: 'Tầng 1',
-                        tenantName: 'Phạm Hoàng Nam',
-                        tenantPhone: '0911 222 333',
-                        title:
-                        'Thay bóng đèn tuýp LED ban công bị hỏng',
-                        description: '',
-                        timeAgo: 'Xong lúc: 26/08/2024',
-                        imageCount: 1,
-                        priorityText: 'Bình thường',
-                        priorityColor: AppColors.textSecondary,
-                        statusText: 'Đã hoàn thành',
-                        statusColor: AppColors.primaryGreen,
-                        costText:
-                        'Chi phí: 80.000đ (Đã cộng hóa đơn T8)',
-                        actionButtons: const SizedBox.shrink(),
-                      ),
-                      const SizedBox(height: 60),
-                    ],
+                      // --- ĐỔ DỮ LIỆU TỪ API VÀO ĐÂY ---
+                      if (_maintenanceRequests.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Text('Không có sự cố nào.', style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                        )
+                      else
+                        ..._maintenanceRequests.map((request) {
+                          final status = request['status'];
 
-                    // thông báo khi bộ lọc không có thẻ phù hợp
-                    if (_selectedFilterIndex != 0 &&
-                        ((_selectedFilterIndex == 1) ||
-                            (_selectedFilterIndex == 2) ||
-                            (_selectedFilterIndex == 3)))
-                      const SizedBox.shrink(),
-                  ],
+                          // Logic Lọc (Filter)
+                          if (_selectedFilterIndex == 1 && status != 'pending') return const SizedBox.shrink();
+                          if (_selectedFilterIndex == 2 && status != 'processing') return const SizedBox.shrink();
+                          if (_selectedFilterIndex == 3 && status != 'completed') return const SizedBox.shrink();
+
+                          final isCompleted = status == 'completed';
+                          final isPending = status == 'pending';
+
+                          return Column(
+                          children: [
+                          _buildMaintenanceCard(
+                          // Các tham số cũ giữ nguyên...
+                          propertyName: request['propertyName'] ?? 'Khu trọ',
+                          room: request['roomName'] ?? 'Phòng',
+                          floor: '',
+                          tenantName: request['tenantName'] ?? 'Khách thuê',
+                          tenantPhone: request['tenantPhone'] ?? '',
+                          title: request['title'] ?? 'Sự cố',
+                          description: request['description'] ?? '',
+                          timeAgo: request['createdAt'] != null
+                          ? request['createdAt'].toString().substring(0, 10)
+                              : '',
+                          imageCount: request['image'] != null ? 1 : 0,
+
+                          // THAY ĐỔI 1: Bổ sung tham số để hiển thị ảnh Base64
+                          base64ImageString: request['image'],
+
+                          priorityText: request['priority'] == 'urgent' ? 'Khẩn cấp'
+                              : request['priority'] == 'high' ? 'Ưu tiên cao'
+                              : 'Bình thường',
+                          priorityColor: request['priority'] == 'urgent' ? Colors.red
+                              : AppColors.warningOrange,
+
+                          statusText: isPending ? 'Chờ tiếp nhận'
+                              : isCompleted ? 'Đã hoàn thành'
+                              : 'Đang xử lý',
+                          statusColor: isPending ? AppColors.textSecondary
+                              : isCompleted ? AppColors.primaryGreen
+                              : AppColors.warningOrange,
+
+                          costText: isCompleted ? 'Đã nghiệm thu' : null,
+
+                          actionButtons: isCompleted ? const SizedBox.shrink() : Row(
+                          children: [
+                          Expanded(
+                          child: OutlinedButton.icon(
+                          // THAY ĐỔI 2: Gắn chức năng gọi điện
+                          onPressed: () async {
+                          final phone = request['tenantPhone'] ?? '';
+                          if (phone.isNotEmpty) {
+                          final Uri launchUri = Uri(scheme: 'tel', path: phone);
+                          try {
+                          await launchUrl(launchUri);
+                          } catch (e) {
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể gọi số này.')));
+                          }
+                          }
+                          },
+                          icon: const Icon(Icons.phone, size: 16, color: AppColors.primaryGreen),
+                          label: const Text('Gọi khách', style: TextStyle(color: AppColors.primaryGreen)),
+                          ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                          child: ElevatedButton(
+                          onPressed: () async {
+                          await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                          builder: (_) => MaintenanceDetailScreen(
+                          issueId: request['id'].toString(),
+                          ),
+                          ),
+                          );
+                          _fetchMaintenanceRequests();
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+                          child: Text(
+                          isPending ? 'Tiếp nhận' : 'Chi tiết',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                          ),
+                          ),
+                          ],
+                          ),
+                          ),
+                          const SizedBox(height: 16),
+                          ],
+                          );
+                        }).toList(),
+                    ],
+                  ),
                 ),
-              ),
             ),
           ),
+          )
         ],
       ),
 
@@ -850,6 +893,7 @@ class _MaintenanceManageScreenState
     required String statusText,
     required Color statusColor,
     required Widget actionButtons,
+    String? base64ImageString,
     String? costText,
   }) {
     return Container(
@@ -977,6 +1021,7 @@ class _MaintenanceManageScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (imageCount > 0) ...[
+                // CẬP NHẬT PHẦN HIỂN THỊ ẢNH Ở ĐÂY ĐỂ ĐỌC ĐƯỢC CẢ 2 LOẠI BASE64
                 Container(
                   width: 70,
                   height: 70,
@@ -984,9 +1029,30 @@ class _MaintenanceManageScreenState
                     color: AppColors.lightGreen,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.image,
-                    color: AppColors.primaryGreen,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Builder(
+                      builder: (context) {
+                        try {
+                          if (base64ImageString == null || base64ImageString.isEmpty) {
+                            return const Icon(Icons.image, color: AppColors.primaryGreen);
+                          }
+                          // Nếu có tiền tố data:image, cắt bỏ phần đầu. Nếu không, lấy nguyên chuỗi
+                          String cleanBase64 = base64ImageString.contains(',')
+                              ? base64ImageString.split(',')[1]
+                              : base64ImageString;
+
+                          return Image.memory(
+                            base64Decode(cleanBase64),
+                            fit: BoxFit.cover,
+                            // Thêm errorBuilder đề phòng chuỗi Base64 bị lỗi hỏng
+                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.red),
+                          );
+                        } catch (e) {
+                          return const Icon(Icons.error, color: Colors.red);
+                        }
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

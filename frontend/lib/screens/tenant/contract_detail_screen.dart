@@ -1,37 +1,119 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
+import 'tenant_maintenance_request_screen.dart';
 
-class ContractDetailScreen extends StatelessWidget {
+class ContractDetailScreen extends StatefulWidget {
   const ContractDetailScreen({super.key});
 
   @override
+  State<ContractDetailScreen> createState() => _ContractDetailScreenState();
+}
+
+class _ContractDetailScreenState extends State<ContractDetailScreen> {
+  Map<String, dynamic>? _contractDetail;
+  bool _isLoading = true;
+  late String _contractId;
+  bool _isInit = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Lấy ID hợp đồng được truyền từ màn hình danh sách sang
+    if (_isInit) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args != null) {
+        _contractId = args.toString();
+        _fetchContractDetail();
+      } else {
+        setState(() => _isLoading = false);
+        print("LỖI: Không nhận được ID hợp đồng!");
+      }
+      _isInit = false;
+    }
+  }
+
+  // Khởi tạo Custom Client bỏ qua SSL
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
+  // Gọi API lấy chi tiết hợp đồng
+  Future<void> _fetchContractDetail() async {
+    // URL API Backend
+    final url = 'http://10.0.2.2:5093/api/contracts/$_contractId';
+    print("ĐANG GỌI API: $url");
+
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _contractDetail = json.decode(response.body);
+          _isLoading = false;
+        });
+      } else {
+        print("LỖI TỪ SERVER: ${response.statusCode} - ${response.body}");
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("LỖI KẾT NỐI HOẶC CODE: $e");
+      setState(() => _isLoading = false);
+    } finally {
+      client.close();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // DỮ LIỆU GIẢ
-    const String roomName = 'Phòng 101 - KDC Nhơn Đức';
-    const String contractCode = 'HD-2026-0012';
-    const String status = 'Đang hiệu lực';
-    const String startDate = '01/10/2026';
-    const String endDate = '01/10/2027';
-    const String price = '2.800.000 đ/tháng';
-    const String deposit = '2.800.000 đ';
-    const String paymentCycle = 'Hàng tháng';
-    const String initialElec = '1250 kWh';
-    const String initialWater = '105 khối';
-    const String ownerName = 'Nguyễn Văn A';
-    const String ownerPhone = '0987654321';
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.primaryGreen,
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+    }
 
-    // DỊCH VỤ
-    final List<Map<String, String>> services = [
-      {'name': 'Rác sinh hoạt', 'price': '30.000 đ', 'unit': 'tháng'},
-      {'name': 'Wifi', 'price': '50.000 đ', 'unit': 'phòng'},
-      {'name': 'Gửi xe máy', 'price': '100.000 đ', 'unit': 'chiếc'},
-    ];
+    if (_contractDetail == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Lỗi')),
+        body: const Center(child: Text('Không thể tải chi tiết hợp đồng.')),
+      );
+    }
 
+    // Bóc tách dữ liệu an toàn từ API (fallback về chuỗi rỗng/mặc định nếu null)
+    final roomName = _contractDetail!['roomName'] ?? 'Phòng trống';
+    final contractCode = _contractDetail!['contractCode'] ?? 'Chưa cập nhật';
 
-    final List<Map<String, String>> members = [
-      {'name': 'Nguễn Văn B', 'phone': '0901234567', 'role': 'Đại diện thuê'},
-    ];
+    // Đổi trạng thái E sang V
+    String status = 'Chưa xác định';
+    if (_contractDetail!['status'] == 'active') status = 'Đang hiệu lực';
+    else if (_contractDetail!['status'] == 'expired') status = 'Đã hết hạn';
+    else if (_contractDetail!['status'] == 'terminated') status = 'Đã thanh lý';
+    else if (_contractDetail!['status'] == 'draft') status = 'Bản nháp';
+
+    final startDate = _contractDetail!['startDate'] ?? 'N/A';
+    final endDate = _contractDetail!['endDate'] ?? 'N/A';
+    final rent = (_contractDetail!['rent'] as num?)?.toDouble() ?? 0;
+    final deposit = (_contractDetail!['deposit'] as num?)?.toDouble() ?? 0;
+
+    String paymentCycle = _contractDetail!['paymentCycle'] == 'quarterly' ? 'Hàng quý' : 'Hàng tháng';
+
+    final initialElec = (_contractDetail!['initialElectricityReading'] as num?)?.toString() ?? '0';
+    final initialWater = (_contractDetail!['initialWaterReading'] as num?)?.toString() ?? '0';
+
+    // Thông tin chủ nhà (Giả sử API trả về object owner)
+    final ownerName = _contractDetail!['ownerName'] ?? 'Đang cập nhật';
+    final ownerPhone = _contractDetail!['ownerPhone'] ?? 'Đang cập nhật';
+
+    // Dịch vụ (Giả sử API trả về mảng services)
+    final services = _contractDetail!['services'] as List<dynamic>? ?? [];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -99,44 +181,52 @@ class ContractDetailScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   _buildInfoRow('Ngày bắt đầu:', startDate),
                   _buildInfoRow('Ngày kết thúc:', endDate),
-                  _buildInfoRow('Giá thuê:', price),
-                  _buildInfoRow('Tiền cọc:', deposit),
+                  _buildInfoRow('Giá thuê:', '${_formatCurrency(rent)} đ/tháng'),
+                  _buildInfoRow('Tiền cọc:', '${_formatCurrency(deposit)} đ'),
                   _buildInfoRow('Chu kỳ thanh toán:', paymentCycle),
-                  _buildInfoRow('Điện đầu kỳ:', initialElec),
-                  _buildInfoRow('Nước đầu kỳ:', initialWater),
+                  _buildInfoRow('Điện đầu kỳ:', '$initialElec kWh'),
+                  _buildInfoRow('Nước đầu kỳ:', '$initialWater khối'),
                 ],
               ),
             ),
             const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
 
             //  DỊCH VỤ
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('DỊCH VỤ ĐI KÈM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
-                  const SizedBox(height: 12),
-                  ...services.map((srv) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
+            if (services.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('DỊCH VỤ ĐI KÈM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                    const SizedBox(height: 12),
+                    ...services.map((srv) {
+                      final srvName = srv['name'] ?? '';
+                      final srvPrice = (srv['price'] as num?)?.toDouble() ?? 0;
+                      final srvUnit = srv['unit'] ?? 'tháng';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Icon(Icons.check_circle, size: 16, color: AppColors.primaryGreen),
-                            const SizedBox(width: 8),
-                            Text(srv['name']!, style: const TextStyle(color: AppColors.textPrimary)),
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle, size: 16, color: AppColors.primaryGreen),
+                                const SizedBox(width: 8),
+                                Text(srvName, style: const TextStyle(color: AppColors.textPrimary)),
+                              ],
+                            ),
+                            Text('${_formatCurrency(srvPrice)} đ / $srvUnit', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                           ],
                         ),
-                        Text('${srv['price']} / ${srv['unit']}', style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                      ],
-                    ),
-                  )),
-                ],
+                      );
+                    }),
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
+              const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
+            ],
 
             // LIÊN HỆ & SỬA CHỮA
             Padding(
@@ -151,8 +241,8 @@ class ContractDetailScreen extends StatelessWidget {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const CircleAvatar(backgroundColor: AppColors.lightGreen, child: Icon(Icons.support_agent, color: AppColors.primaryGreen)),
-                    title: const Text(ownerName, style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                    subtitle: const Text(ownerPhone, style: TextStyle(color: AppColors.textSecondary)),
+                    title: Text(ownerName, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                    subtitle: Text(ownerPhone, style: const TextStyle(color: AppColors.textSecondary)),
                     trailing: IconButton(
                       icon: const Icon(Icons.phone, color: AppColors.primaryGreen),
                       onPressed: () { /* GỌI CHỦ NHÀ */ },
@@ -160,27 +250,36 @@ class ContractDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // NÚT MỚI: GỬI YÊU CẦU SỬA CHỮA
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.warningOrange, // Dùng màu cam cảnh báo cho nổi bật
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 0,
+                  // GỬI YÊU CẦU SỬA CHỮA (Chỉ hiện khi hợp đồng đang hiệu lực)
+                  if (_contractDetail!['status'] == 'active')
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.warningOrange,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.build_circle, color: Colors.white),
+                        label: const Text('GỬI YÊU CẦU SỬA CHỮA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TenantMaintenanceRequestScreen(
+                                roomId: _contractDetail!['roomId']?.toString() ?? '',
+                                roomName: _contractDetail!['roomName'] ?? 'Phòng trống',
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      icon: const Icon(Icons.build_circle, color: Colors.white),
-                      label: const Text('GỬI YÊU CẦU SỬA CHỮA', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      onPressed: () {
-                        // Điều hướng sang trang Gửi yêu cầu sửa chữa
-                        Navigator.pushNamed(context, AppRoutes.tenantMaintenanceRequest);
-                      },
                     ),
-                  ),
                   const SizedBox(height: 12),
 
-                  // Nút xem PDF cũ
+                  // Nút xem PDF
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -191,7 +290,7 @@ class ContractDetailScreen extends StatelessWidget {
                       ),
                       icon: const Icon(Icons.picture_as_pdf, color: AppColors.primaryGreen),
                       label: const Text('XEM FILE HỢP ĐỒNG (PDF)', style: TextStyle(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-                      onPressed: () { /* Xem PDF */ },
+                      onPressed: () { /* Xử lý tải/xem PDF sau */ },
                     ),
                   ),
                 ],
@@ -215,5 +314,11 @@ class ContractDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _formatCurrency(double amount) {
+    String result = amount.toInt().toString();
+    result = result.replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
+    return result;
   }
 }

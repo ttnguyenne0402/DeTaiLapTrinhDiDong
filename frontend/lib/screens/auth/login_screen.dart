@@ -1,4 +1,4 @@
-
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -9,7 +9,10 @@ import '../../core/constants/app_colors.dart';
 import '../tenant/home_screen.dart';
 import '../owner/owner_dashboard.dart';
 import '../admin/admin_dashboard.dart';
+import 'forgot_password_screen.dart';
 import 'register_screen.dart';
+import '../../services/auth_service.dart';
+import '../../services/auth_storage.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +21,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with WidgetsBindingObserver {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController _emailController = TextEditingController();
@@ -26,14 +30,59 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    serverClientId:
+        '843670435307-mngs2e74rvnfc3rb7044alb5m60fs2ea.apps.googleusercontent.com',
   );
 
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _isSocialLoading = false;
+  bool _zaloAttemptActive = false;
+  bool _zaloWasBackgrounded = false;
+  Completer<void>? _zaloReturnedToApp;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    FlutterZalo().init();
+    _loadRememberedCredentials();
+  }
+
+  Future<void> _loadRememberedCredentials() async {
+    try {
+      final credentials = await AuthStorage.getRememberedCredentials();
+      if (!mounted || credentials == null) return;
+      setState(() {
+        _emailController.text = credentials['account'] ?? '';
+        _passwordController.text = credentials['password'] ?? '';
+        _rememberMe = true;
+      });
+    } catch (error) {
+      debugPrint('[LOGIN] Không đọc được thông tin đã lưu: $error');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_zaloAttemptActive) return;
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _zaloWasBackgrounded = true;
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed &&
+        _zaloWasBackgrounded &&
+        !(_zaloReturnedToApp?.isCompleted ?? true)) {
+      _zaloReturnedToApp!.complete();
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -46,22 +95,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 13,
-      ),
-      prefixIcon: Icon(
-        prefixIcon,
-        color: AppColors.textSecondary,
-        size: 21,
-      ),
+      hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+      prefixIcon: Icon(prefixIcon, color: AppColors.textSecondary, size: 21),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: AppColors.background,
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 16,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
@@ -72,10 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(
-          color: AppColors.primaryGreen,
-          width: 1.5,
-        ),
+        borderSide: const BorderSide(color: AppColors.primaryGreen, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
@@ -83,10 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 1.5,
-        ),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
       ),
     );
   }
@@ -97,211 +130,208 @@ class _LoginScreenState extends State<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor:
-            isError ? Colors.redAccent : AppColors.primaryGreen,
+        backgroundColor: isError ? Colors.redAccent : AppColors.primaryGreen,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
 
-  // QUÊN MẬT KHẨU
-  void _showForgotPasswordDialog() {
-    final TextEditingController controller = TextEditingController();
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardSurface,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: const Row(
-            children: [
-              Icon(
-                Icons.lock_reset_rounded,
-                color: AppColors.primaryGreen,
-                size: 25,
-              ),
-              SizedBox(width: 10),
-              Text(
-                'Quên mật khẩu',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Nhập email hoặc số điện thoại đã đăng ký để nhận mã khôi phục.',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                TextFormField(
-                  controller: controller,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: _inputDecoration(
-                    hintText: 'Email hoặc số điện thoại',
-                    prefixIcon: Icons.person_outline_rounded,
-                  ),
-                  validator: (String? value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Vui lòng nhập email hoặc SĐT';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                controller.dispose();
-              },
-              child: const Text(
-                'Hủy',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-
-                final String target = controller.text.trim();
-
-                Navigator.pop(dialogContext);
-                controller.dispose();
-
-                _showNotice(
-                  'Chức năng gửi mã khôi phục chưa được kết nối.',
-                );
-
-                debugPrint('Password recovery requested: $target');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                minimumSize: const Size(105, 44),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Gửi mã',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
-        );
-      },
-    ).then((_) {
-      controller.dispose();
-    });
+  Future<void> _openForgotPasswordPage() async {
+    final didReset = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          initialAccount: _emailController.text.trim(),
+        ),
+      ),
+    );
+    if (didReset == true && mounted) {
+      _showNotice('Đặt lại mật khẩu thành công. Hãy đăng nhập lại.');
+    }
   }
 
-  // ĐĂNG NHẬP BẰNG TÀI KHOẢN TEST
-  void _login() {
+  // ĐĂNG NHẬP THẬT KẾT NỐI VỚI BACKEND .NET & SQL SERVER
+
+  Future<void> _login() async {
     FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) return;
 
-    final String email = _emailController.text.trim().toLowerCase();
+    final String emailOrPhone = _emailController.text.trim();
     final String password = _passwordController.text;
 
-    const String tenantEmail = 'tenant@gmail.com';
-    const String ownerEmail = 'owner@gmail.com';
-    const String adminEmail = 'admin@gmail.com';
-    const String testPassword = '123456';
-
-    if (email == tenantEmail && password == testPassword) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        ),
+    try {
+      final result = await AuthService.login(
+        emailOrPhone: emailOrPhone,
+        password: password,
       );
-      return;
-    }
 
-    if (email == ownerEmail && password == testPassword) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const OwnerDashboard(),
-        ),
+      final dynamic responseData = result['data'];
+
+      if (responseData is! Map) {
+        throw Exception('Backend không trả về thông tin tài khoản hợp lệ.');
+      }
+
+      // Lấy thông tin từ response backend
+      final String userId = responseData['id']?.toString() ?? '';
+      final String role = responseData['role']?.toString().toLowerCase() ?? '';
+      final String accessToken = responseData['accessToken']?.toString() ?? '';
+      final String name = responseData['name']?.toString() ?? '';
+
+      if (userId.isEmpty || role.isEmpty || accessToken.isEmpty) {
+        throw Exception('Thiếu ID, quyền hoặc token đăng nhập.');
+      }
+
+      // Lưu thông tin tài khoản
+      await AuthStorage.saveLogin(
+        userId: userId,
+        role: role,
+        accessToken: accessToken,
+        name: name,
       );
-      return;
-    }
 
-    if (email == adminEmail && password == testPassword) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AdminDashboard(),
-        ),
-      );
-      return;
-    }
+      if (_rememberMe) {
+        await AuthStorage.saveRememberedCredentials(
+          account: emailOrPhone,
+          password: password,
+        );
+      } else {
+        await AuthStorage.clearRememberedCredentials();
+      }
 
-    _showNotice(
-      'Email hoặc mật khẩu không chính xác.',
-      isError: true,
-    );
+      if (!mounted) return;
+
+      _showNotice(result['message'] ?? 'Đăng nhập thành công!');
+
+      // Điều hướng theo vai trò
+      if (role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        );
+      } else if (role == 'owner') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OwnerDashboard()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      _showNotice(e.toString().replaceAll('Exception: ', ''), isError: true);
+    }
   }
 
-  // ĐĂNG NHẬP GOOGLE
+  // ĐĂNG NHẬP GOOGLE QUA BACKEND TRỌ ƠI
   Future<void> _handleGoogleSignIn() async {
     if (_isSocialLoading) return;
 
     setState(() => _isSocialLoading = true);
 
     try {
-      final GoogleSignInAccount? account =
-          await _googleSignIn.signIn();
+      // Bước 1: Đăng xuất phiên Google đang được chọn
+      await _googleSignIn.signOut();
 
-      if (!mounted) return;
+      // Bước 2: Chọn tài khoản Google
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
-      if (account == null) {
+      if (account == null) return;
+
+      // Bước 3: Lấy Google ID token
+      final GoogleSignInAuthentication authentication =
+          await account.authentication;
+
+      final String? idToken = authentication.idToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        _showNotice(
+          'Không lấy được Google ID token. Hãy kiểm tra cấu hình Google.',
+          isError: true,
+        );
         return;
       }
 
-      debugPrint('Google account: ${account.email}');
+      // Bước 4: Gửi Google ID token lên backend Trọ Ơi
+      final result = await AuthService.googleSignIn(idToken: idToken);
 
-      _showNotice(
-        'Đã chọn tài khoản Google. Cần kết nối backend Trọ Ơi để đăng nhập.',
+      if (!mounted) return;
+
+      // Bước 5: Đọc dữ liệu tài khoản từ backend
+      final dynamic responseData = result['data'];
+
+      if (responseData is! Map) {
+        _showNotice('Backend chưa trả về thông tin người dùng.', isError: true);
+        return;
+      }
+
+      // Bước 6: Lấy thông tin tài khoản Trọ Ơi
+      final String userId = responseData['id']?.toString() ?? '';
+      final String role = responseData['role']?.toString().toLowerCase() ?? '';
+      final String appToken = responseData['accessToken']?.toString() ?? '';
+      final String name = responseData['name']?.toString() ?? '';
+
+      // Bước 7: Kiểm tra dữ liệu đăng nhập
+      if (userId.isEmpty || role.isEmpty || appToken.isEmpty) {
+        throw Exception(
+          'Backend chưa trả về đầy đủ ID, quyền hoặc token tài khoản.',
+        );
+      }
+
+      // Bước 8: LƯU THÔNG TIN ĐĂNG NHẬP VÀO AUTH STORAGE
+      await AuthStorage.saveLogin(
+        userId: userId,
+        role: role,
+        accessToken: appToken,
+        name: name,
       );
+
+      // Kiểm tra lưu thành công (không in nội dung token)
+      debugPrint('[GOOGLE LOGIN] User ID: ${await AuthStorage.getUserId()}');
+      debugPrint(
+        '[GOOGLE LOGIN] Has token: '
+        '${(await AuthStorage.getAccessToken())?.isNotEmpty ?? false}',
+      );
+
+      if (!mounted) return;
+
+      // Bước 9: Thông báo đăng nhập thành công
+      _showNotice(
+        result['message']?.toString() ?? 'Đăng nhập Google thành công!',
+      );
+
+      // Bước 10: Điều hướng theo vai trò tài khoản
+      if (role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        );
+      } else if (role == 'owner' || role == 'landlord') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OwnerDashboard()),
+        );
+      } else if (role == 'tenant') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        throw Exception('Vai trò tài khoản không hợp lệ: $role');
+      }
     } catch (e, stackTrace) {
-      debugPrint('Google Sign-In error: $e');
+      debugPrint('[GOOGLE LOGIN] Lỗi: $e');
       debugPrintStack(stackTrace: stackTrace);
 
-      _showNotice(
-        'Đăng nhập Google chưa thành công.',
-        isError: true,
-      );
+      if (!mounted) return;
+
+      _showNotice(e.toString().replaceAll('Exception: ', ''), isError: true);
     } finally {
       if (mounted) {
         setState(() => _isSocialLoading = false);
@@ -309,43 +339,138 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // ĐĂNG NHẬP ZALO
+  // ĐĂNG NHẬP ZALO QUA BACKEND TRỌ ƠI
   Future<void> _handleZaloSignIn() async {
     if (_isSocialLoading) return;
 
     setState(() => _isSocialLoading = true);
 
     try {
-      final bool? result = await FlutterZalo().logIn();
+      final zalo = FlutterZalo();
+      _zaloAttemptActive = true;
+      _zaloWasBackgrounded = false;
+      final returnedToApp = Completer<void>();
+      _zaloReturnedToApp = returnedToApp;
+
+      final loginFuture = zalo.logIn().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () => throw Exception('Quá thời gian chờ phản hồi từ Zalo.'),
+      );
+      final bool? loginResult = await Future.any<bool?>([
+        loginFuture,
+        returnedToApp.future.then((_) async {
+          // Cho SDK một chút thời gian để gửi callback thành công khi quay lại.
+          await Future<void>.delayed(const Duration(seconds: 2));
+          return null;
+        }),
+      ]);
 
       if (!mounted) return;
 
-      if (result != true) {
+      if (loginResult == null) {
+        _showNotice('Đã hủy đăng nhập Zalo.', isError: true);
+        return;
+      }
+
+      if (loginResult != true) {
         _showNotice(
-          'Đăng nhập Zalo chưa thành công hoặc đã bị hủy.',
+          'Đăng nhập Zalo đã bị hủy hoặc không thành công.',
           isError: true,
         );
         return;
       }
 
-      final profile = await FlutterZalo().getProfile();
+      // Bước 2: Lấy access token từ Zalo
+      final dynamic tokenResult = await zalo
+          .getAccessToken()
+          .timeout(const Duration(seconds: 20));
+
+      final String zaloAccessToken = tokenResult?.toString().trim() ?? '';
+
+      if (zaloAccessToken.isEmpty) {
+        _showNotice('Không lấy được access token từ Zalo.', isError: true);
+        return;
+      }
+
+      debugPrint('[ZALO LOGIN] Đã lấy access token.');
+
+      // Bước 3: Gửi token Zalo lên backend Trọ Ơi
+      final result = await AuthService.zaloLogin(accessToken: zaloAccessToken);
 
       if (!mounted) return;
 
-      debugPrint('Zalo profile: $profile');
+      // Bước 4: Đọc dữ liệu trả về từ backend
+      final dynamic responseData = result['data'];
 
-      _showNotice(
-        'Đã xác thực Zalo. Cần kết nối backend Trọ Ơi để hoàn tất đăng nhập.',
+      if (responseData is! Map) {
+        _showNotice('Backend chưa trả về thông tin tài khoản.', isError: true);
+        return;
+      }
+
+      // Bước 5: Lấy thông tin tài khoản Trọ Ơi
+      final String userId = responseData['id']?.toString() ?? '';
+      final String role = responseData['role']?.toString().toLowerCase() ?? '';
+      final String appToken = responseData['accessToken']?.toString() ?? '';
+      final String name = responseData['name']?.toString() ?? '';
+
+      // Bước 6: Kiểm tra dữ liệu
+      if (userId.isEmpty || role.isEmpty || appToken.isEmpty) {
+        throw Exception(
+          'Backend chưa trả về đầy đủ ID, quyền hoặc token tài khoản.',
+        );
+      }
+
+      // Bước 7: LƯU THÔNG TIN ĐĂNG NHẬP VÀO AUTH STORAGE
+      await AuthStorage.saveLogin(
+        userId: userId,
+        role: role,
+        accessToken: appToken,
+        name: name,
       );
+
+      // Kiểm tra lưu thành công, không in nội dung token
+      debugPrint('[ZALO LOGIN] User ID: ${await AuthStorage.getUserId()}');
+      debugPrint(
+        '[ZALO LOGIN] Has token: '
+        '${(await AuthStorage.getAccessToken())?.isNotEmpty ?? false}',
+      );
+
+      if (!mounted) return;
+
+      // Bước 8: Thông báo đăng nhập thành công
+      _showNotice(
+        result['message']?.toString() ?? 'Đăng nhập Zalo thành công!',
+      );
+
+      // Bước 9: Điều hướng theo quyền tài khoản
+      if (role == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+        );
+      } else if (role == 'owner' || role == 'landlord') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OwnerDashboard()),
+        );
+      } else if (role == 'tenant') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        throw Exception('Vai trò tài khoản không hợp lệ: $role');
+      }
     } catch (e, stackTrace) {
-      debugPrint('Zalo Sign-In error: $e');
+      debugPrint('[ZALO LOGIN] Lỗi: $e');
       debugPrintStack(stackTrace: stackTrace);
 
-      _showNotice(
-        'Không thể đăng nhập Zalo. Hãy kiểm tra cấu hình ứng dụng Zalo.',
-        isError: true,
-      );
+      if (!mounted) return;
+
+      _showNotice(e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
+      _zaloAttemptActive = false;
+      _zaloReturnedToApp = null;
       if (mounted) {
         setState(() => _isSocialLoading = false);
       }
@@ -355,9 +480,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _goToRegister() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const RegisterScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const RegisterScreen()),
     );
   }
 
@@ -378,11 +501,7 @@ class _LoginScreenState extends State<LoginScreen> {
               painter: const CozyRoomHeroPainter(),
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.only(
-                    top: 28,
-                    left: 26,
-                    right: 26,
-                  ),
+                  padding: const EdgeInsets.only(top: 28, left: 26, right: 26),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -445,8 +564,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
           SafeArea(
             child: SingleChildScrollView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.only(
                 top: size.height * 0.355,
                 left: 19,
@@ -582,15 +700,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                     color: Color(0xFFC8D1CC),
                                   ),
                                   onChanged: (bool? value) {
+                                    final shouldRemember = value ?? false;
                                     setState(() {
-                                      _rememberMe = value ?? false;
+                                      _rememberMe = shouldRemember;
                                     });
+                                    if (!shouldRemember) {
+                                      AuthStorage.clearRememberedCredentials();
+                                    }
                                   },
                                 ),
                               ),
                               const SizedBox(width: 6),
                               const Text(
-                                'Ghi nhớ đăng nhập',
+                                'Ghi nhớ mật khẩu',
                                 style: TextStyle(
                                   color: AppColors.textSecondary,
                                   fontSize: 12.5,
@@ -599,7 +721,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                           GestureDetector(
-                            onTap: _showForgotPasswordDialog,
+                            onTap: _openForgotPasswordPage,
                             child: const Text(
                               'Quên mật khẩu?',
                               style: TextStyle(
@@ -611,7 +733,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 22),
                       SizedBox(
                         height: 53,
@@ -870,8 +991,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       Paint()..color = Colors.white.withOpacity(0.90),
     );
 
-    final Paint cloudPaint = Paint()
-      ..color = Colors.white.withOpacity(0.55);
+    final Paint cloudPaint = Paint()..color = Colors.white.withOpacity(0.55);
 
     _cloud(canvas, Offset(w * 0.18, h * 0.12), 46, cloudPaint);
     _cloud(canvas, Offset(w * 0.75, h * 0.08), 60, cloudPaint);
@@ -911,8 +1031,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       seed: 3,
     );
 
-    final Paint treeLinePaint = Paint()
-      ..color = leafDark.withOpacity(0.85);
+    final Paint treeLinePaint = Paint()..color = leafDark.withOpacity(0.85);
 
     final Path treePath = Path()..moveTo(0, h * 0.80);
     final math.Random rnd = math.Random(7);
@@ -943,11 +1062,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   void _cloud(Canvas canvas, Offset center, double scale, Paint paint) {
     canvas.drawOval(
-      Rect.fromCenter(
-        center: center,
-        width: scale * 1.6,
-        height: scale * 0.6,
-      ),
+      Rect.fromCenter(center: center, width: scale * 1.6, height: scale * 0.6),
       paint,
     );
 
@@ -989,12 +1104,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       final double bw = 30 + rnd.nextDouble() * 46;
       final double bh = h * heightScale * (0.5 + rnd.nextDouble());
 
-      final Rect rect = Rect.fromLTWH(
-        x,
-        baseY - bh,
-        bw,
-        bh + (h - baseY),
-      );
+      final Rect rect = Rect.fromLTWH(x, baseY - bh, bw, bh + (h - baseY));
 
       canvas.drawRect(rect, buildingPaint);
 
@@ -1023,12 +1133,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   void _paintRightCurtain(Canvas canvas, double w, double h) {
     final double curtainW = w * 0.16;
-    final Rect rect = Rect.fromLTWH(
-      w - curtainW,
-      0,
-      curtainW,
-      h * 0.90,
-    );
+    final Rect rect = Rect.fromLTWH(w - curtainW, 0, curtainW, h * 0.90);
 
     final Path path = Path()
       ..moveTo(rect.left + curtainW * 0.15, rect.top)
@@ -1150,21 +1255,13 @@ class CozyRoomHeroPainter extends CustomPainter {
       size * 0.80,
     );
 
-    canvas.drawRect(
-      photoRect,
-      Paint()..color = photoColor.withOpacity(0.8),
-    );
+    canvas.drawRect(photoRect, Paint()..color = photoColor.withOpacity(0.8));
 
     canvas.restore();
   }
 
   void _paintBedCorner(Canvas canvas, double w, double h) {
-    final Rect bedRect = Rect.fromLTWH(
-      w * 0.80,
-      h * 0.66,
-      w * 0.20,
-      h * 0.34,
-    );
+    final Rect bedRect = Rect.fromLTWH(w * 0.80, h * 0.66, w * 0.20, h * 0.34);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(bedRect, const Radius.circular(18)),
@@ -1202,12 +1299,7 @@ class CozyRoomHeroPainter extends CustomPainter {
   }
 
   void _paintShelfAndPlant(Canvas canvas, double w, double h) {
-    final Rect shelfRect = Rect.fromLTWH(
-      -10,
-      h * 0.03,
-      w * 0.22,
-      h * 0.045,
-    );
+    final Rect shelfRect = Rect.fromLTWH(-10, h * 0.03, w * 0.22, h * 0.045);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(shelfRect, const Radius.circular(3)),
@@ -1246,15 +1338,9 @@ class CozyRoomHeroPainter extends CustomPainter {
       shelfRect.bottom,
     );
 
-    final Offset control = Offset(
-      vineStart.dx - 30,
-      vineStart.dy + h * 0.18,
-    );
+    final Offset control = Offset(vineStart.dx - 30, vineStart.dy + h * 0.18);
 
-    final Offset end = Offset(
-      vineStart.dx + 10,
-      vineStart.dy + h * 0.34,
-    );
+    final Offset end = Offset(vineStart.dx + 10, vineStart.dy + h * 0.34);
 
     final Path vinePath = Path()
       ..moveTo(vineStart.dx, vineStart.dy)
@@ -1280,14 +1366,10 @@ class CozyRoomHeroPainter extends CustomPainter {
 
   Offset _quadPoint(Offset p0, Offset p1, Offset p2, double t) {
     final double x =
-        (1 - t) * (1 - t) * p0.dx +
-        2 * (1 - t) * t * p1.dx +
-        t * t * p2.dx;
+        (1 - t) * (1 - t) * p0.dx + 2 * (1 - t) * t * p1.dx + t * t * p2.dx;
 
     final double y =
-        (1 - t) * (1 - t) * p0.dy +
-        2 * (1 - t) * t * p1.dy +
-        t * t * p2.dy;
+        (1 - t) * (1 - t) * p0.dy + 2 * (1 - t) * t * p1.dy + t * t * p2.dy;
 
     return Offset(x, y);
   }
@@ -1304,11 +1386,7 @@ class CozyRoomHeroPainter extends CustomPainter {
     canvas.rotate(rotate);
 
     canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset.zero,
-        width: size,
-        height: size * 0.55,
-      ),
+      Rect.fromCenter(center: Offset.zero, width: size, height: size * 0.55),
       paint,
     );
 
@@ -1316,20 +1394,14 @@ class CozyRoomHeroPainter extends CustomPainter {
   }
 
   void _paintPinboard(Canvas canvas, double w, double h) {
-    final Rect board = Rect.fromLTWH(
-      -16,
-      h * 0.20,
-      w * 0.16,
-      h * 0.34,
-    );
+    final Rect board = Rect.fromLTWH(-16, h * 0.20, w * 0.16, h * 0.34);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(board, const Radius.circular(6)),
       Paint()..color = cardboard,
     );
 
-    final Paint dotPaint = Paint()
-      ..color = woodDark.withOpacity(0.08);
+    final Paint dotPaint = Paint()..color = woodDark.withOpacity(0.08);
 
     final math.Random rnd = math.Random(11);
 
@@ -1357,10 +1429,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     _polaroid(
       canvas,
-      Offset(
-        board.left + board.width * 0.42,
-        board.top + board.height * 0.68,
-      ),
+      Offset(board.left + board.width * 0.42, board.top + board.height * 0.68),
       board.width * 0.55,
       tilt: 0.05,
       photoColor: leafDark,
@@ -1373,25 +1442,13 @@ class CozyRoomHeroPainter extends CustomPainter {
       board.height * 0.20,
     );
 
-    canvas.drawRect(
-      sticky,
-      Paint()..color = const Color(0xFFF7D774),
-    );
+    canvas.drawRect(sticky, Paint()..color = const Color(0xFFF7D774));
 
-    final Paint heartPaint = Paint()
-      ..color = Colors.redAccent.withOpacity(0.7);
+    final Paint heartPaint = Paint()..color = Colors.redAccent.withOpacity(0.7);
 
-    canvas.drawCircle(
-      sticky.center.translate(-3, -2),
-      3,
-      heartPaint,
-    );
+    canvas.drawCircle(sticky.center.translate(-3, -2), 3, heartPaint);
 
-    canvas.drawCircle(
-      sticky.center.translate(3, -2),
-      3,
-      heartPaint,
-    );
+    canvas.drawCircle(sticky.center.translate(3, -2), 3, heartPaint);
 
     final Path heartPath = Path()
       ..moveTo(sticky.center.dx - 6, sticky.center.dy - 1)
@@ -1410,12 +1467,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     final Path shadowPath = Path()..addRect(rect);
 
-    canvas.drawShadow(
-      shadowPath,
-      Colors.black.withOpacity(0.15),
-      3,
-      true,
-    );
+    canvas.drawShadow(shadowPath, Colors.black.withOpacity(0.15), 3, true);
 
     canvas.drawRect(rect, Paint()..color = paperWhite);
 
@@ -1461,23 +1513,14 @@ class CozyRoomHeroPainter extends CustomPainter {
     for (int i = 1; i <= 4; i++) {
       final double gy = deskRect.top + deskRect.height * (i / 5);
 
-      canvas.drawLine(
-        Offset(0, gy),
-        Offset(w, gy),
-        grainPaint,
-      );
+      canvas.drawLine(Offset(0, gy), Offset(w, gy), grainPaint);
     }
 
     final Offset bookBase = Offset(w * 0.02, deskRect.top - 4);
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          bookBase.dx,
-          bookBase.dy - 10,
-          w * 0.09,
-          12,
-        ),
+        Rect.fromLTWH(bookBase.dx, bookBase.dy - 10, w * 0.09, 12),
         const Radius.circular(2),
       ),
       Paint()..color = green,
@@ -1485,12 +1528,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          bookBase.dx + 4,
-          bookBase.dy - 20,
-          w * 0.08,
-          11,
-        ),
+        Rect.fromLTWH(bookBase.dx + 4, bookBase.dy - 20, w * 0.08, 11),
         const Radius.circular(2),
       ),
       Paint()..color = greenDark,
@@ -1498,12 +1536,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          -w * 0.02,
-          deskRect.top - 2,
-          w * 0.14,
-          8,
-        ),
+        Rect.fromLTWH(-w * 0.02, deskRect.top - 2, w * 0.14, 8),
         const Radius.circular(2),
       ),
       Paint()..color = const Color(0xFFB9C2BC),
@@ -1513,11 +1546,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: mugCenter,
-          width: 46,
-          height: 40,
-        ),
+        Rect.fromCenter(center: mugCenter, width: 46, height: 40),
         const Radius.circular(8),
       ),
       Paint()..color = cream,
@@ -1542,12 +1571,7 @@ class CozyRoomHeroPainter extends CustomPainter {
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          mugCenter.dx - 16,
-          mugCenter.dy - 20,
-          32,
-          6,
-        ),
+        Rect.fromLTWH(mugCenter.dx - 16, mugCenter.dy - 20, 32, 6),
         const Radius.circular(3),
       ),
       Paint()..color = woodDark,
@@ -1562,11 +1586,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       canvas.rotate(angle);
 
       canvas.drawOval(
-        Rect.fromCenter(
-          center: const Offset(0, -14),
-          width: 10,
-          height: 22,
-        ),
+        Rect.fromCenter(center: const Offset(0, -14), width: 10, height: 22),
         mugLeafPaint,
       );
 
@@ -1593,10 +1613,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       ..shader = RadialGradient(
         center: const Alignment(0, -0.2),
         radius: 1.1,
-        colors: [
-          Colors.white.withOpacity(0.18),
-          Colors.transparent,
-        ],
+        colors: [Colors.white.withOpacity(0.18), Colors.transparent],
       ).createShader(fullRect);
 
     canvas.drawRect(fullRect, glow);
@@ -1607,10 +1624,7 @@ class CozyRoomHeroPainter extends CustomPainter {
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          Colors.black.withOpacity(0.10),
-          Colors.transparent,
-        ],
+        colors: [Colors.black.withOpacity(0.10), Colors.transparent],
       ).createShader(topRect);
 
     canvas.drawRect(topRect, edge);

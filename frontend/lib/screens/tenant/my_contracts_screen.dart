@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import 'dart:convert';
+import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
-
-
-
-class ContractMock {
-  final String title;
-  final String status;
-  final String startDate;
-
-  ContractMock({
-    required this.title,
-    required this.status,
-    required this.startDate,
-  });
-}
-
+import '../../utils/database_helper.dart';
+import 'contract_detail_screen.dart';
+import '../../services/auth_storage.dart';
 class MyContractsScreen extends StatefulWidget {
   const MyContractsScreen({super.key});
 
@@ -28,31 +20,79 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
   String selectedFilter = 'Tất cả';
   final List<String> filters = ['Tất cả', 'Hiệu lực', 'Đã hết hạn'];
 
+  List _contracts = [];
+  bool _isLoading = true;
 
-  final List<ContractMock> dummyContracts = [
-    ContractMock(
-      title: 'KDC Nhơn Đức, Huyện Nhà Bè',
-      status: 'Hiệu lực',
-      startDate: '01/10/2026',
-    ),
-    ContractMock(
-      title: 'KTX ĐH Công Thương, Tân Phú',
-      status: 'Đã hết hạn',
-      startDate: '15/08/2025',
-    ),
-    ContractMock(
-      title: 'Phòng trọ 102 - Quận 7',
-      status: 'Hiệu lực',
-      startDate: '15/09/2026',
-    ),
-  ];
+  // URL API Backend
+  late String _apiUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+  }
+  Future<void> _initData() async {
+    final userId = await AuthStorage.getUserId();
+    _apiUrl = 'http://10.0.2.2:5093/api/contracts/tenant/${userId ?? ""}';
+    await _loadData();
+  }
+  // Hàm tạo Client tùy chỉnh bỏ qua lỗi SSL
+  IOClient _getCustomClient() {
+    final httpClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    return IOClient(httpClient);
+  }
+
+  Future<void> _loadData() async {
+    // 1. Lấy dữ liệu từ SQLite
+    final localData = await DatabaseHelper.instance.getLocalContracts();
+    if (localData.isNotEmpty) {
+      setState(() {
+        _contracts = List.from(localData);
+        _isLoading = false;
+      });
+    }
+
+    // 2. Gọi API để lấy dữ liệu mới nhất
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(Uri.parse(_apiUrl));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> apiData = json.decode(response.body);
+
+        // 3. Lưu đè dữ liệu mới vào SQLite
+        await DatabaseHelper.instance.insertContracts(apiData);
+
+        // 4. Cập nhật lại UI
+        if (mounted) {
+          setState(() {
+            _contracts = List.from(apiData);
+            _isLoading = false;
+          });
+        }
+      } else {
+        print("Lỗi server: ${response.statusCode}");
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Lỗi khi lấy hợp đồng từ server: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } finally {
+      client.close();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-
-    List<ContractMock> filteredContracts = dummyContracts.where((contract) {
+    // XỬ LÝ LỌC TRÊN DỮ LIỆU THẬT
+    List filteredContracts = _contracts.where((contract) {
       if (selectedFilter == 'Tất cả') return true;
-      return contract.status == selectedFilter;
+      if (selectedFilter == 'Hiệu lực') return contract['status'] == 'active';
+      if (selectedFilter == 'Đã hết hạn') return contract['status'] == 'expired';
+      return false;
     }).toList();
 
     return Scaffold(
@@ -64,10 +104,9 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
           'Hợp đồng của tôi',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-
         elevation: 0,
       ),
-      body:Container(
+      body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
           color: AppColors.background,
@@ -117,12 +156,24 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
 
               // --- DANH SÁCH HỢP ĐỒNG  ---
               Expanded(
-                child: ListView.builder(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredContracts.isEmpty
+                    ? const Center(
+                  child: Text('Không có hợp đồng nào.', style: TextStyle(color: AppColors.textSecondary)),
+                )
+                    : ListView.builder(
                   itemCount: filteredContracts.length,
                   padding: const EdgeInsets.only(bottom: 20),
                   itemBuilder: (context, index) {
                     final contract = filteredContracts[index];
-                    bool isActive = contract.status == 'Hiệu lực';
+                    bool isActive = contract['status'] == 'active';
+
+                    // Lấy tên phòng
+                    String roomName = contract['roomId'] ?? 'Phòng trống';
+                    if (contract['contractCode'] != null) {
+                      roomName = 'Hợp đồng: ${contract['contractCode']}';
+                    }
 
                     return Card(
                       color: AppColors.cardSurface,
@@ -134,22 +185,26 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
-                          // CHUYỂN SANG CHI TIẾT HỢP ĐỒNG
-                          Navigator.pushNamed(context, '/tenant/contracts/detail');
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ContractDetailScreen(),
+                              settings: RouteSettings(arguments: contract['id']),
+                            ),
+                          );
                         },
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-
                                   Expanded(
                                     child: Text(
-                                      contract.title,
+                                      roomName,
                                       style: const TextStyle(
                                         color: AppColors.textPrimary,
                                         fontSize: 16,
@@ -165,8 +220,6 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-
-
                               Row(
                                 children: [
                                   const Text(
@@ -180,7 +233,7 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
-                                      contract.status,
+                                      isActive ? 'Hiệu lực' : (contract['status'] == 'expired' ? 'Đã hết hạn' : 'Đã thanh lý'),
                                       style: TextStyle(
                                         color: isActive ? AppColors.primaryGreen : AppColors.textSecondary,
                                         fontSize: 12,
@@ -191,8 +244,6 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-
-
                               Row(
                                 children: [
                                   const Text(
@@ -200,7 +251,7 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                                     style: TextStyle(color: AppColors.textSecondary),
                                   ),
                                   Text(
-                                    contract.startDate,
+                                    contract['startDate'] ?? 'N/A',
                                     style: const TextStyle(
                                       color: AppColors.textPrimary,
                                       fontWeight: FontWeight.w500,
@@ -220,7 +271,6 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
           ),
         ),
       ),
-
     );
   }
 }
