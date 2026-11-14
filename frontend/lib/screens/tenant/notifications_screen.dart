@@ -207,7 +207,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       Navigator.pushNamed(context, '/tenant/contracts/detail');
                       break;
                     case 'maintenance':
-                      Navigator.pushNamed(context, '/tenant/maintenance/request');
+                      Navigator.pushNamed(context, AppRoutes.tenantMaintenanceHistory);
                       break;
                   }
                 },

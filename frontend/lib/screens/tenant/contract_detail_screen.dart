@@ -269,7 +269,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => TenantMaintenanceRequestScreen(
-                                roomId: 'ROOM01',
+                                roomId: _contractDetail!['roomId']?.toString() ?? '',
                                 roomName: _contractDetail!['roomName'] ?? 'Phòng trống',
                               ),
                             ),

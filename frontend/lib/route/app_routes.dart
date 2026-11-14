@@ -35,4 +35,5 @@ abstract class AppRoutes {
   static const String home = '/home';
   static const String roomDetail = '/room-detail';
   static const String tenantMaintenanceRequest = '/tenant/maintenance/request';
+  static const String tenantMaintenanceHistory = '/tenant/maintenance/history';
 }

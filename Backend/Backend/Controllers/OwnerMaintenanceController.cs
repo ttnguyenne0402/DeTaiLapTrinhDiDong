@@ -101,12 +101,17 @@ namespace Backend.Controllers
         {
             try
             {
-                var request = await _context.MaintenanceRequests.FindAsync(id);
+                // Thêm Include Room để lấy tên phòng ghép vào thông báo
+                var request = await _context.MaintenanceRequests
+                    .Include(m => m.Room)
+                    .FirstOrDefaultAsync(m => m.Id == id);
+
                 if (request == null) return NotFound(new { message = "Không tìm thấy sự cố." });
 
+                // Cập nhật trạng thái
                 request.Status = req.Status;
 
-                // Nếu chủ nhà có ghi chú chi phí, phân bổ (từ giao diện app) thì lưu vào đây
+                // Nếu chủ nhà có ghi chú chi phí, phân bổ thì lưu vào đây
                 if (!string.IsNullOrEmpty(req.OwnerNote))
                 {
                     request.OwnerNote = req.OwnerNote;
@@ -120,6 +125,61 @@ namespace Backend.Controllers
 
                 request.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
+
+                // BẮT ĐẦU CHÈN CODE TẠO THÔNG BÁO CHO NGƯỜI THUÊ
+                try
+                {
+                    string title = "";
+                    string message = "";
+                    string roomName = request.Room?.Name ?? "phòng của bạn";
+
+                    if (req.Status == "processing")
+                    {
+                        title = "Yêu cầu sửa chữa đang được xử lý";
+                        message = $"Chủ trọ đã tiếp nhận và đang xử lý sự cố '{request.Title}' tại {roomName}.";
+                    }
+                    else if (req.Status == "completed")
+                    {
+                        title = "Yêu cầu sửa chữa đã hoàn tất";
+                        message = $"Sự cố '{request.Title}' tại {roomName} đã được khắc phục xong.";
+                        if (!string.IsNullOrEmpty(req.OwnerNote))
+                        {
+                            message += $" Ghi chú từ chủ trọ: {req.OwnerNote}";
+                        }
+                    }
+                    else if (req.Status == "rejected")
+                    {
+                        title = "Yêu cầu sửa chữa bị từ chối";
+                        message = $"Chủ trọ đã từ chối yêu cầu sửa chữa '{request.Title}'.";
+                        if (!string.IsNullOrEmpty(req.OwnerNote))
+                        {
+                            message += $" Lý do: {req.OwnerNote}";
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(title))
+                    {
+                        var notif = new Notification
+                        {
+                            Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8),
+                            UserId = request.TenantId, // Gửi cho NGƯỜI THUÊ
+                            Title = title,
+                            Message = message,
+                            Type = "maintenance",
+                            ReferenceId = request.Id,
+                            ReferenceType = "maintenance",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        _context.Notifications.Add(notif);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Lỗi tạo thông báo sửa chữa cho khách thuê: {ex.Message}");
+                }
+                // KẾT THÚC CHÈN CODE
 
                 return Ok(new { message = "Đã cập nhật trạng thái sự cố thành công!" });
             }
