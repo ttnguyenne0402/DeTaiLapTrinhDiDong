@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/post_service.dart';
@@ -79,7 +80,7 @@ class _PostDetailOwnerScreenState extends State<PostDetailOwnerScreen> {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]}.',
     );
-    return '${str}đ';
+    return '$strđ';
   }
 
   String _roomStatusLabel(String? status) {
@@ -165,19 +166,38 @@ class _PostDetailOwnerScreenState extends State<PostDetailOwnerScreen> {
                         ? Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Image.asset(
+                            errorBuilder: (_, _, _) => Image.asset(
                               'frontend/assets/images/anhPhongDemo.jpg',
                               fit: BoxFit.cover,
                             ),
                           )
-                        : Image.asset(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.image, size: 64, color: Colors.grey),
-                            ),
-                          ),
+                        : (!imageUrl.startsWith('frontend/') &&
+                                !imageUrl.startsWith('assets/') &&
+                                File(imageUrl).existsSync())
+                            ? Image.file(
+                                File(imageUrl),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Container(
+                                  color: Colors.grey[300],
+                                  child: const Icon(
+                                    Icons.image,
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              )
+                            : Image.asset(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => Container(
+                                  color: Colors.grey[300],
+                                  child: const Icon(
+                                    Icons.image,
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
                   ),
                   Positioned(
                     top: 14,

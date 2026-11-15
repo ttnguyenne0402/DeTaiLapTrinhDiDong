@@ -671,9 +671,14 @@ BEGIN
     ('rev_01', 'room_101', 'usr_tenant1', 5, N'Chủ nhà thân thiện, phòng sạch sẽ và rất thoáng mát!', 'visible', DATEADD(day, -10, GETDATE()), GETDATE()),
     ('rev_02', 'room_a1',  'usr_tenant2', 4, N'Nội thất xịn, mỗi tội đường giờ cao điểm hơi đông xe.', 'visible', DATEADD(day, -5, GETDATE()), GETDATE());
 
-    INSERT INTO notifications (id, user_id, title, message, type, created_at, updated_at) VALUES
-    ('notif_01', 'usr_admin', N'Tin đăng mới chờ duyệt', N'Chủ trọ Nguyễn Văn An vừa đăng tin cho phòng Studio A2', 'post_approval', DATEADD(minute, -10, GETDATE()), GETDATE()),
-    ('notif_02', 'usr_admin', N'Lịch hẹn mới', N'Có khách hẹn xem phòng tại Nhà Trọ An Khang', 'appointment', DATEADD(hour, -2, GETDATE()), GETDATE());
+    INSERT INTO notifications (id, user_id, title, message, type, reference_id, reference_type, read_at, created_at, updated_at) VALUES
+    ('notif_01', 'usr_admin', N'Tin đăng mới chờ duyệt', N'Chủ trọ Nguyễn Văn An vừa đăng tin cho phòng Studio A2', 'post_approval', 'post_05', 'rental_post', NULL, DATEADD(minute, -10, GETDATE()), GETDATE()),
+    ('notif_02', 'usr_admin', N'Lịch hẹn mới', N'Có khách hẹn xem phòng tại Nhà Trọ An Khang', 'appointment', 'apt_01', 'viewing_appointment', NULL, DATEADD(hour, -2, GETDATE()), GETDATE()),
+    ('notif_own_01', 'usr_owner1', N'Khách đặt lịch xem phòng mới', N'Khách Đỗ Hoàng Yến (0966554433) vừa đặt lịch xem Phòng Studio A2 - Căn Hộ Mini Xanh vào lúc 09:30 ngày mai.', 'appointment_new', 'apt_02', 'viewing_appointment', NULL, DATEADD(minute, -15, GETDATE()), GETDATE()),
+    ('notif_own_02', 'usr_owner1', N'Admin từ chối bài đăng', N'Tin đăng [Cho thuê căn hộ 1PN VIP Cộng Hòa] bị từ chối. Lý do: Hình ảnh phòng mờ và thiếu thông tin chi phí dịch vụ.', 'post_rejected', 'post_06', 'rental_post', NULL, DATEADD(hour, -1, GETDATE()), GETDATE()),
+    ('notif_own_03', 'usr_owner1', N'Khách báo hỏng / bảo trì phòng', N'Khách Lê Quốc Việt (Phòng 101 - Nhà Trọ An Khang) báo sự cố: Máy lạnh không mát và bị chảy nước ở dàn lạnh.', 'maintenance_request', 'room_101', 'maintenance', NULL, DATEADD(hour, -3, GETDATE()), GETDATE()),
+    ('notif_own_04', 'usr_owner1', N'Khách thanh toán hóa đơn', N'Khách Lê Quốc Việt (Phòng 101) đã chuyển khoản thanh toán hóa đơn kỳ Tháng 11/2026 (INV-2026-002) số tiền 3.730.000đ.', 'invoice_payment', 'inv_02', 'invoice', NULL, DATEADD(hour, -5, GETDATE()), GETDATE()),
+    ('notif_own_05', 'usr_owner1', N'Khách hủy lịch hẹn xem phòng', N'Khách Phạm Minh Tuấn đã báo hủy lịch hẹn xem Phòng Studio A1 ngày 10/11/2026 lúc 14:00 do bận đột xuất.', 'appointment_cancelled', 'apt_04', 'viewing_appointment', NULL, DATEADD(day, -1, GETDATE()), GETDATE()),
+    ('notif_own_06', 'usr_owner1', N'Bài đăng đã được Admin duyệt', N'Tin đăng [Cho thuê phòng trọ khép kín Tân Phú giá tốt] (Phòng 101 - Nhà Trọ An Khang) đã được duyệt và hiển thị.', 'post_approved', 'post_01', 'rental_post', GETDATE(), DATEADD(day, -2, GETDATE()), GETDATE());
 END
 GO
-select * from services

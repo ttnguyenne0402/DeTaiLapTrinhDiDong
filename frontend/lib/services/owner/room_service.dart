@@ -84,24 +84,50 @@ class RoomService {
     }
   }
 
-  // Thêm mới phòng
-  static Future<bool> createRoom(Map<String, dynamic> data) async {
+  // Thêm mới phòng (trả về null nếu thành công, hoặc chuỗi thông báo lỗi)
+  static Future<String?> createRoomWithMessage(Map<String, dynamic> data) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/owner/rooms'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
-    return response.statusCode == 200;
+    if (response.statusCode == 200) return null;
+    try {
+      final err = jsonDecode(response.body);
+      if (err is Map && err['message'] != null) {
+        return err['message'].toString();
+      }
+    } catch (_) {}
+    return 'Thêm phòng thất bại. Vui lòng thử lại!';
   }
 
-  // Cập nhật thông tin phòng
-  static Future<bool> updateRoom(String id, Map<String, dynamic> data) async {
+  // Cập nhật phòng (trả về null nếu thành công, hoặc chuỗi thông báo lỗi)
+  static Future<String?> updateRoomWithMessage(String id, Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse('$baseUrl/api/owner/rooms/$id'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
     );
-    return response.statusCode == 200;
+    if (response.statusCode == 200) return null;
+    try {
+      final err = jsonDecode(response.body);
+      if (err is Map && err['message'] != null) {
+        return err['message'].toString();
+      }
+    } catch (_) {}
+    return 'Cập nhật phòng thất bại. Vui lòng thử lại!';
+  }
+
+  // Thêm mới phòng
+  static Future<bool> createRoom(Map<String, dynamic> data) async {
+    final err = await createRoomWithMessage(data);
+    return err == null;
+  }
+
+  // Cập nhật thông tin phòng
+  static Future<bool> updateRoom(String id, Map<String, dynamic> data) async {
+    final err = await updateRoomWithMessage(id, data);
+    return err == null;
   }
 
   // Xóa phòng

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
@@ -15,9 +16,7 @@ class PostsManageScreen extends StatefulWidget {
 }
 
 class _PostsManageScreenState extends State<PostsManageScreen> {
-  // Dùng GlobalKey để điều khiển TabBarView từ bên ngoài mà không cần TabController thủ công
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  Key _tab3Key = UniqueKey();
   bool _isLoading = true;
   List<Map<String, dynamic>> _posts = [];
 
@@ -79,11 +78,29 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
     }
   }
 
+  String _formatSqlitePrice(dynamic rawPrice) {
+    final str = (rawPrice ?? '').toString().trim();
+    if (str.isEmpty) return 'Thỏa thuận';
+    final digits = str
+        .replaceAll('.', '')
+        .replaceAll(',', '')
+        .replaceAll('đ', '')
+        .replaceAll('/tháng', '')
+        .trim();
+    final numVal = int.tryParse(digits);
+    if (numVal == null || numVal <= 0) return str;
+    final formatted = numVal.toString().replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (m) => '.',
+        );
+    return '$formattedđ/tháng';
+  }
+
   // 2. Tải các bản nháp được lưu trong cơ sở dữ liệu SQLite cục bộ trên điện thoại
   Future<void> _loadDraftsFromSqlite() async {
     try {
       final sqliteDrafts = await SqliteHelper.instance.getDraftPosts();
-      if (sqliteDrafts.isNotEmpty && mounted) {
+      if (mounted) {
         setState(() {
           _posts.removeWhere((p) => p['isSqlite'] == true);
           for (var draft in sqliteDrafts) {
@@ -102,7 +119,7 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
               'title': draft['title'] ?? 'Bản nháp tin đăng',
               'description': draft['description'] ?? '',
               'room': '${draft['room_name'] ?? 'Phòng'} - ${draft['building_name'] ?? 'Tòa nhà'} (Bản nháp)',
-              'price': draft['price'] ?? 'Thỏa thuận',
+              'price': _formatSqlitePrice(draft['price']),
               'amenities': amnList,
               'views': 0,
               'likes': 0,
@@ -136,143 +153,100 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
 
     return DefaultTabController(
       length: 3,
-      child: Builder(
-        builder: (tabContext) {
-          return Scaffold(
-            key: _scaffoldKey,
-            backgroundColor: AppColors.primaryGreen,
-            drawer: const OwnerDrawer(currentRoute: 'posts'),
-            appBar: AppBar(
-              backgroundColor: AppColors.primaryGreen,
-              elevation: 0,
-              iconTheme: const IconThemeData(color: Colors.white),
-              leading: Builder(
-                builder: (context) => IconButton(
-                  icon: const Icon(Icons.menu, color: Colors.white),
-                  tooltip: 'Menu',
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                ),
-              ),
-              title: const Text(
-                'Quản lý tin đăng',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-              centerTitle: true,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  tooltip: 'Làm mới',
-                  onPressed: _loadAllPosts,
-                ),
-              ],
-              bottom: TabBar(
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white60,
-                indicatorColor: Colors.orange,
-                indicatorWeight: 3,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-                tabs: [
-                  Tab(text: 'Đang hiển thị ($activeCount)'),
-                  Tab(text: 'Chờ duyệt ($pendingCount)'),
-                  Tab(text: 'Bản nháp / Ẩn ($hiddenOrDraftCount)'),
-                ],
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: AppColors.primaryGreen,
+        drawer: const OwnerDrawer(currentRoute: 'posts'),
+        appBar: AppBar(
+          backgroundColor: AppColors.primaryGreen,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu, color: Colors.white),
+              tooltip: 'Menu',
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+          title: const Text(
+            'Quản lý tin đăng',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              tooltip: 'Làm mới',
+              onPressed: _loadAllPosts,
+            ),
+          ],
+          bottom: TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white60,
+            indicatorColor: Colors.orange,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            tabs: [
+              Tab(text: 'Đang hiển thị ($activeCount)'),
+              Tab(text: 'Chờ duyệt ($pendingCount)'),
+              Tab(text: 'Bản nháp / Ẩn ($hiddenOrDraftCount)'),
+            ],
+          ),
+        ),
+        body: Container(
+          color: AppColors.primaryGreen,
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF9F9FB),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(24),
+                topRight: Radius.circular(24),
               ),
             ),
-            body: Container(
-              color: AppColors.primaryGreen,
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF9F9FB),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _loadAllPosts,
+                    child: TabBarView(
+                      children: [
+                        _buildPostList('active'),
+                        _buildPostList('pending'),
+                        _buildPostList('hidden_draft'),
+                      ],
+                    ),
                   ),
-                ),
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : RefreshIndicator(
-                        onRefresh: _loadAllPosts,
-                        child: TabBarView(
-                          children: [
-                            _buildPostList('active'),
-                            _buildPostList('pending'),
-                            KeyedSubtree(
-                              key: _tab3Key,
-                              child: _buildPostList('hidden_draft'),
-                            ),
-                          ],
-                        ),
-                      ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () async {
+            final created = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PostFormScreen(),
               ),
+            );
+            if (created == true) {
+              await _loadAllPosts();
+            }
+          },
+          backgroundColor: Colors.orange,
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: const Text(
+            'Tạo tin đăng',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
-            floatingActionButton: FloatingActionButton.extended(
-              onPressed: () async {
-                final newPost = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PostFormScreen(),
-                  ),
-                );
-
-                if (newPost == true) {
-                  await _loadAllPosts();
-                } else if (newPost != null && newPost is Map<String, dynamic>) {
-                  await _loadAllPosts();
-                  setState(() {
-                    _posts.insert(0, Map<String, dynamic>.from(newPost));
-                    _tab3Key = UniqueKey();
-                  });
-
-                  final tabController = DefaultTabController.of(tabContext);
-
-                  // Nếu bấm Gửi Admin duyệt -> Nhảy sang Tab 2 (Chờ duyệt)
-                  if (newPost['status'] == 'pending') {
-                    tabController.animateTo(1);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text(
-                          'Đã gửi bài đăng mới cho Admin duyệt thành công!',
-                        ),
-                        backgroundColor: AppColors.primaryGreen,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                  // Nếu bấm Lưu Nháp -> Nhảy sang Tab 3 (Bản nháp / Ẩn)
-                  else if (newPost['status'] == 'draft') {
-                    tabController.animateTo(2);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Đã lưu bài viết vào bản nháp thành công!',
-                        ),
-                        backgroundColor: Colors.orange,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                }
-              },
-              backgroundColor: Colors.orange,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Tạo tin đăng',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -340,6 +314,43 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
     );
   }
 
+  Widget _buildPostThumb(String imgPath) {
+    final fallback = Container(
+      width: 85,
+      height: 85,
+      color: Colors.grey[200],
+      child: const Icon(Icons.image, color: Colors.grey),
+    );
+    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+      return Image.network(
+        imgPath,
+        width: 85,
+        height: 85,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    if (!imgPath.startsWith('frontend/') && !imgPath.startsWith('assets/')) {
+      final file = File(imgPath);
+      if (file.existsSync()) {
+        return Image.file(
+          file,
+          width: 85,
+          height: 85,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        );
+      }
+    }
+    return Image.asset(
+      imgPath,
+      width: 85,
+      height: 85,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+
   // Thẻ hiển thị một bài đăng (thông tin cơ bản, bấm vào để xem chi tiết)
   Widget _buildPostCard(Map<String, dynamic> post) {
     final String status = post['status'] ?? 'draft';
@@ -382,17 +393,9 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    post['image'] ?? 'frontend/assets/images/anhPhongDemo.jpg',
-                    width: 85,
-                    height: 85,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 85,
-                      height: 85,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image, color: Colors.grey),
-                    ),
+                  child: _buildPostThumb(
+                    post['image']?.toString() ??
+                        'frontend/assets/images/anhPhongDemo.jpg',
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -856,20 +859,12 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(6),
-                            child: Image.asset(
-                              post['image'] ??
-                                  'frontend/assets/images/anhPhongDemo.jpg',
+                            child: SizedBox(
                               width: 55,
                               height: 55,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 55,
-                                height: 55,
-                                color: Colors.grey[200],
-                                child: const Icon(
-                                  Icons.image,
-                                  color: Colors.grey,
-                                ),
+                              child: _buildPostThumb(
+                                post['image']?.toString() ??
+                                    'frontend/assets/images/anhPhongDemo.jpg',
                               ),
                             ),
                           ),
@@ -1041,7 +1036,9 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
         'amenities': post['amenities'] is List ? post['amenities'] : ['Wifi', 'Chỗ để xe'],
         'submitNote': note.isNotEmpty ? note : 'Gửi duyệt từ bản nháp',
         'status': 'pending',
-        'images': ['frontend/assets/images/anhPhongDemo.jpg'],
+        'images': [
+          post['image']?.toString() ?? 'frontend/assets/images/anhPhongDemo.jpg',
+        ],
       });
       // 2. Xóa bản nháp khỏi SQLite vì đã gửi duyệt lên SQL Server
       await SqliteHelper.instance.deleteDraftPost(post['sqliteId']);
