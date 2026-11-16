@@ -78,11 +78,21 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
 
     if (!mounted) return;
     final String t = item.type.toLowerCase();
+    final String title = item.title.toLowerCase();
+    final String msg = item.message.toLowerCase();
+    final bool isCancelled = t.contains('cancel') ||
+        t.contains('hủy') ||
+        title.contains('hủy') ||
+        msg.contains('hủy');
 
-    if (t.contains('appointment')) {
+    if (t.contains('appointment') || isCancelled) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const AppointmentsManageScreen()),
+        MaterialPageRoute(
+          builder: (_) => AppointmentsManageScreen(
+            initialTabIndex: isCancelled ? 2 : 0,
+          ),
+        ),
       );
     } else if (t.contains('post')) {
       Navigator.push(
@@ -274,7 +284,7 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
   }
 
   Widget _buildNotificationCard(OwnerNotificationModel item) {
-    final style = _getNotificationStyle(item.type);
+    final style = _getNotificationStyle(item);
 
     return Dismissible(
       key: Key(item.id),
@@ -393,14 +403,18 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.primaryGreen,
+                              color: style.color == Colors.redAccent
+                                  ? Colors.redAccent
+                                  : AppColors.primaryGreen,
                             ),
                           ),
                           const SizedBox(width: 4),
                           Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 11,
-                            color: AppColors.primaryGreen,
+                            color: style.color == Colors.redAccent
+                                ? Colors.redAccent
+                                : AppColors.primaryGreen,
                           ),
                         ],
                       ),
@@ -415,9 +429,16 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
     );
   }
 
-  _NotifStyle _getNotificationStyle(String type) {
-    final t = type.toLowerCase();
-    if (t.contains('appointment_cancelled')) {
+  _NotifStyle _getNotificationStyle(OwnerNotificationModel item) {
+    final t = item.type.toLowerCase();
+    final title = item.title.toLowerCase();
+    final msg = item.message.toLowerCase();
+    final bool isCancelled = t.contains('cancel') ||
+        t.contains('hủy') ||
+        title.contains('hủy') ||
+        msg.contains('hủy');
+
+    if (isCancelled && (t.contains('appointment') || title.contains('lịch') || msg.contains('lịch') || t.isEmpty)) {
       return _NotifStyle(
         icon: Icons.event_busy_rounded,
         color: Colors.redAccent,
@@ -431,7 +452,7 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
         badgeLabel: 'Đặt lịch xem phòng',
         actionLabel: 'Xác nhận / Đổi giờ',
       );
-    } else if (t.contains('post_rejected')) {
+    } else if (t.contains('post_rejected') || ((t.contains('post') || title.contains('tin')) && (title.contains('từ chối') || msg.contains('từ chối')))) {
       return _NotifStyle(
         icon: Icons.unpublished_outlined,
         color: Colors.red.shade700,
@@ -445,14 +466,14 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
         badgeLabel: 'Duyệt bài đăng',
         actionLabel: 'Xem quản lý tin',
       );
-    } else if (t.contains('maintenance')) {
+    } else if (t.contains('maintenance') || title.contains('hỏng') || title.contains('bảo trì')) {
       return _NotifStyle(
         icon: Icons.build_circle_outlined,
         color: Colors.orange.shade800,
         badgeLabel: 'Báo hỏng / Bảo trì',
         actionLabel: 'Xử lý bảo trì',
       );
-    } else if (t.contains('invoice') || t.contains('payment')) {
+    } else if (t.contains('invoice') || t.contains('payment') || title.contains('thanh toán') || title.contains('hóa đơn')) {
       return _NotifStyle(
         icon: Icons.payments_outlined,
         color: Colors.teal.shade700,

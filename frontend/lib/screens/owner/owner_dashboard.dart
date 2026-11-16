@@ -11,6 +11,7 @@ import 'tenant_list_screen.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/owner_dashboard_service.dart';
 import '../../services/owner/owner_notification_service.dart';
+import '../../utils/phone_helper.dart';
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
@@ -326,14 +327,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                                           ? Colors.blue
                                           : Colors.orange),
                                   onTap: _openAppointmentsScreen,
-                                  onCallTap: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Đang gọi ${item.phone}...'),
-                                        duration: const Duration(seconds: 1),
-                                      ),
-                                    );
-                                  },
+                                  onCallTap: () => PhoneHelper.call(context, item.phone),
                                 ),
                               );
                             }).toList(),
@@ -488,10 +482,13 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                       fontSize: 12,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: onCallTap,
-                    child: Icon(Icons.phone_in_talk, color: primaryColor),
+                  const SizedBox(height: 6),
+                  IconButton(
+                    onPressed: onCallTap,
+                    icon: Icon(Icons.phone_in_talk, color: primaryColor),
+                    padding: const EdgeInsets.all(4),
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Gọi điện',
                   ),
                 ],
               ),
