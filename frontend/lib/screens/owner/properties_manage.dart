@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'owner_dashboard.dart';
-import 'owner_profile_screen.dart';
 import 'property_form.dart';
 import 'rooms_manage.dart';
 import 'tenant_list_screen.dart';
@@ -61,7 +60,11 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const OwnerProfileScreen(),
+                      builder: (context) => const ProfileScreen(
+                        user: {
+                          'Role': 'owner',
+                        },
+                      ),
                     ),
                   );
                 },

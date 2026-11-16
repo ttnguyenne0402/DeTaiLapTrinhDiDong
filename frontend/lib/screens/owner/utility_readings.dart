@@ -1,4 +1,3 @@
-import 'owner_profile_screen.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/utility_card_w.dart';

@@ -64,6 +64,7 @@ namespace Backend.Controllers
                     Role = user.Role,
 
                     BankAccounts = user.BankAccounts
+                        .Where(bank => bank.Status == "active")
                         .Select(bank => new BankAccountDTO
                         {
                             Id = bank.Id,
@@ -204,7 +205,7 @@ namespace Backend.Controllers
                 AccountNumber = request.AccountNumber.Trim(),
                 AccountHolder = request.AccountHolder.Trim(),
                 IsDefault = !await _context.BankAccounts
-                    .AnyAsync(b => b.UserId == userId),
+                    .AnyAsync(b => b.UserId == userId && b.Status == "active"),
                 Status = "active",
                 CreatedAt = DateTime.Now,
                 UpdatedAt = DateTime.Now
@@ -297,6 +298,79 @@ namespace Backend.Controllers
                     IsDefault = bankAccount.IsDefault,
                     Status = bankAccount.Status
                 }
+            });
+        }
+
+        [HttpPut("bank-accounts/{id}/default")]
+        public async Task<IActionResult> SetDefaultBankAccount(string id)
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var accounts = await _context.BankAccounts
+                .Where(b => b.UserId == userId && b.Status == "active")
+                .ToListAsync();
+            var selected = accounts.FirstOrDefault(b => b.Id == id);
+            if (selected == null)
+                return NotFound(new { message = "Không tìm thấy tài khoản ngân hàng đang hoạt động." });
+
+            foreach (var account in accounts)
+                account.IsDefault = account.Id == selected.Id;
+
+            selected.UpdatedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Đã chọn tài khoản ngân hàng mặc định.",
+                data = new { defaultBankAccountId = selected.Id }
+            });
+        }
+
+        [HttpDelete("bank-accounts/{id}")]
+        public async Task<IActionResult> DeleteBankAccount(string id)
+        {
+            string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return Unauthorized(new { message = "Không xác định được người dùng." });
+
+            var account = await _context.BankAccounts
+                .FirstOrDefaultAsync(b => b.Id == id && b.UserId == userId && b.Status == "active");
+            if (account == null)
+                return NotFound(new { message = "Không tìm thấy tài khoản ngân hàng đang hoạt động." });
+
+            var wasDefault = account.IsDefault;
+            account.Status = "inactive";
+            account.IsDefault = false;
+            account.UpdatedAt = DateTime.Now;
+
+            string? newDefaultId = null;
+            if (wasDefault)
+            {
+                var remainingAccounts = await _context.BankAccounts
+                    .Where(b => b.UserId == userId && b.Status == "active" && b.Id != id)
+                    .OrderBy(b => b.CreatedAt)
+                    .ThenBy(b => b.Id)
+                    .ToListAsync();
+
+                foreach (var remaining in remainingAccounts)
+                    remaining.IsDefault = false;
+
+                var replacement = remainingAccounts.FirstOrDefault();
+                if (replacement != null)
+                {
+                    replacement.IsDefault = true;
+                    replacement.UpdatedAt = DateTime.Now;
+                    newDefaultId = replacement.Id;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new
+            {
+                message = "Đã xóa tài khoản ngân hàng.",
+                data = new { defaultBankAccountId = newDefaultId }
             });
         }
     }

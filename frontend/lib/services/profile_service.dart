@@ -212,4 +212,34 @@ class ProfileService {
       throw Exception('Lỗi cập nhật tài khoản ngân hàng: $e');
     }
   }
+
+  static Future<void> setDefaultBankAccount({required String id}) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/bank-accounts/$id/default'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 15));
+
+      _handleResponse(response, 'Không thể chọn tài khoản mặc định.');
+    } on Exception {
+      rethrow;
+    } catch (e) {
+      throw Exception('Lỗi chọn tài khoản mặc định: $e');
+    }
+  }
+
+  static Future<void> deleteBankAccount({required String id}) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/bank-accounts/$id'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 15));
+
+      _handleResponse(response, 'Không thể xóa tài khoản ngân hàng.');
+    } on Exception {
+      rethrow;
+    } catch (e) {
+      throw Exception('Lỗi xóa tài khoản ngân hàng: $e');
+    }
+  }
 }

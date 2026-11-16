@@ -3,7 +3,6 @@ import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'owner_dashboard.dart';
 import 'properties_manage.dart';
-import 'owner_profile_screen.dart';
 import '../tenant/profile_screen.dart';
 
 class TenantListScreen extends StatefulWidget {

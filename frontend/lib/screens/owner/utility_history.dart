@@ -3,7 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/invoice_service.dart';
 import 'utility_readings.dart';
-import 'owner_profile_screen.dart';
+import '../tenant/profile_screen.dart';
 
 class LandlordUtilityScreen extends StatefulWidget {
   final String? propertyId;
@@ -157,7 +157,14 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
               constraints: const BoxConstraints(),
               icon: const Icon(Icons.person, color: Colors.white, size: 20),
               onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const OwnerProfileScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(
+                      user: {'Role': 'owner'},
+                    ),
+                  ),
+                );
               },
             ),
           ),
