@@ -19,10 +19,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late Map<String, dynamic> _userData;
 
-  String bankName = '';
-  String bankAccount = '';
-  String accountHolder = '';
-  String? _bankAccountId;
+  List<Map<String, dynamic>> _bankAccounts = [];
 
   bool _isLoading = true;
   String? _loadError;
@@ -62,24 +59,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
 
-      final dynamic bankAccounts = data['bankAccounts'];
-
-      Map<String, dynamic>? selectedBank;
-
-      if (bankAccounts is List) {
-        final accounts = bankAccounts
-            .whereType<Map<String, dynamic>>()
-            .toList();
-
-        for (final account in accounts) {
-          if (account['isDefault'] == true) {
-            selectedBank = account;
-            break;
-          }
-        }
-
-        selectedBank ??= accounts.isNotEmpty ? accounts.first : null;
-      }
+      final dynamic rawBankAccounts = data['bankAccounts'];
+      final bankAccounts = rawBankAccounts is List
+          ? rawBankAccounts.whereType<Map<String, dynamic>>().toList()
+          : <Map<String, dynamic>>[];
 
       setState(() {
         _userData = {
@@ -91,22 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'Role': data['role'] ?? 'tenant',
         };
 
-        if (selectedBank != null) {
-          _bankAccountId = selectedBank['id']?.toString();
-
-          bankName =
-              (selectedBank['bankName'] ?? selectedBank['bankCode'] ?? '')
-                  .toString();
-
-          bankAccount = (selectedBank['accountNumber'] ?? '').toString();
-
-          accountHolder = (selectedBank['accountHolder'] ?? '').toString();
-        } else {
-          _bankAccountId = null;
-          bankName = '';
-          bankAccount = '';
-          accountHolder = '';
-        }
+        _bankAccounts = bankAccounts;
 
         _isLoading = false;
       });
@@ -213,7 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // THÊM / CHỈNH SỬA NGÂN HÀNG
   // =====================================================
 
-  Future<void> _showBankDialog() async {
+  Future<void> _showBankDialog({Map<String, dynamic>? account}) async {
     if (!mounted) return;
 
     final result = await showDialog<Map<String, String>>(
@@ -221,9 +189,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       barrierDismissible: false,
       builder: (_) {
         return BankDialog(
-          bankName: bankName,
-          bankAccount: bankAccount,
-          accountHolder: accountHolder,
+          bankName: (account?['bankName'] ?? account?['bankCode'] ?? '').toString(),
+          bankAccount: (account?['accountNumber'] ?? '').toString(),
+          accountHolder: (account?['accountHolder'] ?? '').toString(),
         );
       },
     );
@@ -237,7 +205,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       Map<String, dynamic> savedBank;
 
-      if (_bankAccountId == null || _bankAccountId!.isEmpty) {
+      final accountId = account?['id']?.toString();
+      if (accountId == null || accountId.isEmpty) {
         // Chưa có tài khoản: gọi API thêm mới
         savedBank = await ProfileService.addBankAccount(
           bankName: newBankName,
@@ -247,7 +216,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } else {
         // Đã có tài khoản: gọi API cập nhật
         savedBank = await ProfileService.updateBankAccount(
-          id: _bankAccountId!,
+          id: accountId,
           bankName: newBankName,
           accountNumber: newBankAccount,
           accountHolder: newAccountHolder,
@@ -257,17 +226,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       setState(() {
-        bankName = newBankName;
-        bankAccount = newBankAccount;
-        accountHolder = newAccountHolder;
-
-        _bankAccountId = savedBank['id']?.toString() ?? _bankAccountId;
+        final savedAccount = <String, dynamic>{...savedBank};
+        final savedId = savedAccount['id']?.toString();
+        final existingIndex = _bankAccounts.indexWhere(
+          (item) => item['id']?.toString() == savedId,
+        );
+        if (existingIndex >= 0) {
+          _bankAccounts[existingIndex] = savedAccount;
+        } else {
+          _bankAccounts.add(savedAccount);
+        }
       });
 
       _showMessage('Lưu tài khoản ngân hàng thành công.');
     } catch (e) {
       if (!mounted) return;
 
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _setDefaultBankAccount(Map<String, dynamic> account) async {
+    final id = account['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    try {
+      await ProfileService.setDefaultBankAccount(id: id);
+      if (!mounted) return;
+
+      setState(() {
+        for (final item in _bankAccounts) {
+          item['isDefault'] = item['id']?.toString() == id;
+        }
+      });
+      _showMessage('Đã chọn tài khoản mặc định.');
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _deleteBankAccount(Map<String, dynamic> account) async {
+    final id = account['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xóa tài khoản ngân hàng?'),
+        content: const Text(
+          'Tài khoản sẽ không còn dùng cho hóa đơn mới. Hóa đơn cũ vẫn giữ thông tin tài khoản đã chọn.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ProfileService.deleteBankAccount(id: id);
+      final data = await ProfileService.getProfile();
+      final dynamic rawAccounts = data['bankAccounts'];
+      final accounts = rawAccounts is List
+          ? rawAccounts.whereType<Map<String, dynamic>>().toList()
+          : <Map<String, dynamic>>[];
+
+      if (!mounted) return;
+      setState(() => _bankAccounts = accounts);
+      _showMessage('Đã xóa tài khoản ngân hàng.');
+    } catch (e) {
+      if (!mounted) return;
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     }
   }
@@ -526,81 +563,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // =====================================================
 
   Widget _buildBankInfo() {
+    String? defaultId;
+    for (final account in _bankAccounts) {
+      if (account['isDefault'] == true) {
+        defaultId = account['id']?.toString();
+        break;
+      }
+    }
+
     return Column(
       children: [
         Row(
           children: [
             Expanded(
-              child: _sectionTitle(
-                'Thông tin ngân hàng',
-                Icons.account_balance_outlined,
-              ),
+              child: _sectionTitle('Tài khoản ngân hàng', Icons.account_balance_outlined),
             ),
-            IconButton(
-              onPressed: _showBankDialog,
-              icon: const Icon(Icons.edit_outlined, color: primaryColor),
-              tooltip: 'Chỉnh sửa tài khoản ngân hàng',
+            FilledButton.icon(
+              onPressed: () => _showBankDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Thêm'),
+              style: FilledButton.styleFrom(backgroundColor: primaryColor),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade100),
-          ),
-          child: Column(
-            children: [
-              const Row(
+        if (_bankAccounts.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: const Text('Chưa có tài khoản ngân hàng.'),
+          )
+        else
+          ..._bankAccounts.map((account) {
+            final isDefault = account['isDefault'] == true ||
+                (defaultId == null && _bankAccounts.first == account);
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
                 children: [
-                  Icon(Icons.account_balance, size: 32, color: primaryColor),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Thông tin tài khoản ngân hàng',
-                      style: TextStyle(
-                        color: primaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                  Row(
+                    children: [
+                      const Icon(Icons.account_balance_outlined, color: primaryColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          (account['bankName'] ?? account['bankCode'] ?? 'Ngân hàng').toString(),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                       ),
-                    ),
+                      if (isDefault)
+                        const Chip(
+                          label: Text('Mặc định'),
+                          visualDensity: VisualDensity.compact,
+                          labelStyle: TextStyle(fontSize: 12),
+                        ),
+                      IconButton(
+                        tooltip: 'Chỉnh sửa tài khoản',
+                        onPressed: () => _showBankDialog(account: account),
+                        icon: const Icon(Icons.edit_outlined, color: primaryColor),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Tùy chọn tài khoản',
+                        onSelected: (action) {
+                          if (action == 'default') {
+                            _setDefaultBankAccount(account);
+                          } else if (action == 'delete') {
+                            _deleteBankAccount(account);
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          if (!isDefault)
+                            const PopupMenuItem(
+                              value: 'default',
+                              child: Text('Đặt làm mặc định'),
+                            ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Text('Xóa tài khoản'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
+                  _infoRow(Icons.credit_card_outlined, 'Số tài khoản', (account['accountNumber'] ?? '').toString()),
+                  const Divider(height: 1),
+                  _infoRow(Icons.person_outline, 'Chủ tài khoản', (account['accountHolder'] ?? '').toString()),
                 ],
               ),
-              const SizedBox(height: 10),
-              _infoRow(Icons.account_balance_outlined, 'Ngân hàng', bankName),
-              const Divider(height: 1),
-              _infoRow(Icons.credit_card_outlined, 'Số tài khoản', bankAccount),
-              const Divider(height: 1),
-              _infoRow(
-                Icons.person_outline,
-                'Tên chủ tài khoản',
-                accountHolder,
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _showBankDialog,
-                  icon: Icon(
-                    bankAccount.isEmpty ? Icons.add : Icons.edit_outlined,
-                  ),
-                  label: Text(
-                    bankAccount.isEmpty
-                        ? 'Thêm tài khoản ngân hàng'
-                        : 'Chỉnh sửa tài khoản ngân hàng',
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+            );
+          }),
       ],
     );
   }

@@ -85,7 +85,11 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const OwnerProfileScreen(),
+                      builder: (context) => const ProfileScreen(
+                        user: {
+                          'Role': 'owner',
+                        },
+                      ),
                     ),
                   );
                 },

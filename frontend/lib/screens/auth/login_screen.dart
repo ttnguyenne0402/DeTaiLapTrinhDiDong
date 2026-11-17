@@ -36,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   bool _obscurePassword = true;
   bool _rememberMe = false;
+  bool _isLoginLoading = false;
   bool _isSocialLoading = false;
   bool _zaloAttemptActive = false;
   bool _zaloWasBackgrounded = false;
@@ -155,9 +156,12 @@ class _LoginScreenState extends State<LoginScreen>
   // ĐĂNG NHẬP THẬT KẾT NỐI VỚI BACKEND .NET & SQL SERVER
 
   Future<void> _login() async {
+    if (_isLoginLoading) return;
     FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoginLoading = true);
 
     final String emailOrPhone = _emailController.text.trim();
     final String password = _passwordController.text;
@@ -226,6 +230,10 @@ class _LoginScreenState extends State<LoginScreen>
       if (!mounted) return;
 
       _showNotice(e.toString().replaceAll('Exception: ', ''), isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoginLoading = false);
+      }
     }
   }
 
@@ -737,7 +745,7 @@ class _LoginScreenState extends State<LoginScreen>
                       SizedBox(
                         height: 53,
                         child: ElevatedButton(
-                          onPressed: _login,
+                          onPressed: _isLoginLoading ? null : _login,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accentYellow,
                             foregroundColor: AppColors.textPrimary,
@@ -747,14 +755,23 @@ class _LoginScreenState extends State<LoginScreen>
                               borderRadius: BorderRadius.circular(15),
                             ),
                           ),
-                          child: const Text(
-                            'ĐĂNG NHẬP',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
+                          child: _isLoginLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.textPrimary,
+                                    strokeWidth: 2.4,
+                                  ),
+                                )
+                              : const Text(
+                                  'ĐĂNG NHẬP',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
                         ),
                       ),
 
