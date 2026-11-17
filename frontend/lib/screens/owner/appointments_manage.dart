@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import '../../services/owner/appointment_service.dart';
+import '../../utils/phone_helper.dart';
 import 'contract_form.dart';
 
 class AppointmentsManageScreen extends StatefulWidget {
-  const AppointmentsManageScreen({super.key});
+  final int initialTabIndex;
+
+  const AppointmentsManageScreen({super.key, this.initialTabIndex = 0});
 
   @override
   State<AppointmentsManageScreen> createState() =>
@@ -21,7 +24,11 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
+    );
     _loadAppointments();
   }
 
@@ -602,14 +609,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                   ),
                 ),
                 IconButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Đang gọi số ${item['phone']}...'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
+                  onPressed: () => PhoneHelper.call(context, item['phone']?.toString()),
                   icon: Icon(Icons.phone, color: AppColors.primaryGreen),
                   tooltip: 'Gọi điện',
                 ),
@@ -655,90 +655,68 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
             const SizedBox(height: 12),
             const Divider(height: 1),
             const SizedBox(height: 10),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (status == 'pending' || status == 'rescheduled') ...[
-                  OutlinedButton(
-                    onPressed: () => _showRejectDialog(item),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+            if (status == 'pending' || status == 'rescheduled')
+              SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => _showRejectDialog(item),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Từ chối',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
                       ),
                     ),
-                    child: const Text(
-                      'Từ chối',
-                      style: TextStyle(color: Colors.red, fontSize: 12),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _showRescheduleDialog(item),
-                    icon: const Icon(Icons.schedule, size: 15, color: Colors.orange),
-                    label: const Text(
-                      'Đổi giờ',
-                      style: TextStyle(color: Colors.orange, fontSize: 12),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.orange),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                    OutlinedButton.icon(
+                      onPressed: () => _showRescheduleDialog(item),
+                      icon: const Icon(Icons.schedule, size: 15, color: Colors.orange),
+                      label: const Text(
+                        'Đổi giờ',
+                        style: TextStyle(color: Colors.orange, fontSize: 12),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.orange),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => _updateStatus(
-                      item,
-                      'confirmed',
-                      'Đã xác nhận lịch hẹn và gửi thông báo cho khách',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGreen,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                    ElevatedButton(
+                      onPressed: () => _updateStatus(
+                        item,
+                        'confirmed',
+                        'Đã xác nhận lịch hẹn và gửi thông báo cho khách',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Xác nhận lịch',
+                        style: TextStyle(color: Colors.white, fontSize: 12),
                       ),
                     ),
-                    child: const Text(
-                      'Xác nhận lịch',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ],
-                if (status == 'confirmed') ...[
-                  OutlinedButton(
-                    onPressed: () => _showRejectDialog(item),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.redAccent),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Từ chối / Hủy',
-                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _showRescheduleDialog(item),
-                    icon: const Icon(Icons.schedule, size: 15, color: Colors.orange),
-                    label: const Text(
-                      'Đổi giờ',
-                      style: TextStyle(color: Colors.orange, fontSize: 12),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.orange),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
+                  ],
+                ),
+              ),
+            if (status == 'confirmed')
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
                   ElevatedButton.icon(
                     onPressed: () => _updateStatus(
                       item,
@@ -756,55 +734,57 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green[700],
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
                 ],
-                if (status == 'completed') ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Đã hoàn tất xem phòng',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.green[700],
-                          fontStyle: FontStyle.italic,
-                        ),
+              ),
+            if (status == 'completed')
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Đã hoàn tất xem phòng',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green[700],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _openCreateContract(item),
+                    icon: const Icon(
+                      Icons.description_outlined,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                    label: const Text(
+                      'Lập hợp đồng',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
                       ),
-                      ElevatedButton.icon(
-                        onPressed: () => _openCreateContract(item),
-                        icon: const Icon(
-                          Icons.description_outlined,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Lập hợp đồng',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryGreen,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
                       ),
-                    ],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ],
-                if (status == 'cancelled' || status == 'rejected') ...[
+              ),
+            if (status == 'cancelled' || status == 'rejected')
+              Row(
+                children: [
                   Text(
                     status == 'rejected'
                         ? 'Đã từ chối lịch hẹn'
@@ -816,8 +796,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                     ),
                   ),
                 ],
-              ],
-            ),
+              ),
           ],
         ),
       ),
