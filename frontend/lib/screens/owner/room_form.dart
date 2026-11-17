@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/room_service.dart';
 import '../../services/owner/property_service.dart';
@@ -6,8 +8,13 @@ import '../../services/owner/property_service.dart';
 // Màn hình biểu mẫu thêm mới hoặc chỉnh sửa phòng trọ
 class RoomFormScreen extends StatefulWidget {
   final RoomModel? initialData;
+  final String? initialPropertyId;
 
-  const RoomFormScreen({super.key, this.initialData});
+  const RoomFormScreen({
+    super.key,
+    this.initialData,
+    this.initialPropertyId,
+  });
 
   @override
   State<RoomFormScreen> createState() => _RoomFormScreenState();
@@ -16,6 +23,7 @@ class RoomFormScreen extends StatefulWidget {
 class _RoomFormScreenState extends State<RoomFormScreen> {
   final Color primaryColor = const Color(0xFF1B5E55);
   final _formKey = GlobalKey<FormState>();
+  final ImagePicker _picker = ImagePicker();
 
   late final TextEditingController _nameController;
   late final TextEditingController _areaController;
@@ -24,9 +32,12 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
   late final TextEditingController _descController;
 
   List<PropertyModel> _properties = [];
+  List<RoomModel> _existingRooms = [];
   String? _selectedPropertyId;
   bool _isLoading = false;
   bool _loadingProperties = true;
+
+  final List<String> _selectedImages = [];
 
   // Trạng thái phòng mặc định
   String _selectedStatus = 'Còn trống';
@@ -41,37 +52,170 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
       text: (item != null && item.area > 0) ? '${item.area.toInt()}' : '',
     );
     _floorController = TextEditingController(
-      text: item?.floor != null ? '${item!.floor}' : '',
+      text: item?.floor != null ? '${item!.floor}' : '1',
     );
     _priceController = TextEditingController(
-      text: (item != null && item.price > 0) ? '${item.price.toInt()}' : '',
+      text: (item != null && item.price > 0)
+          ? _formatNumberDots('${item.price.toInt()}')
+          : '',
     );
     _descController = TextEditingController(text: item?.description ?? '');
 
     if (item != null) {
       _selectedStatus = item.statusText;
       _selectedPropertyId = item.propertyId;
+      if (item.images.isNotEmpty) {
+        _selectedImages.add(item.images);
+      }
+    } else if (widget.initialPropertyId != null &&
+        widget.initialPropertyId!.isNotEmpty) {
+      _selectedPropertyId = widget.initialPropertyId;
     }
 
-    _loadProperties();
+    _loadInitialData();
   }
 
-  Future<void> _loadProperties() async {
+  Future<void> _loadInitialData() async {
     try {
-      final list = await PropertyService.fetchProperties('USER_OWNER_01', 'all');
+      final results = await Future.wait([
+        PropertyService.fetchProperties('USER_OWNER_01', 'all'),
+        RoomService.fetchRooms('USER_OWNER_01', status: 'all'),
+      ]);
       if (mounted) {
+        final props = results[0] as List<PropertyModel>;
+        final rooms = results[1] as List<RoomModel>;
         setState(() {
-          _properties = list;
-          if (_selectedPropertyId == null && _properties.isNotEmpty) {
+          _properties = props;
+          _existingRooms = rooms;
+          if (_selectedPropertyId != null) {
+            final match = _properties.where(
+              (p) => p.id.toLowerCase() == _selectedPropertyId!.toLowerCase(),
+            );
+            if (match.isNotEmpty) {
+              _selectedPropertyId = match.first.id;
+            } else if (_properties.isNotEmpty) {
+              _selectedPropertyId = _properties.first.id;
+            }
+          } else if (_properties.isNotEmpty) {
             _selectedPropertyId = _properties.first.id;
           }
           _loadingProperties = false;
         });
       }
     } catch (e) {
-      debugPrint('Lỗi tải danh sách tòa nhà: $e');
+      debugPrint('Lỗi tải danh sách tòa nhà & phòng: $e');
       if (mounted) {
         setState(() => _loadingProperties = false);
+      }
+    }
+  }
+
+  String _formatNumberDots(String input) {
+    final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
+    final numVal = int.tryParse(digits);
+    if (numVal == null || numVal <= 0) return '';
+    return numVal.toString().replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (m) => '.',
+        );
+  }
+
+  // Chuẩn hóa tên phòng để kiểm tra trùng không phân biệt hoa thường (vd "Phòng 101" == "phòng 101" == "101")
+  String _normalizeRoomCode(String input) {
+    var s = input.trim().toLowerCase();
+    if (s.startsWith('phòng ')) {
+      s = s.substring(6).trim();
+    } else if (s.startsWith('phong ')) {
+      s = s.substring(6).trim();
+    }
+    return s;
+  }
+
+  // Chọn ảnh từ Camera hoặc Thư viện
+  Future<void> _showImageSourceSheet() async {
+    if (_selectedImages.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tối đa 5 ảnh cho mỗi phòng')),
+      );
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Chọn hình ảnh phòng',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(Icons.camera_alt_outlined, color: primaryColor),
+                title: const Text('Chụp ảnh từ Camera'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _pickFromCamera();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library_outlined, color: primaryColor),
+                title: const Text('Chọn ảnh từ Thư viện (Gallery)'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await _pickFromGallery();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFromCamera() async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (file != null && mounted) {
+        setState(() {
+          _selectedImages.insert(0, file.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể mở Camera: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final List<XFile> files = await _picker.pickMultiImage(imageQuality: 85);
+      if (files.isNotEmpty && mounted) {
+        setState(() {
+          for (final f in files) {
+            if (_selectedImages.length < 5) {
+              _selectedImages.add(f.path);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể mở Thư viện ảnh: $e')),
+        );
       }
     }
   }
@@ -109,8 +253,6 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
         ),
         centerTitle: true,
       ),
-
-      // Thân màn hình bo góc lồng 2 lớp Container
       body: Container(
         color: AppColors.primaryGreen,
         child: Container(
@@ -138,8 +280,8 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                         _buildPropertyDropdown(),
                         const SizedBox(height: 20),
 
-                        // Tải ảnh thực tế phòng
-                        _buildSectionTitle('Hình ảnh phòng'),
+                        // Tải ảnh thực tế phòng (Từ Gallery hoặc Camera)
+                        _buildSectionTitle('Hình ảnh phòng (Từ Thư viện / Camera)'),
                         const SizedBox(height: 8),
                         _buildImagePickerSection(),
                         const SizedBox(height: 20),
@@ -150,7 +292,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                         _buildCardGroup(
                           children: [
                             _buildTextField(
-                              label: 'Tên phòng',
+                              label: 'Tên / Số phòng',
                               hint: 'VD: Phòng 101',
                               controller: _nameController,
                               icon: Icons.meeting_room_outlined,
@@ -172,7 +314,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                 Expanded(
                                   child: _buildTextField(
                                     label: 'Tầng thứ',
-                                    hint: '2',
+                                    hint: '1',
                                     controller: _floorController,
                                     keyboardType: TextInputType.number,
                                     icon: Icons.layers_outlined,
@@ -183,11 +325,12 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                             const SizedBox(height: 16),
                             _buildTextField(
                               label: 'Giá thuê phòng',
-                              hint: '4000000',
+                              hint: '4.000.000',
                               controller: _priceController,
                               suffixText: 'đ/tháng',
                               keyboardType: TextInputType.number,
                               icon: Icons.payments_outlined,
+                              isCurrency: true,
                             ),
                           ],
                         ),
@@ -240,10 +383,48 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                             ? null
                             : () async {
                                 if (_formKey.currentState!.validate()) {
-                                  if (_nameController.text.trim().isEmpty) {
+                                  final roomName = _nameController.text.trim();
+                                  if (roomName.isEmpty) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text('Vui lòng nhập tên phòng'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  final targetPropId = _selectedPropertyId ??
+                                      (_properties.isNotEmpty
+                                          ? _properties.first.id
+                                          : 'prop_01');
+                                  final targetFloor =
+                                      int.tryParse(_floorController.text.trim()) ?? 1;
+
+                                  // Kiểm tra trùng tên phòng trong cùng bất động sản và cùng tầng (không phân biệt hoa/thường)
+                                  final inputNorm = _normalizeRoomCode(roomName);
+                                  final duplicate = _existingRooms.any((r) {
+                                    if (isEdit &&
+                                        r.id.toLowerCase() ==
+                                            widget.initialData!.id.toLowerCase()) {
+                                      return false;
+                                    }
+                                    final sameProp = r.propertyId.trim().toLowerCase() ==
+                                        targetPropId.trim().toLowerCase();
+                                    final sameFloor = (r.floor ?? 1) == targetFloor;
+                                    final sameName = r.name.trim().toLowerCase() ==
+                                            roomName.toLowerCase() ||
+                                        _normalizeRoomCode(r.name) == inputNorm;
+                                    return sameProp && sameFloor && sameName;
+                                  });
+
+                                  if (duplicate) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Phòng "$roomName" thuộc tầng $targetFloor đã tồn tại trong bất động sản này! Vui lòng đặt tên khác.',
+                                        ),
+                                        backgroundColor: Colors.red,
                                       ),
                                     );
                                     return;
@@ -254,9 +435,6 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
 
                                   setState(() => _isLoading = true);
 
-                                  final targetPropId = _selectedPropertyId ??
-                                      (_properties.isNotEmpty ? _properties.first.id : 'prop_01');
-
                                   final cleanPrice = _priceController.text
                                       .replaceAll('.', '')
                                       .replaceAll(',', '')
@@ -265,30 +443,37 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
 
                                   final payload = {
                                     'propertyId': targetPropId,
-                                    'name': _nameController.text.trim(),
+                                    'name': roomName,
                                     'area': double.tryParse(_areaController.text.trim()) ?? 20.0,
-                                    'floor': int.tryParse(_floorController.text.trim()) ?? 1,
+                                    'floor': targetFloor,
                                     'price': double.tryParse(cleanPrice) ?? 3500000.0,
                                     'status': _selectedStatus == 'Còn trống'
                                         ? 'available'
-                                        : (_selectedStatus == 'Đang cho thuê' ? 'rented' : 'maintenance'),
+                                        : (_selectedStatus == 'Đang cho thuê'
+                                            ? 'rented'
+                                            : 'maintenance'),
                                     'description': _descController.text.trim(),
+                                    'images': _selectedImages.isNotEmpty
+                                        ? _selectedImages.first
+                                        : 'frontend/assets/images/anhPhongDemo.jpg',
                                   };
 
-                                  bool success = false;
+                                  String? errMessage;
                                   if (isEdit) {
-                                    success = await RoomService.updateRoom(
+                                    errMessage = await RoomService.updateRoomWithMessage(
                                       widget.initialData!.id,
                                       payload,
                                     );
                                   } else {
-                                    success = await RoomService.createRoom(payload);
+                                    errMessage = await RoomService.createRoomWithMessage(
+                                      payload,
+                                    );
                                   }
 
                                   if (!mounted) return;
                                   setState(() => _isLoading = false);
 
-                                  if (success) {
+                                  if (errMessage == null) {
                                     messenger.showSnackBar(
                                       SnackBar(
                                         content: Text(isEdit
@@ -301,9 +486,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                   } else {
                                     messenger.showSnackBar(
                                       SnackBar(
-                                        content: Text(isEdit
-                                            ? 'Cập nhật phòng thất bại'
-                                            : 'Thêm phòng thất bại'),
+                                        content: Text(errMessage),
                                         backgroundColor: Colors.red,
                                       ),
                                     );
@@ -321,7 +504,10 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                             ? const SizedBox(
                                 width: 22,
                                 height: 22,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
                               )
                             : Text(
                                 isEdit ? 'CẬP NHẬT PHÒNG' : 'THÊM PHÒNG',
@@ -345,7 +531,12 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
 
   Widget _buildPropertyDropdown() {
     if (_loadingProperties) {
-      return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(8.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
     if (_properties.isEmpty) {
@@ -425,11 +616,23 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
     IconData? icon,
+    bool isCurrency = false,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      onChanged: isCurrency
+          ? (val) {
+              final formatted = _formatNumberDots(val);
+              if (formatted != val) {
+                controller.value = TextEditingValue(
+                  text: formatted,
+                  selection: TextSelection.collapsed(offset: formatted.length),
+                );
+              }
+            }
+          : null,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -459,43 +662,119 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
     );
   }
 
-  // Khu vực chọn và tải ảnh phòng
-  Widget _buildImagePickerSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey[300]!, style: BorderStyle.solid),
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: primaryColor.withValues(alpha: 0.1),
-            child: Icon(Icons.add_a_photo_outlined, color: primaryColor),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Thêm hình ảnh thực tế phòng',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Hỗ trợ JPG, PNG (Tối đa 5 ảnh)',
-            style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-          ),
-        ],
-      ),
+  Widget _buildPreviewThumbnail(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, color: Colors.grey),
+      );
+    }
+    if (path.startsWith('frontend/') || path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const Icon(Icons.image, color: Colors.grey),
+      );
+    }
+    return Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const Icon(Icons.image, color: Colors.grey),
     );
   }
 
-  // Khung chọn trạng thái khả dụng của phòng
+  // Khu vực chọn ảnh phòng từ Gallery hoặc Camera
+  Widget _buildImagePickerSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: _showImageSourceSheet,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: primaryColor.withValues(alpha: 0.4),
+                style: BorderStyle.solid,
+              ),
+            ),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: primaryColor.withValues(alpha: 0.1),
+                  child: Icon(Icons.add_a_photo_outlined, color: primaryColor),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Bấm để chọn ảnh từ Thư viện hoặc Chụp ảnh',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Đã chọn ${_selectedImages.length}/5 ảnh',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_selectedImages.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _selectedImages.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, idx) {
+                final imgPath = _selectedImages[idx];
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 92,
+                    height: 92,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildPreviewThumbnail(imgPath),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedImages.removeAt(idx);
+                              });
+                            },
+                            child: const CircleAvatar(
+                              radius: 11,
+                              backgroundColor: Colors.black54,
+                              child: Icon(Icons.close, size: 14, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildStatusSelector() {
     final statuses = ['Còn trống', 'Đang cho thuê', 'Bảo trì'];
 

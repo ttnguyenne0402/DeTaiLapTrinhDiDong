@@ -12,10 +12,12 @@ namespace Backend.Services
         private readonly IPaymentRepository _paymentRepo;
         private readonly IInvoiceRepository _invoiceRepo;
 
+        // TODO: chuyển các giá trị này sang appsettings.json / user-secrets, không để trong code
         private const string Vnp_TmnCode = "CC55FG4O";
         private const string Vnp_HashSecret = "STYTYTIHZBSLWYQININXOAQNEZYKXGHL";
         private const string Vnp_Url = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
         private const string Vnp_ReturnUrl = "http://10.0.2.2:5093/api/payments/vnpay-return";
+
         public PaymentService(IPaymentRepository paymentRepo, IInvoiceRepository invoiceRepo)
         {
             _paymentRepo = paymentRepo;
@@ -28,12 +30,19 @@ namespace Backend.Services
             if (invoice == null || invoice.Status == "paid")
                 return (false, "Hóa đơn không hợp lệ hoặc đã thanh toán.", null);
 
+            // Số tiền do client gửi lên không đáng tin: phải khớp với hóa đơn,
+            // vì đây chính là số tiền sẽ hiện trong thông báo cho chủ trọ
+            if (request.Amount != invoice.Total)
+                return (false, "Số tiền thanh toán không khớp với hóa đơn.", null);
 
-            string txnRef = "GD" + DateTime.Now.ToString("yyyyMMddHHmmss");
+            // Thêm hậu tố ngẫu nhiên để 2 giao dịch trong cùng 1 giây không đụng khóa
+            string suffix = Guid.NewGuid().ToString("N").Substring(0, 4).ToUpper();
+            string stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+            string txnRef = "GD" + stamp + suffix;
 
             var payment = new Payment
             {
-                Id = "PAY" + DateTime.Now.ToString("yyyyMMddHHmmss"),
+                Id = "PAY" + stamp + suffix,
                 PaymentCode = txnRef,
                 InvoiceId = request.InvoiceId,
                 PayerId = request.PayerId,
@@ -54,7 +63,7 @@ namespace Backend.Services
                 return (true, "Vui lòng thanh toán qua link.", paymentUrl);
             }
 
-            // NẾU LÀ TIỀN MẶT
+            // NẾU LÀ TIỀN MẶT / CHUYỂN KHOẢN
             invoice.Status = "pending";
             await _invoiceRepo.UpdateAsync(invoice);
             return (true, "Đã ghi nhận, chờ chủ nhà duyệt.", null);
@@ -64,50 +73,46 @@ namespace Backend.Services
         {
             // 1. Tìm giao dịch thanh toán trong database dựa vào mã txnRef
             var payment = await _paymentRepo.GetByPaymentCodeAsync(txnRef);
+            if (payment == null) return false;
 
-            if (payment == null)
-            {
-                return false; 
-            }
+            // Idempotent: VNPay/người dùng gọi lại thì không xử lý lần 2
+            // (tránh việc một lệnh gọi "thất bại" đến sau làm hóa đơn đã paid bị đổi về unpaid)
+            if (payment.Status == "success") return true;
+            if (payment.Status != "pending") return false;
 
             // 2. Tìm hóa đơn liên kết với giao dịch này
             var invoice = await _invoiceRepo.GetByIdAsync(payment.InvoiceId);
-
-            if (invoice == null)
-            {
-                return false; // Không tìm thấy hóa đơn
-            }
+            if (invoice == null) return false;
 
             // 3. Nếu khách hàng thanh toán thành công trên VNPay
             if (responseCode == "00")
             {
-                // Cập nhật trạng thái Giao dịch thành công
                 payment.Status = "success";
                 payment.PaidAt = DateTime.Now;
                 payment.UpdatedAt = DateTime.Now;
                 await _paymentRepo.UpdateAsync(payment);
 
-                // Cập nhật trạng thái Hóa đơn thành đã thanh toán
                 invoice.Status = "paid";
                 invoice.UpdatedAt = DateTime.Now;
                 await _invoiceRepo.UpdateAsync(invoice);
 
                 return true;
             }
-            else
-            {
-                // Nếu khách hàng hủy giao dịch hoặc thanh toán thất bại
-                payment.Status = "failed";
-                payment.UpdatedAt = DateTime.Now;
-                await _paymentRepo.UpdateAsync(payment);
 
-                // Khôi phục trạng thái hóa đơn về unpaid 
+            // Khách hủy giao dịch hoặc thanh toán thất bại
+            payment.Status = "failed";
+            payment.UpdatedAt = DateTime.Now;
+            await _paymentRepo.UpdateAsync(payment);
+
+            // Chỉ khôi phục về unpaid nếu hóa đơn chưa được thanh toán bằng giao dịch khác
+            if (invoice.Status != "paid")
+            {
                 invoice.Status = "unpaid";
                 invoice.UpdatedAt = DateTime.Now;
                 await _invoiceRepo.UpdateAsync(invoice);
-
-                return false;
             }
+
+            return false;
         }
     }
 }

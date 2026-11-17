@@ -26,7 +26,8 @@ namespace Backend.Services
                 Message = n.Message,
                 Type = n.Type,
                 IsRead = n.ReadAt != null,
-                CreatedAt = n.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? ""
+                CreatedAt = n.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "",
+                ReferenceId = n.ReferenceId
             });
         }
 

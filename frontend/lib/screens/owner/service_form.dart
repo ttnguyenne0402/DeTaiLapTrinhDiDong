@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/service_service.dart';
+import '../../services/auth_storage.dart';
 
 class ServiceFormScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -361,9 +362,9 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                                       .trim();
                                   final priceVal = double.tryParse(rawPrice) ?? 0.0;
                                   final iconStr = _getIconString(_selectedIcon);
-
+                                  final ownerId = await AuthStorage.getUserId();
                                   final payload = {
-                                    'ownerId': 'USER_OWNER_01',
+                                    'ownerId': ownerId.toString().trim(),
                                     'name': _nameController.text.trim(),
                                     'price': priceVal,
                                     'unit': _selectedUnit,

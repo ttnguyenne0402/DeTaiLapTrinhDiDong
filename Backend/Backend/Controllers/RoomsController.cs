@@ -45,7 +45,8 @@ namespace Backend.Controllers
                 // Bỏ qua nếu propertyId là placeholder Swagger ("propertyId" hoặc "all")
                 if (!OwnerHelper.IsPlaceholder(propertyId, "propertyId"))
                 {
-                    query = query.Where(r => r.PropertyId == propertyId);
+                    string cleanPropId = propertyId!.Trim().ToLower();
+                    query = query.Where(r => r.PropertyId.ToLower() == cleanPropId);
                 }
 
                 // Lọc theo trạng thái phòng (bỏ qua nếu status là "status" hoặc "all")
@@ -167,6 +168,35 @@ namespace Backend.Controllers
                 }
 
                 string validPropertyId = property.Id;
+                int targetFloor = dto.Floor ?? 1;
+                string rawInputName = dto.Name.Trim();
+                string normalizedInputName = rawInputName.ToLower();
+                string strippedInputName = normalizedInputName.StartsWith("phòng ")
+                    ? normalizedInputName.Substring(6).Trim()
+                    : normalizedInputName;
+
+                // Kiểm tra trùng tên phòng trong cùng tòa nhà và cùng tầng (không phân biệt hoa thường)
+                var existingRoomsOnFloor = await _context.Rooms
+                    .Where(r => r.PropertyId == validPropertyId && (r.Floor ?? 1) == targetFloor)
+                    .Select(r => r.Name)
+                    .ToListAsync();
+
+                bool isDuplicate = existingRoomsOnFloor.Any(existingName =>
+                {
+                    string normExisting = (existingName ?? "").Trim().ToLower();
+                    string strippedExisting = normExisting.StartsWith("phòng ")
+                        ? normExisting.Substring(6).Trim()
+                        : normExisting;
+                    return normExisting == normalizedInputName || strippedExisting == strippedInputName;
+                });
+
+                if (isDuplicate)
+                {
+                    return BadRequest(new
+                    {
+                        message = $"Phòng '{rawInputName}' thuộc tầng {targetFloor} đã tồn tại trong {property.Name}. Vui lòng đặt tên khác!"
+                    });
+                }
 
                 string normalizedStatus = dto.Status.ToLower();
                 if (normalizedStatus.Contains("trống") || normalizedStatus == "available" || normalizedStatus == "empty")
@@ -229,17 +259,48 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy phòng cần cập nhật" });
                 }
 
+                string targetPropertyId = room.PropertyId;
                 if (!string.IsNullOrWhiteSpace(dto.PropertyId))
                 {
                     var prop = await _context.Properties
                         .FirstOrDefaultAsync(p => p.Id == dto.PropertyId || p.Id.ToLower() == dto.PropertyId.ToLower());
                     if (prop != null)
                     {
-                        room.PropertyId = prop.Id;
+                        targetPropertyId = prop.Id;
                     }
                 }
 
-                if (!string.IsNullOrWhiteSpace(dto.Name)) room.Name = dto.Name;
+                int targetFloor = dto.Floor ?? room.Floor ?? 1;
+                string newRoomName = !string.IsNullOrWhiteSpace(dto.Name) ? dto.Name.Trim() : room.Name.Trim();
+                string normalizedInputName = newRoomName.ToLower();
+                string strippedInputName = normalizedInputName.StartsWith("phòng ")
+                    ? normalizedInputName.Substring(6).Trim()
+                    : normalizedInputName;
+
+                var otherRoomsOnFloor = await _context.Rooms
+                    .Where(r => r.Id != room.Id && r.PropertyId == targetPropertyId && (r.Floor ?? 1) == targetFloor)
+                    .Select(r => r.Name)
+                    .ToListAsync();
+
+                bool isDuplicate = otherRoomsOnFloor.Any(existingName =>
+                {
+                    string normExisting = (existingName ?? "").Trim().ToLower();
+                    string strippedExisting = normExisting.StartsWith("phòng ")
+                        ? normExisting.Substring(6).Trim()
+                        : normExisting;
+                    return normExisting == normalizedInputName || strippedExisting == strippedInputName;
+                });
+
+                if (isDuplicate)
+                {
+                    return BadRequest(new
+                    {
+                        message = $"Phòng '{newRoomName}' thuộc tầng {targetFloor} đã tồn tại trong tòa nhà này. Vui lòng đặt tên khác!"
+                    });
+                }
+
+                room.PropertyId = targetPropertyId;
+                if (!string.IsNullOrWhiteSpace(dto.Name)) room.Name = dto.Name.Trim();
                 if (dto.Area > 0) room.Area = dto.Area;
                 if (dto.Floor.HasValue) room.Floor = dto.Floor;
                 if (dto.Price > 0) room.Price = dto.Price;
