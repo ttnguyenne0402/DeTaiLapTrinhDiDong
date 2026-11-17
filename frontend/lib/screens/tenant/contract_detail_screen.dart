@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import 'package:signature/signature.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
+import '../../services/owner/contract_service.dart';
 import 'tenant_maintenance_request_screen.dart';
 
 class ContractDetailScreen extends StatefulWidget {
@@ -19,6 +21,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
   bool _isLoading = true;
   late String _contractId;
   bool _isInit = true;
+  final SignatureController _tenantSignatureController = SignatureController( penStrokeWidth: 2.5, penColor: Colors.black, exportBackgroundColor: Colors.white, );
 
   @override
   void didChangeDependencies() {
@@ -36,6 +39,8 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
       _isInit = false;
     }
   }
+
+  @override void dispose() { _tenantSignatureController.dispose(); super.dispose(); }
 
   // Khởi tạo Custom Client bỏ qua SSL
   IOClient _getCustomClient() {
@@ -222,6 +227,86 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                         ),
                       );
                     }),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
+            ],
+
+            if (_contractDetail!['status'] == 'pending') ...[
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 🔴 TIÊU ĐỀ + NÚT "KÝ LẠI" (XÓA CHỮ KÝ VẼ LẠI)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'KÝ XÁC NHẬN HỢP ĐỒNG',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGreen,
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () {
+                            _tenantSignatureController.clear(); // 🌟 Xóa sạch chữ ký cũ
+                          },
+                          icon: const Icon(Icons.refresh, size: 14, color: AppColors.primaryGreen),
+                          label: const Text(
+                            'Ký lại',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryGreen,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Vui lòng dùng ngón tay vẽ chữ ký của bạn vào khung bên dưới:', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    const SizedBox(height: 12),
+                    Container(
+                      height: 150,
+                      decoration: BoxDecoration(border: Border.all(color: AppColors.primaryGreen), borderRadius: BorderRadius.circular(10), color: Colors.white),
+                      child: Signature(controller: _tenantSignatureController, backgroundColor: Colors.white),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+                        icon: const Icon(Icons.draw, color: Colors.white),
+                        label: const Text('XÁC NHẬN KÝ HỢP ĐỒNG', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        onPressed: () async {
+                          final bytes = await _tenantSignatureController.toPngBytes();
+                          if (bytes == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng vẽ chữ ký trước khi xác nhận.')));
+                            return;
+                          }
+                          final base64Sig = base64Encode(bytes);
+                          final success = await ContractService.signContract(
+                            contractId: _contractId,
+                            ownerSignatureBase64: '',
+                            tenantSignatureBase64: base64Sig,
+                          );
+                          if (success && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ký hợp đồng thành công!')));
+                            _fetchContractDetail();
+                          }
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),

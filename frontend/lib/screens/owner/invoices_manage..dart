@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
+import '../../services/auth_storage.dart';
 import '../../services/owner/invoice_service.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'invoice_form.dart';
@@ -106,12 +108,30 @@ class _InvoiceManaState extends State<Invoice_mana> {
   }
 
   Future<void> _fetchInvoices() async {
-    setState(() => _isLoading = true);
+    final ownerId = await AuthStorage.getUserId() ?? '';
+
     final data = await OwnerInvoiceService.getMonthlyInvoices(
+      ownerId: ownerId,
       month: _selectedMonth.month,
       year: _selectedMonth.year,
       search: _searchController.text.trim(),
     );
+
+    if (mounted) {
+      if (data != null && data is Map<String, dynamic>) {
+        final list = (data['invoices'] as List<dynamic>? ?? [])
+            .map((e) => InvoiceData.fromJson(e as Map<String, dynamic>))
+            .toList();
+        setState(() {
+          _invoices = list;
+          _totalPaid = (data['totalPaid'] as num?)?.toDouble() ?? 0.0;
+          _totalOutstanding = (data['totalOutstanding'] as num?)?.toDouble() ?? 0.0;
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    }
 
     if (mounted) {
       if (data != null && data is Map<String, dynamic>) {
@@ -325,12 +345,18 @@ class _InvoiceManaState extends State<Invoice_mana> {
       return;
     }
 
-    // 4. Gọi điện thoại
+    // 4. Gọi điện thoại trực tiếp bằng Ứng dụng Cuộc gọi
     if (action == 'call') {
-      if (invoice.phone.isEmpty) {
+      final phoneClean = invoice.phone.replaceAll(RegExp(r'[^\d+]'), '');
+      if (phoneClean.isEmpty) {
         _showMessage('Chưa có số điện thoại của khách thuê.');
       } else {
-        _showMessage('Số điện thoại: ${invoice.phone}');
+        final uri = Uri.parse('tel:$phoneClean');
+        try {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (_) {
+          _showMessage('Số điện thoại khách: ${invoice.phone}');
+        }
       }
       return;
     }
@@ -394,8 +420,10 @@ class _InvoiceManaState extends State<Invoice_mana> {
         return Row(
           children: [
             _actionButton(invoice, label: 'Gọi khách', icon: Icons.phone, action: 'call'),
-            const SizedBox(width: 8),
-            _actionButton(invoice, label: 'Thu tiền mặt', icon: Icons.payments_outlined, action: 'confirm', primary: true),
+            const SizedBox(width: 6),
+            _actionButton(invoice, label: 'Sửa HĐ', icon: Icons.edit_note, action: 'edit'),
+            const SizedBox(width: 6),
+            _actionButton(invoice, label: 'Thu tiền', icon: Icons.payments_outlined, action: 'confirm', primary: true),
           ],
         );
       case InvoiceStatus.pendingConfirmation:

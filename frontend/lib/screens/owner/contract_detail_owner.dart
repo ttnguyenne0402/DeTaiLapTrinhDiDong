@@ -177,7 +177,6 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.calendar_month, size: 16, color: AppColors.accentYellow),
                     const SizedBox(width: 6),
                     Text(duration.isNotEmpty ? duration : 'Thời hạn hợp đồng', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                   ],

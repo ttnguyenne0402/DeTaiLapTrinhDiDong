@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/invoice_service.dart'; // Đảm bảo đúng đường dẫn tới service chứa hàm getLiquidationDetails của bạn
 
@@ -17,22 +18,116 @@ class _ContractLiquidationScreenState
   bool _isLoading = true;
   Map<String, dynamic>? _data;
 
+  final List<Map<String, dynamic>> _deductions = [];
+
+  double get _totalDeductionAmount {
+    double sum = 0;
+    for (var d in _deductions) {
+      if (d['amount'] is num) sum += (d['amount'] as num).toDouble();
+    }
+    return sum;
+  }
+
+  void _showAddDeductionDialog() {
+    final titleController = TextEditingController();
+    final noteController = TextEditingController();
+    final amountController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.add_circle_outline, color: AppColors.primaryGreen),
+            SizedBox(width: 8),
+            Text('Thêm khoản khấu trừ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Tên hạng mục / Hư hỏng', hintText: 'VD: Hỏng khóa cửa'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: noteController,
+              decoration: const InputDecoration(labelText: 'Ghi chú lý do', hintText: 'VD: Làm gãy tay gạt khóa'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Số tiền khấu trừ (VNĐ)', hintText: 'VD: 150000'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+            onPressed: () {
+              final title = titleController.text.trim();
+              final note = noteController.text.trim();
+              final amt = double.tryParse(amountController.text.trim()) ?? 0;
+
+              if (title.isNotEmpty) {
+                setState(() {
+                  _deductions.add({
+                    'title': title,
+                    'subtitle': note.isNotEmpty ? note : 'Khấu trừ khi bàn giao',
+                    'amount': amt,
+                    'isWarning': amt > 0,
+                  });
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Thêm mới', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  final TextEditingController _elecNewController = TextEditingController();
+  final TextEditingController _waterNewController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
+    _elecNewController.addListener(() => setState(() {}));
+    _waterNewController.addListener(() => setState(() {}));
     _fetchLiquidationData();
+  }
+
+  @override
+  void dispose() {
+    _elecNewController.dispose();
+    _waterNewController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchLiquidationData() async {
     setState(() => _isLoading = true);
 
-    // Nếu không truyền ID thì dùng mã mặc định để test
     final id = widget.contractId ?? 'ctr_01';
     final res = await OwnerInvoiceService.getLiquidationDetails(id);
 
     if (mounted) {
       setState(() {
         _data = res;
+        if (_data != null) {
+          final eOld = (_data!['elecOld'] is num) ? (_data!['elecOld'] as num).toDouble() : 0.0;
+          final wOld = (_data!['waterOld'] is num) ? (_data!['waterOld'] as num).toDouble() : 0.0;
+          final eNew = (_data!['elecNew'] is num) ? (_data!['elecNew'] as num).toDouble() : eOld;
+          final wNew = (_data!['waterNew'] is num) ? (_data!['waterNew'] as num).toDouble() : wOld;
+
+          _elecNewController.text = eNew.toInt().toString();
+          _waterNewController.text = wNew.toInt().toString();
+        }
         _isLoading = false;
       });
     }
@@ -321,10 +416,10 @@ class _ContractLiquidationScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              const Row(
                 children: [
                   Icon(Icons.archive_outlined, color: AppColors.textPrimary),
                   SizedBox(width: 8),
@@ -335,44 +430,38 @@ class _ContractLiquidationScreenState
                           color: AppColors.textPrimary)),
                 ],
               ),
-              Text('4 hạng mục',
-                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              Text('${_deductions.length} hạng mục',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInspectionItem(
-            title: 'Giường & Nệm',
-            subtitle: 'Đạt chuẩn, sạch sẽ, không rách',
-            statusText: 'Bình thường',
-            isWarning: false,
-          ),
-          const SizedBox(height: 8),
-          _buildInspectionItem(
-            title: 'Máy lạnh & Remote',
-            subtitle: 'Làm lạnh tốt, remote đầy đủ pin',
-            statusText: 'Bình thường',
-            isWarning: false,
-          ),
-          const SizedBox(height: 8),
-          _buildInspectionItem(
-            title: 'Vỡ mặt kính tủ bếp',
-            subtitle: 'Nứt vỡ góc phải do va đập',
-            amount: '-500.000 đ',
-            isWarning: true,
-            hasImage: true,
-          ),
-          const SizedBox(height: 8),
-          _buildInspectionItem(
-            title: 'Vệ sinh phòng cuối kỳ',
-            subtitle: 'Chưa tổng vệ sinh bàn giao sàn & WC',
-            amount: '-200.000 đ',
-            isWarning: true,
-          ),
-          const SizedBox(height: 12),
+          if (_deductions.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: Text(
+                  'Chưa có khoản khấu trừ / bồi thường nào.',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ),
+            )
+          else
+            for (var item in _deductions) ...[
+              _buildInspectionItem(
+                title: item['title'] ?? '',
+                subtitle: item['subtitle'] ?? '',
+                statusText: (item['amount'] == null || item['amount'] == 0) ? 'Bình thường' : null,
+                amount: (item['amount'] != null && item['amount'] > 0) ? '-${_formatMoney(item['amount'])}' : null,
+                isWarning: item['isWarning'] == true,
+                hasImage: item['hasImage'] == true,
+              ),
+              const SizedBox(height: 8),
+            ],
+          const SizedBox(height: 4),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: _showAddDeductionDialog,
               icon: const Icon(Icons.add_circle_outline, size: 18),
               label: const Text('Thêm khoản bồi thường / khấu trừ'),
               style: OutlinedButton.styleFrom(
@@ -466,19 +555,22 @@ class _ContractLiquidationScreenState
     );
   }
 
-  // phần chốt chỉ số điện nước (Đã gắn dữ liệu thật từ API)
   Widget _buildUtilitySection() {
-    final elecOld = _data?['elecOld'] ?? 0;
-    final elecNew = _data?['elecNew'] ?? 0;
-    final elecUsage = _data?['elecUsage'] ?? 0;
-    final elecCost = _data?['elecCost'] ?? 0;
+    final elecOld = (_data?['elecOld'] is num) ? (_data!['elecOld'] as num).toDouble() : 0.0;
+    final waterOld = (_data?['waterOld'] is num) ? (_data!['waterOld'] as num).toDouble() : 0.0;
 
-    final waterOld = _data?['waterOld'] ?? 0;
-    final waterNew = _data?['waterNew'] ?? 0;
-    final waterUsage = _data?['waterUsage'] ?? 0;
-    final waterCost = _data?['waterCost'] ?? 0;
+    final elecPrice = (_data?['elecPrice'] is num) ? (_data!['elecPrice'] as num).toDouble() : 3800.0;
+    final waterPrice = (_data?['waterPrice'] is num) ? (_data!['waterPrice'] as num).toDouble() : 25000.0;
 
-    final utilityTotal = _data?['utilityTotal'] ?? 0;
+    final elecNew = double.tryParse(_elecNewController.text) ?? elecOld;
+    final waterNew = double.tryParse(_waterNewController.text) ?? waterOld;
+
+    final elecUsage = (elecNew - elecOld) > 0 ? (elecNew - elecOld) : 0.0;
+    final waterUsage = (waterNew - waterOld) > 0 ? (waterNew - waterOld) : 0.0;
+
+    final elecCost = elecUsage * elecPrice;
+    final waterCost = waterUsage * waterPrice;
+    final utilityTotal = elecCost + waterCost;
 
     return Container(
       width: double.infinity,
@@ -519,11 +611,25 @@ class _ContractLiquidationScreenState
             ],
           ),
           const SizedBox(height: 12),
-          _buildUtilityRow(
-              Icons.bolt, 'Điện sinh hoạt', '$elecOld ➔ $elecNew kWh', '$elecUsage kWh × 3.800 đ', '-$elecCost đ'),
-          const SizedBox(height: 8),
-          _buildUtilityRow(
-              Icons.water_drop, 'Nước sinh hoạt', '$waterOld ➔ $waterNew m³', '$waterUsage m³ × 25.000 đ', '-$waterCost đ'),
+          _buildUtilityInputRow(
+            Icons.bolt,
+            'Điện sinh hoạt (kWh)',
+            elecOld,
+            _elecNewController,
+            elecUsage,
+            elecPrice,
+            elecCost,
+          ),
+          const SizedBox(height: 10),
+          _buildUtilityInputRow(
+            Icons.water_drop,
+            'Nước sinh hoạt (m³)',
+            waterOld,
+            _waterNewController,
+            waterUsage,
+            waterPrice,
+            waterCost,
+          ),
           const SizedBox(height: 12),
           const Divider(),
           Row(
@@ -531,8 +637,8 @@ class _ContractLiquidationScreenState
             children: [
               const Text('Tổng tiền dịch vụ kỳ cuối:',
                   style: TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-              Text('$utilityTotal đ',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              Text(_formatMoney(utilityTotal),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red)),
             ],
           ),
         ],
@@ -540,34 +646,58 @@ class _ContractLiquidationScreenState
     );
   }
 
-  Widget _buildUtilityRow(IconData icon, String title, String detail,
-      String calc, String amount) {
+  Widget _buildUtilityInputRow(
+    IconData icon,
+    String title,
+    double oldVal,
+    TextEditingController newController,
+    double usage,
+    double price,
+    double cost,
+  ) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.primaryGreen, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                Text(detail, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
             children: [
-              Text(amount,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13)),
-              Text(calc, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              Icon(icon, color: AppColors.primaryGreen, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+              Text('-${_formatMoney(cost)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text('Số cũ: ${oldVal.toInt()}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const SizedBox(width: 12),
+              const Text('➔ Số mới: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              SizedBox(
+                width: 70,
+                height: 32,
+                child: TextField(
+                  controller: newController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text('+${usage.toInt()} (${_formatMoney(price)}/đv)', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
         ],
@@ -575,13 +705,32 @@ class _ContractLiquidationScreenState
     );
   }
 
+  String _formatMoney(dynamic amount) {
+    if (amount == null) return '0 đ';
+    final str = amount.toString().replaceAll('đ', '').replaceAll('.', '').replaceAll(',', '').trim();
+    final numVal = double.tryParse(str) ?? 0;
+    return '${numVal.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} đ';
+  }
+
   // bảng quyết toán thanh lý (Đã gắn dữ liệu thật từ API)
   Widget _buildSettlementSummaryCard() {
-    final deposit = _data?['deposit'] ?? 0;
-    final utilityTotal = _data?['utilityTotal'] ?? 0;
-    final deductionTotal = _data?['deductionTotal'] ?? 0;
+    final deposit = (_data?['deposit'] is num) ? (_data!['deposit'] as num).toDouble() : (double.tryParse(_data?['deposit']?.toString() ?? '') ?? 0.0);
+
+    final elecOld = (_data?['elecOld'] is num) ? (_data!['elecOld'] as num).toDouble() : 0.0;
+    final waterOld = (_data?['waterOld'] is num) ? (_data!['waterOld'] as num).toDouble() : 0.0;
+    final elecPrice = (_data?['elecPrice'] is num) ? (_data!['elecPrice'] as num).toDouble() : 3800.0;
+    final waterPrice = (_data?['waterPrice'] is num) ? (_data!['waterPrice'] as num).toDouble() : 25000.0;
+
+    final elecNew = double.tryParse(_elecNewController.text) ?? elecOld;
+    final waterNew = double.tryParse(_waterNewController.text) ?? waterOld;
+
+    final elecUsage = (elecNew - elecOld) > 0 ? (elecNew - elecOld) : 0.0;
+    final waterUsage = (waterNew - waterOld) > 0 ? (waterNew - waterOld) : 0.0;
+
+    final utilityTotal = (elecUsage * elecPrice) + (waterUsage * waterPrice);
+    final deductionTotal = _totalDeductionAmount;
     final totalDeductions = utilityTotal + deductionTotal;
-    final refundAmount = _data?['refundAmount'] ?? 0;
+    final refundAmount = (deposit - totalDeductions) > 0 ? (deposit - totalDeductions) : 0.0;
 
     return Container(
       width: double.infinity,
@@ -874,17 +1023,41 @@ class _ContractLiquidationScreenState
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () async {
+              final contractId = _data?['contractId'] ?? widget.contractId;
+              if (contractId == null) return;
+
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
+              final response = await http.post(
+                Uri.parse('http://10.0.2.2:5093/api/OwnerContracts/$contractId/terminate'),
+                headers: {'Content-Type': 'application/json'},
+              );
+
+              if (response.statusCode == 200 && mounted) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Thanh lý hợp đồng thành công! Phòng đã được đưa về trạng thái trống.'),
+                    backgroundColor: AppColors.primaryGreen,
+                  ),
+                );
+                navigator.pop(true);
+              }
+            },
             icon: const Icon(Icons.check_circle_outline, color: Colors.white),
-            label: const Text('Xác nhận Hoàn Cọc & Ký Thanh Lý',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold)),
+            label: const Text(
+              'Xác nhận Hoàn Cọc & Ký Thanh Lý',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange.shade700,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
@@ -895,15 +1068,19 @@ class _ContractLiquidationScreenState
           child: OutlinedButton.icon(
             onPressed: () {},
             icon: const Icon(Icons.picture_as_pdf, color: AppColors.primaryGreen),
-            label: const Text('Xuất biên bản PDF bàn giao',
-                style: TextStyle(
-                    color: AppColors.primaryGreen,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold)),
+            label: const Text(
+              'Xuất biên bản PDF bàn giao',
+              style: TextStyle(
+                color: AppColors.primaryGreen,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: AppColors.primaryGreen, width: 1.5),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/auth_storage.dart';
 import '../../widgets/owner/contract_card.dart';
 import '../../route/app_routes.dart';
 import 'contract_detail_owner.dart';
@@ -36,11 +37,17 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
   // Tải danh sách hợp đồng thực tế từ API Backend
   Future<void> _fetchContracts() async {
     setState(() => _isLoading = true);
+
     try {
+      final ownerId = await AuthStorage.getUserId() ?? '';
+
+      // Lấy mã ID chủ trọ đang đăng nhập
       final res = await ContractService.getContracts(
+        ownerId: ownerId,
         status: _selectedRole,
         search: _searchKeyword,
       );
+
       setState(() {
         _contracts = res.contracts;
         _activeCount = res.activeCount;
@@ -370,23 +377,17 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       noteText: contract['noteText'] ?? '',
       primaryBtnText: primaryBtnText,
       primaryBtnColor: primaryBtnColor,
-      onTapDetail: () {
-        final status = contract['status'] ?? '';
-
-
-        if (status == 'Bản nháp' || status == 'draft') {
-          _openContract(Map<String, dynamic>.from(contract));
-          return;
-        }
-
-
+      onTapDetail: (status == 'Đang hiệu lực' || status == 'Sắp hết hạn' || status == 'Đã thanh lý')
+          ? () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ContractDetailScreen(contract: Map<String, dynamic>.from(contract)),
+            builder: (context) => ContractDetailScreen(
+              contract: Map<String, dynamic>.from(contract),
+            ),
           ),
         );
-      },
+      }: null,
       onTapPrimaryBtn: () {
         _handlePrimaryButton(Map<String, dynamic>.from(contract));
       },

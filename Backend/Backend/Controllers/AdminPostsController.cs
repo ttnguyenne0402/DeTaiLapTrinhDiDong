@@ -106,11 +106,17 @@ namespace Backend.Controllers
                     Area = post.Room?.Area ?? 0,
                     MaxPeople = post.Room?.MaxPeople ?? 0,
                     Floor = post.Room?.Floor,
-                    Images = post.RentalPostImages.Select(i => i.ImagePath).ToList(),
-                    Amenities = post.Room?.RoomAmenities
+                    Images = post.RentalPostImages.Any()
+                        ? post.RentalPostImages.Select(i => i.ImagePath).ToList()
+                        : (!string.IsNullOrWhiteSpace(post.Room?.Images)
+                            ? post.Room.Images.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(img => img.Trim()).ToList()
+                            : new List<string>()),
+                     Amenities = !string.IsNullOrWhiteSpace(post.Amenities)
+                    ? post.Amenities.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(a => a.Trim()).ToList()
+                    : (post.Room?.RoomAmenities
                         .Where(ra => ra.Amenity != null)
                         .Select(ra => ra.Amenity!.Name)
-                        .ToList() ?? new List<string>()
+                        .ToList() ?? new List<string>())
                 };
 
                 return Ok(detail);

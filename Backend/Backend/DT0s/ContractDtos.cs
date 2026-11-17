@@ -18,6 +18,9 @@
         public string Duration { get; set; } = null!;
         public string CycleText { get; set; } = null!;
         public string NoteText { get; set; } = null!;
+        public string? Cccd { get; set; }
+
+        public List<ContractServiceItemDto>? Services { get; set; } = new();
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
     }

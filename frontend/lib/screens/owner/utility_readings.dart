@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/owner/utility_card_w.dart';
 import '../../services/owner/invoice_service.dart';
+import 'invoice_form.dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   final String? propertyId;
@@ -45,6 +46,17 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           final phone = item['phone']?.toString() ?? '';
           final elecOld = item['elecOld']?.toString() ?? '0';
           final waterOld = item['waterOld']?.toString() ?? '0';
+          final elecNew = item['elecNew']?.toString();
+          final waterNew = item['waterNew']?.toString();
+          final isRecorded = item['isRecorded'] == true;
+
+          if (isRecorded && elecNew != null && waterNew != null) {
+            _elecNewValues[id] = elecNew;
+            _waterNewValues[id] = waterNew;
+            _roomStatuses[id] = RoomUtilityStatus.completed;
+          } else if (_roomStatuses[id] == null) {
+            _roomStatuses[id] = RoomUtilityStatus.pending;
+          }
 
           loaded.add(_RoomInfo(
             id: id,
@@ -52,12 +64,10 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
             roomName: roomName,
             tenant: tenant,
             phone: phone,
-            status: RoomUtilityStatus.pending,
+            status: _roomStatuses[id]!,
             elecOld: elecOld,
             waterOld: waterOld,
           ));
-
-          _roomStatuses[id] = RoomUtilityStatus.pending;
         }
 
         setState(() {
@@ -79,16 +89,33 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     });
   }
 
-  void _saveReading(String room, String elec, String water) {
+  void _saveReading(String room, String elec, String water) async {
+    final targetRoom = _rooms.firstWhere((r) => r.id == room, orElse: () => _rooms.first);
+    final newEl = double.tryParse(elec) ?? double.tryParse(targetRoom.elecOld ?? '0') ?? 0;
+    final newWt = double.tryParse(water) ?? double.tryParse(targetRoom.waterOld ?? '0') ?? 0;
+
     setState(() {
       _elecNewValues[room] = elec;
       _waterNewValues[room] = water;
       _roomStatuses[room] = RoomUtilityStatus.completed;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đã ghi nhận chỉ số phòng $room.')),
+    final success = await OwnerInvoiceService.saveUtilityReading(
+      contractId: targetRoom.contractId,
+      newElectric: newEl,
+      newWater: newWt,
     );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success
+              ? 'Đã lưu vĩnh viễn chỉ số phòng ${targetRoom.roomName} vào CSDL thành công!'
+              : 'Đã ghi nhận chỉ số phòng ${targetRoom.roomName}.'),
+          backgroundColor: success ? AppColors.primaryGreen : Colors.orange,
+        ),
+      );
+    }
   }
 
   bool _matchesFilter(RoomUtilityStatus status) {
@@ -109,40 +136,53 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
 
     if (completedRooms.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chưa có phòng nào được nhập chỉ số mới để chốt!')),
+        const SnackBar(
+          content: Text('Vui lòng nhập chỉ số điện nước mới và bấm "Lưu chỉ số" trước!'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
+    int issuedCount = 0;
 
-    int successCount = 0;
-    final now = DateTime.now();
+    for (var room in completedRooms) {
+      if (!mounted) break;
 
-    for (var r in completedRooms) {
-      final newEl = double.tryParse(_elecNewValues[r.id] ?? '') ?? double.tryParse(r.elecOld ?? '0') ?? 0;
-      final newWt = double.tryParse(_waterNewValues[r.id] ?? '') ?? double.tryParse(r.waterOld ?? '0') ?? 0;
+      final newEl = double.tryParse(_elecNewValues[room.id] ?? '') ?? double.tryParse(room.elecOld ?? '0') ?? 0;
+      final newWt = double.tryParse(_waterNewValues[room.id] ?? '') ?? double.tryParse(room.waterOld ?? '0') ?? 0;
 
-      final body = {
-        'contractId': r.contractId,
-        'month': now.month,
-        'year': now.year,
-        'newElectric': newEl,
-        'newWater': newWt,
-        'discountAmount': 0,
-        'status': 'unpaid',
-      };
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Invoice_form(
+            invoice: null,
+            contractId: room.contractId,
+            initialNewElectric: newEl,
+            initialNewWater: newWt,
+          ),
+        ),
+      );
 
-      final res = await OwnerInvoiceService.createInvoice(body);
-      if (res != null) successCount++;
+      if (result == true) {
+        issuedCount++;
+      } else {
+        break;
+      }
     }
 
     if (mounted) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã chốt số và tạo thành công $successCount hóa đơn!')),
-      );
-      Navigator.pop(context, true);
+      _fetchRoomsSummary();
+
+      if (issuedCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã hoàn tất phát hành hóa đơn cho $issuedCount phòng!'),
+            backgroundColor: AppColors.primaryGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -218,10 +258,10 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                                 phone: room.phone,
                                 status: _roomStatuses[room.id] ?? room.status,
                                 totalAmount: room.totalAmount,
-                                elecOld: int.tryParse(room.elecOld ?? ''),
-                                elecNew: int.tryParse(_elecNewValues[room.id] ?? ''),
-                                waterOld: int.tryParse(room.waterOld ?? ''),
-                                waterNew: int.tryParse(_waterNewValues[room.id] ?? ''),
+                                elecOld: (double.tryParse(room.elecOld ?? '') ?? 0).toInt(),
+                                elecNew: (double.tryParse(_elecNewValues[room.id] ?? '') ?? 0).toInt(),
+                                waterOld: (double.tryParse(room.waterOld ?? '') ?? 0).toInt(),
+                                waterNew: (double.tryParse(_waterNewValues[room.id] ?? '') ?? 0).toInt(),
                                 waterCost: room.waterCost,
                                 warningTag: room.warningTag,
                                 warningMessage: room.warningMessage,
@@ -421,14 +461,27 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
         height: 46,
         child: ElevatedButton.icon(
           onPressed: completed > 0 ? _submitAllCompleted : null,
-          icon: const Icon(Icons.receipt_long, color: Colors.white),
+          icon: Icon(
+            Icons.arrow_forward_rounded,
+            color: completed > 0 ? Colors.white : Colors.grey.shade600,
+          ),
           label: Text(
-            'Chốt số & Tạo hóa đơn ($completed phòng)',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+            completed > 0
+                ? 'Đến trang Lập hóa đơn ($completed phòng)'
+                : 'Nhập số điện nước để lập hóa đơn',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: completed > 0 ? Colors.white : Colors.grey.shade600,
+            ),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.warningOrange,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            backgroundColor: AppColors.primaryGreen,
+            disabledBackgroundColor: Colors.grey.shade200,
+            elevation: completed > 0 ? 2 : 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         ),
       ),

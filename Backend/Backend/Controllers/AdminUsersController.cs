@@ -91,11 +91,75 @@ namespace Backend.Controllers
 
                 await _context.SaveChangesAsync();
 
+
+                if (newStatus == "blocked")
+                {
+                    string subject = "[Quản Lý Phòng Trọ] Thông báo tạm khóa tài khoản 🔒";
+                    string htmlContent = $@"
+                        <h3>Chào {user.Name},</h3>
+                        <p>Tài khoản <b>{user.Email}</b> của bạn đã bị <b>Quản trị viên tạm khóa</b> do vi phạm chính sách sử dụng.</p>
+                        <p>Nếu bạn muốn yêu cầu hỗ trợ xem xét mở lại tài khoản, vui lòng liên hệ Admin qua:</p>
+                        <ul>
+                            <li><b>Số điện thoại / Zalo:</b> 0909 123 456</li>
+                            <li><b>Email hỗ trợ:</b> admin@phongtro.vn</li>
+                        </ul>
+                        <p>Trân trọng,<br>Ban Quản Trị Hệ Thống</p>";
+
+                    _ = SendResendEmailAsync(user.Email, user.Name, subject, htmlContent);
+                }
+                else if (newStatus == "active")
+                {
+                    string subject = "[Quản Lý Phòng Trọ] Tài khoản của bạn đã được mở khóa! 🎉";
+                    string htmlContent = $@"
+                        <h3>Chào {user.Name},</h3>
+                        <p>Quản trị viên đã xem xét và <b>kích hoạt lại tài khoản {user.Email}</b> của bạn.</p>
+                        <p>Hiện tại bạn đã có thể mở ứng dụng và đăng nhập lại bình thường.</p>
+                        <p>Chúc bạn có trải nghiệm tuyệt vời!</p>";
+
+                    _ = SendResendEmailAsync(user.Email, user.Name, subject, htmlContent);
+                }
+
                 return Ok(new { message = "Cập nhật trạng thái thành công!", status = user.Status });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi cập nhật trạng thái", error = ex.Message });
+            }
+        }
+
+        private static readonly System.Net.Http.HttpClient _resendClient = new System.Net.Http.HttpClient();
+
+        //THAY MÃ RESEND API KEY CỦA BẠN VÀO DÒNG DƯỚI ĐÂY (VD: "re_123456789...")
+        private const string RESEND_API_KEY = "re_YOUR_RESEND_API_KEY_HERE";
+
+        private async Task SendResendEmailAsync(string toEmail, string name, string subject, string htmlContent)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(toEmail) || !toEmail.Contains("@") || toEmail.EndsWith(".local")) return;
+
+                var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://api.resend.com/emails");
+                request.Headers.Add("Authorization", $"Bearer {RESEND_API_KEY}");
+
+                var payload = new
+                {
+                    from = "Quản Lý Phòng Trọ <onboarding@resend.dev>",
+                    to = new[] { toEmail },
+                    subject = subject,
+                    html = htmlContent
+                };
+
+                request.Content = new System.Net.Http.StringContent(
+                    System.Text.Json.JsonSerializer.Serialize(payload),
+                    System.Text.Encoding.UTF8,
+                    "application/json"
+                );
+
+                await _resendClient.SendAsync(request);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RESEND EMAIL ERROR]: {ex.Message}");
             }
         }
     }

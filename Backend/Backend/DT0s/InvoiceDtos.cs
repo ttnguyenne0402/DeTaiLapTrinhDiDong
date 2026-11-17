@@ -12,7 +12,9 @@ namespace Backend.DTOs
         public string TenantPhone { get; set; } = null!;
         public decimal RentPrice { get; set; }
         public decimal OldElectric { get; set; }
+        public decimal NewElectric { get; set; }
         public decimal OldWater { get; set; }
+        public decimal NewWater { get; set; }
         public decimal ElectricUnitPrice { get; set; } = 3800; // Mặc định nếu chưa cài đặt
         public decimal WaterUnitPrice { get; set; } = 25000;
         public List<ContractServiceItemDto> OtherServices { get; set; } = new();
@@ -70,6 +72,7 @@ namespace Backend.DTOs
     {
         public string ContractId { get; set; } = null!;
         public string ContractCode { get; set; } = null!;
+        public string RoomId { get; set; } = null!;
         public string PropertyId { get; set; } = null!;
         public string PropertyName { get; set; } = null!;
         public string RoomName { get; set; } = null!;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/auth_storage.dart';
 import '../../services/owner/invoice_service.dart';
 import 'utility_readings.dart';
 import '../tenant/profile_screen.dart';
@@ -36,16 +37,20 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
 
-    // Truyền propertyId vào đây để lọc đúng phòng của khu trọ được bấm
-    final contracts = await OwnerInvoiceService.getActiveContracts(propertyId: widget.propertyId);
+    final ownerId = await AuthStorage.getUserId() ?? '';
+    final contracts = await OwnerInvoiceService.getActiveContracts(ownerId: ownerId, propertyId: widget.propertyId);
 
     if (mounted && contracts is List && contracts.isNotEmpty) {
-      _rooms = contracts;
-      _selectedRoomId = _rooms.first['roomId']?.toString() ?? _rooms.first['contractId']?.toString();
-      _selectedRoomName = _rooms.first['roomName']?.toString() ?? 'Phòng';
+      setState(() {
+        _rooms = contracts;
+        _selectedRoomId = _rooms.first['roomId']?.toString() ?? _rooms.first['contractId']?.toString();
+        _selectedRoomName = _rooms.first['roomName']?.toString() ?? 'Phòng';
+      });
 
       if (_selectedRoomId != null) {
         await _fetchData();
+      } else {
+        if (mounted) setState(() => _isLoading = false);
       }
     } else {
       if (mounted) {
@@ -432,6 +437,7 @@ class _LandlordUtilityScreenState extends State<LandlordUtilityScreen> {
               height: 240,
               child: BarChart(
                 BarChartData(
+                  gridData: const FlGridData(show: false),
                   barTouchData: BarTouchData(
                     touchTooltipData: BarTouchTooltipData(
                       getTooltipColor: (_) => Colors.grey.shade800,
