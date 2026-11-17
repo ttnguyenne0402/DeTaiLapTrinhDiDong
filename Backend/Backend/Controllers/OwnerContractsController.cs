@@ -3,6 +3,7 @@ using Backend.DTOs;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Backend.Helpers;
 
 namespace Backend.Controllers
 {
@@ -19,20 +20,35 @@ namespace Backend.Controllers
 
 
         [HttpGet]
-        public async Task<IActionResult> GetContracts([FromQuery] string? status, [FromQuery] string? search)
+        [HttpGet("{ownerId}")]
+        public async Task<IActionResult> GetContracts( [FromRoute] string? ownerId,[FromQuery] string? status, [FromQuery] string? search, [FromQuery(Name = "ownerId")] string? ownerIdQuery = null)
         {
             try
             {
-                var query = _context.Contracts
-                    .Include(c => c.Room)
-                        .ThenInclude(r => r.Property)
-                    .Include(c => c.Tenant)
-                    .Include(c => c.ContractMembers)
-                    .AsQueryable();
+                  string? targetOwner = !string.IsNullOrEmpty(ownerId)
+                             ? ownerId
+                             : ownerIdQuery;
 
-                var rawContracts = await query
-                    .OrderByDescending(c => c.CreatedAt)
-                    .ToListAsync();
+                  var query = _context.Contracts
+                             .Include(c => c.Room)
+                                 .ThenInclude(r => r.Property)
+                             .Include(c => c.Tenant)
+                             .Include(c => c.ContractMembers)
+                             .Include(c => c.ContractServices)
+                                 .ThenInclude(cs => cs.Service)
+                             .AsQueryable();
+
+
+                  if (!string.IsNullOrEmpty(targetOwner) && targetOwner != "all")
+                         {
+                             var targetOwnerIds = OwnerHelper.ResolveOwnerIds(targetOwner);
+                             query = query.Where(c => targetOwnerIds.Contains(c.OwnerId));
+                         }
+
+                  var rawContracts = await query
+                             .OrderByDescending(c => c.CreatedAt)
+                             .ToListAsync();
+
 
                 var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -100,6 +116,14 @@ namespace Backend.Controllers
                         Duration = $"📅 {c.StartDate:dd/MM/yyyy} - {c.EndDate:dd/MM/yyyy}",
                         CycleText = c.PaymentCycle == "quarterly" ? "Kỳ thu: Hàng quý" : "Kỳ thu: Hàng tháng (Ngày 05)",
                         NoteText = note,
+                        Cccd = c.Terms?.StartsWith("CCCD:") == true ? c.Terms.Split('|')[0].Replace("CCCD:", ""): "",
+                        Services = c.ContractServices.Select(cs => new ContractServiceItemDto
+                        {
+                            ServiceId = cs.ServiceId,
+                            Name = cs.Service?.Name ?? "Dịch vụ",
+                            Unit = cs.Service?.Unit ?? "tháng",
+                            Price = cs.UnitPrice
+                        }).ToList(),
                         StartDate = c.StartDate.ToDateTime(TimeOnly.MinValue),
                         EndDate = c.EndDate.ToDateTime(TimeOnly.MinValue)
                     };
@@ -146,46 +170,70 @@ namespace Backend.Controllers
         {
             try
             {
-                // 1. Xử lý khách thuê (khách vãng lai hoặc khách hẹn trước)
-                string? tenantId = null;
-                if (!string.IsNullOrWhiteSpace(req.TenantPhone))
+                string inputVal = !string.IsNullOrWhiteSpace(req.TenantPhone) ? req.TenantPhone.Trim() : "";
+                string formName = !string.IsNullOrWhiteSpace(req.TenantName) ? req.TenantName.Trim() : "Khách thuê mới";
+
+                var tenant = await _context.Users.FirstOrDefaultAsync(u =>
+                    u.Email == inputVal ||
+                    u.Phone == inputVal
+                );
+
+                if (tenant != null)
                 {
-                    var tenant = await _context.Users.FirstOrDefaultAsync(u => u.Phone == req.TenantPhone);
-                    if (tenant == null)
+
+                    tenant.Name = formName;
+                    tenant.UpdatedAt = DateTime.UtcNow;
+                }
+                else if (!string.IsNullOrEmpty(inputVal))
+                {
+
+                    bool isEmail = inputVal.Contains("@");
+
+                    tenant = new User
                     {
-                        tenant = new User
-                        {
-                            Id = "usr_" + Guid.NewGuid().ToString("N")[..8],
-                            Name = !string.IsNullOrWhiteSpace(req.TenantName) ? req.TenantName : "Khách thuê mới",
-                            Phone = req.TenantPhone,
-                            Email = $"{req.TenantPhone}@tenant.local",
-                            Password = "default_password_123", // Bổ sung mật khẩu mặc định để tránh lỗi NOT NULL
-                            Role = "tenant",
-                            Status = "active",
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-                        _context.Users.Add(tenant);
-                        await _context.SaveChangesAsync();
-                    }
-                    tenantId = tenant.Id;
+                        Id = "usr_" + Guid.NewGuid().ToString("N")[..8],
+                        Name = formName, // Lưu đúng tên Đỗ Hoàng Yến
+                        Email = isEmail ? inputVal : $"{inputVal}@tenant.local",
+                        Phone = isEmail ? null : inputVal,
+                        Password = "default_password_123",
+                        Role = "tenant",
+                        Status = "active",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    _context.Users.Add(tenant);
                 }
 
-                if (string.IsNullOrEmpty(tenantId))
+                await _context.SaveChangesAsync();
+
+                if (tenant == null)
                 {
-                    return BadRequest(new { message = "Vui lòng cung cấp số điện thoại người thuê." });
+                    return BadRequest(new
+                    {
+                        message = "Vui lòng cung cấp Email hoặc Số điện thoại người thuê."
+                    });
                 }
 
-                // 2. Phân giải ngày bắt đầu và kết thúc
+                // 2. Parse ngày tháng chuẩn định dạng dd/MM/yyyy
                 DateOnly start = DateOnly.FromDateTime(DateTime.UtcNow);
                 DateOnly end = start.AddYears(1);
 
-                if (!string.IsNullOrWhiteSpace(req.StartDate) && DateOnly.TryParse(req.StartDate, out var s))
-                    start = s;
-                if (!string.IsNullOrWhiteSpace(req.EndDate) && DateOnly.TryParse(req.EndDate, out var e))
-                    end = e;
+                if (!string.IsNullOrWhiteSpace(req.StartDate))
+                {
+                    if (DateOnly.TryParseExact(req.StartDate, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var s))
+                        start = s;
+                    else DateOnly.TryParse(req.StartDate, out start);
+                }
 
-                // 3. Lấy thông tin phòng và chủ sở hữu của phòng
+                if (!string.IsNullOrWhiteSpace(req.EndDate))
+                {
+                    if (DateOnly.TryParseExact(req.EndDate, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var e))
+                        end = e;
+                    else DateOnly.TryParse(req.EndDate, out end);
+                }
+
+                // 3. Lấy thông tin phòng trọ và Bất động sản
                 var roomId = req.RoomId;
                 Room? room = null;
 
@@ -205,49 +253,83 @@ namespace Backend.Controllers
                     return BadRequest(new { message = "Không tìm thấy phòng trọ phù hợp để tạo hợp đồng." });
                 }
 
-                // 4. Khởi tạo hợp đồng mới
+                // 4. Xử lý mã Lịch hẹn (BỎ CHUỖI "walkin" ĐỂ TRÁNH LỖI KHÓA NGOẠI SQL)
+                string? validAppointmentId = null;
+                if (!string.IsNullOrEmpty(req.ViewingAppointmentId) && req.ViewingAppointmentId != "walkin")
+                {
+                    var aptExists = await _context.ViewingAppointments.AnyAsync(a => a.Id == req.ViewingAppointmentId);
+                    if (aptExists)
+                    {
+                        validAppointmentId = req.ViewingAppointmentId;
+                    }
+                }
+
+                // 5. Khởi tạo Hợp đồng mới
                 var contract = new Contract
                 {
                     Id = "ctr_" + Guid.NewGuid().ToString("N")[..8],
                     ContractCode = $"HD-{DateTime.UtcNow.Year}-P{new Random().Next(100, 999)}",
-                    ViewingAppointmentId = req.ViewingAppointmentId, // Lưu mã lịch hẹn nếu có, NULL nếu là khách vãng lai
+                    ViewingAppointmentId = validAppointmentId, // Đã được xử lý loại bỏ "walkin" an toàn
                     RoomId = room.Id,
-                    OwnerId = room.Property.OwnerId, // Gán OwnerId từ khu trọ để tránh lỗi NOT NULL
-                    TenantId = tenantId,
+                    OwnerId = room.Property.OwnerId,
+                    TenantId = tenant.Id,
                     StartDate = start,
                     EndDate = end,
                     Rent = req.RentPrice > 0 ? req.RentPrice : room.Price,
                     Deposit = req.DepositPrice > 0 ? req.DepositPrice : room.Deposit,
                     PaymentCycle = "monthly",
                     Status = (req.Status == "Chờ ký" || req.Status == "pending") ? "pending" : "draft",
+                    Terms = $"CCCD:{req.Cccd}|IssueDate:{req.IssueDate}|IssuePlace:{req.IssuePlace}",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
 
+                 if (contract.Status == "pending")
+                 {
+                    var contractNotif = new Notification
+                    {
+                         Id = "notif_" + Guid.NewGuid().ToString("N")[..8],
+                         UserId = tenant.Id, // Mã tài khoản người thuê
+                         Title = "Bạn có hợp đồng thuê phòng mới cần ký!",
+                         Message = $"Chủ trọ vừa gửi hợp đồng thuê {room.Name} cho bạn. Vui lòng vào mục Hợp đồng để kiểm tra và ký xác nhận.",
+                         Type = "contract_pending",
+                         ReferenceId = contract.Id,
+                         ReferenceType = "contract",
+                         CreatedAt = DateTime.UtcNow,
+                         UpdatedAt = DateTime.UtcNow
+                    };
+                    _context.Notifications.Add(contractNotif);
+                 }
+
                 _context.Contracts.Add(contract);
 
+                // 6. Lưu Danh sách Dịch vụ áp dụng (Đã kiểm tra tránh lỗi Khóa ngoại SQL)
                 if (req.Services != null && req.Services.Any())
                 {
                     foreach (var srv in req.Services)
                     {
                         if (!string.IsNullOrEmpty(srv.ServiceId))
                         {
-                            var contractService = new Backend.Models.ContractService
+                            var serviceExists = await _context.Services.AnyAsync(s => s.Id == srv.ServiceId);
+                            if (serviceExists)
                             {
-                                Id = "cs_" + Guid.NewGuid().ToString("N")[..8],
-                                ContractId = contract.Id,
-                                ServiceId = srv.ServiceId,
-                                UnitPrice = srv.Price,
-                                Status = "active",
-                                CreatedAt = DateTime.UtcNow,
-                                UpdatedAt = DateTime.UtcNow
-                            };
-                            _context.ContractServices.Add(contractService);
+                                var contractService = new Backend.Models.ContractService
+                                {
+                                    Id = "cs_" + Guid.NewGuid().ToString("N")[..8],
+                                    ContractId = contract.Id,
+                                    ServiceId = srv.ServiceId,
+                                    UnitPrice = srv.Price,
+                                    Status = "active",
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                };
+                                _context.ContractServices.Add(contractService);
+                            }
                         }
                     }
                 }
 
-                // Lưu danh sách thành viên ở cùng vào bảng contract_members
+                // 7. Lưu Danh sách Thành viên ở cùng
                 if (req.Members != null && req.Members.Any())
                 {
                     foreach (var mem in req.Members)
@@ -259,7 +341,7 @@ namespace Backend.Controllers
                                 Id = "mem_" + Guid.NewGuid().ToString("N")[..8],
                                 ContractId = contract.Id,
                                 Name = mem.FullName,
-                                IdentityCard = mem.Cccd ?? "", 
+                                IdentityCard = mem.Cccd ?? "",
                                 Phone = mem.Phone,
                                 Relationship = string.IsNullOrEmpty(mem.Relationship) ? "Ở chung" : mem.Relationship,
                                 CreatedAt = DateTime.UtcNow,
@@ -270,10 +352,10 @@ namespace Backend.Controllers
                     }
                 }
 
-                // 5. Chỉ đổi sang completed nếu KHÔNG PHẢI là bản nháp
-                if (!string.IsNullOrEmpty(req.ViewingAppointmentId) && contract.Status != "draft")
+                // 8. Đổi trạng thái lịch hẹn sang "completed" nếu đây là hợp đồng gửi ký thật
+                if (!string.IsNullOrEmpty(validAppointmentId) && contract.Status != "draft")
                 {
-                    var apt = await _context.ViewingAppointments.FindAsync(req.ViewingAppointmentId);
+                    var apt = await _context.ViewingAppointments.FindAsync(validAppointmentId);
                     if (apt != null)
                     {
                         apt.Status = "completed";
@@ -293,87 +375,117 @@ namespace Backend.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Lỗi tạo hợp đồng", error = ex.Message });
+                string errorMsg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                return StatusCode(500, new { message = "Lỗi tạo hợp đồng", error = errorMsg });
             }
         }
 
-        // PUT: /api/OwnerContracts/{id}/sign (Ký hợp đồng và kích hoạt)
         [HttpPut("{id}/sign")]
-        public async Task<IActionResult> SignContract(string id, [FromBody] SignContractRequest req)
-        {
-            try
+            public async Task<IActionResult> SignContract(string id, [FromBody] SignContractRequest req)
             {
-                var contract = await _context.Contracts
-                    .Include(c => c.Room)
-                    .FirstOrDefaultAsync(c => c.Id == id || c.ContractCode == id);
-
-                if (contract == null)
+                try
                 {
-                    return NotFound(new { message = "Không tìm thấy hợp đồng." });
-                }
-                
-                contract.OwnerSignature = req.OwnerSignature;
-                contract.TenantSignature = req.TenantSignature;
+                    var contract = await _context.Contracts
+                        .Include(c => c.Room)
+                        .FirstOrDefaultAsync(c => c.Id == id || c.ContractCode == id);
 
-                // 2. Cập nhật trạng thái hợp đồng sang active (Đang hiệu lực)
-                contract.Status = "active";
-                contract.SignedAt = DateTime.UtcNow;
-                contract.UpdatedAt = DateTime.UtcNow;
-
-                // 3. Tự động chuyển phòng sang trạng thái đã thuê
-                if (contract.Room != null)
-                {
-                    contract.Room.Status = "rented";
-                    contract.Room.UpdatedAt = DateTime.UtcNow;
-                }
-
-                await _context.SaveChangesAsync();
-
-                return Ok(new
-                {
-                    message = "Hợp đồng đã ký thành công và có hiệu lực!",
-                    contractId = contract.Id,
-                    status = "active"
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi ký hợp đồng", error = ex.Message });
-            }
-        }
-
-
-
-        // GET: /api/OwnerContracts/available-rooms (Lấy danh sách phòng trống)
-        [HttpGet("available-rooms")]
-        public async Task<IActionResult> GetAvailableRooms()
-        {
-            try
-            {
-                var rooms = await _context.Rooms
-                    .Include(r => r.Property)
-                    .Where(r => r.Status == "available")
-                    .OrderBy(r => r.Property.Name)
-                    .ThenBy(r => r.Name)
-                    .Select(r => new AvailableRoomDto
+                    if (contract == null)
                     {
-                        RoomId = r.Id,
-                        RoomName = r.Name,
-                        PropertyName = r.Property.Name,
-                        Price = r.Price,
-                        Deposit = r.Deposit,
-                        Area = (double)r.Area,
-                        Floor = r.Floor
-                    })
-                    .ToListAsync();
+                        return NotFound(new { message = "Không tìm thấy hợp đồng." });
+                    }
 
-                return Ok(rooms);
+                    // 1. Chỉ cập nhật chữ ký nào có gửi lên (Không đè rỗng lên chữ ký cũ)
+                    if (!string.IsNullOrWhiteSpace(req.OwnerSignature))
+                    {
+                        contract.OwnerSignature = req.OwnerSignature;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(req.TenantSignature))
+                    {
+                        contract.TenantSignature = req.TenantSignature;
+                    }
+
+                    // 🔴 2. KIỂM TRA PHÁP LÝ: CHỈ KÍCH HOẠT 'active' KHI CẢ CHỦ TRỌ VÀ NGƯỜI THUÊ ĐÃ KÝ ĐỦ
+                    bool isBothSigned = !string.IsNullOrWhiteSpace(contract.OwnerSignature) &&
+                                       !string.IsNullOrWhiteSpace(contract.TenantSignature);
+
+                    if (isBothSigned)
+                    {
+                        contract.Status = "active"; // Đã ký đủ 2 bên -> Đang hiệu lực
+                        contract.SignedAt = DateTime.UtcNow;
+
+                        if (contract.Room != null)
+                        {
+                            contract.Room.Status = "rented"; // Chuyển phòng sang Đã thuê
+                            contract.Room.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                    else
+                    {
+                        contract.Status = "pending"; // Mới 1 bên ký -> Vẫn ở trạng thái Chờ ký!
+                    }
+
+                    contract.UpdatedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        message = isBothSigned
+                            ? "Hợp đồng đã ký đủ 2 bên và chính thức có hiệu lực!"
+                            : "Đã lưu chữ ký, đang chờ bên còn lại ký xác nhận.",
+                        status = contract.Status,
+                        isBothSigned = isBothSigned
+                    });
+                }
+                catch (Exception ex)
+                {
+                    string errorMsg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                    return StatusCode(500, new { message = "Lỗi khi ký hợp đồng", error = errorMsg });
+                }
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi nạp phòng trống", error = ex.Message });
-            }
-        }
+
+
+
+
+       // GET: /api/OwnerContracts/available-rooms?ownerId=... (Lấy danh sách phòng trống theo Chủ trọ)
+           [HttpGet("available-rooms")]
+           public async Task<IActionResult> GetAvailableRooms([FromQuery] string? ownerId)
+           {
+               try
+               {
+                   var query = _context.Rooms
+                       .Include(r => r.Property)
+                       .Where(r => r.Status == "available");
+
+
+                   if (!string.IsNullOrEmpty(ownerId) && ownerId != "all")
+                   {
+                       var targetOwnerIds = OwnerHelper.ResolveOwnerIds(ownerId);
+                       query = query.Where(r => r.Property != null && targetOwnerIds.Contains(r.Property.OwnerId));
+                   }
+
+                   var rooms = await query
+                       .OrderBy(r => r.Property.Name)
+                       .ThenBy(r => r.Name)
+                       .Select(r => new AvailableRoomDto
+                       {
+                           RoomId = r.Id,
+                           RoomName = r.Name,
+                           PropertyName = r.Property.Name,
+                           Price = r.Price,
+                           Deposit = r.Deposit,
+                           Area = (double)r.Area,
+                           Floor = r.Floor
+                       })
+                       .ToListAsync();
+
+                   return Ok(rooms);
+               }
+               catch (Exception ex)
+               {
+                   return StatusCode(500, new { message = "Lỗi nạp phòng trống", error = ex.Message });
+               }
+           }
 
         // GET: /api/OwnerContracts/appointments (Lấy lịch hẹn xem phòng để liên kết)
         [HttpGet("appointments")]
@@ -605,6 +717,7 @@ namespace Backend.Controllers
                 var contract = await _context.Contracts
                     .Include(c => c.Room)
                         .ThenInclude(r => r.Property)
+                            .ThenInclude(p => p.Owner)
                     .Include(c => c.Tenant)
                     .FirstOrDefaultAsync(c => c.Id == contractId || c.ContractCode == contractId);
 
@@ -613,23 +726,27 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy hợp đồng." });
                 }
 
-                // Lấy thông tin chốt điện nước kỳ cuối (nếu có)
                 var lastUtility = await _context.UtilityReadings
                     .Where(u => u.RoomId == contract.RoomId)
                     .OrderByDescending(u => u.Month)
+                    .ThenByDescending(u => u.CreatedAt)
                     .FirstOrDefaultAsync();
 
-                decimal elecUsage = lastUtility != null ? Math.Max(0, lastUtility.ElectricityNew - lastUtility.ElectricityOld) : 0;
-                decimal waterUsage = lastUtility != null ? Math.Max(0, lastUtility.WaterNew - lastUtility.WaterOld) : 0;
+                decimal oldElectric = lastUtility != null ? lastUtility.ElectricityNew : contract.InitialElectricityReading;
+                decimal newElectric = lastUtility != null ? lastUtility.ElectricityNew : contract.InitialElectricityReading;
 
-                // Bạn có thể tùy chỉnh đơn giá điện nước cho phù hợp với dự án
-                decimal elecCost = elecUsage * 3800m;
-                decimal waterCost = waterUsage * 25000m;
+                decimal oldWater = lastUtility != null ? lastUtility.WaterNew : contract.InitialWaterReading;
+                decimal newWater = lastUtility != null ? lastUtility.WaterNew : contract.InitialWaterReading;
+
+                decimal elecUnitPrice = lastUtility?.ElectricityPrice ?? 3800m;
+                decimal waterUnitPrice = lastUtility?.WaterPrice ?? 25000m;
+
+                decimal elecUsage = Math.Max(0, newElectric - oldElectric);
+                decimal waterUsage = Math.Max(0, newWater - oldWater);
+
+                decimal elecCost = elecUsage * elecUnitPrice;
+                decimal waterCost = waterUsage * waterUnitPrice;
                 decimal utilityTotal = elecCost + waterCost;
-
-                // Các khoản khấu trừ bàn giao (ví dụ hư hỏng, vệ sinh - có thể điều chỉnh theo logic thực tế)
-                decimal deductionItems = 700000m; // VD: 500k vỡ kính + 200k dọn vệ sinh
-                decimal refundAmount = contract.Deposit - utilityTotal - deductionItems;
 
                 return Ok(new
                 {
@@ -643,18 +760,19 @@ namespace Backend.Controllers
                     startDate = contract.StartDate.ToString("dd/MM/yyyy"),
                     endDate = contract.EndDate.ToString("dd/MM/yyyy"),
                     deposit = contract.Deposit,
-                    elecOld = lastUtility?.ElectricityOld ?? 0,
-                    elecNew = lastUtility?.ElectricityNew ?? 0,
+                    elecOld = oldElectric,
+                    elecNew = newElectric,
+                    elecPrice = elecUnitPrice,
                     elecUsage = elecUsage,
                     elecCost = elecCost,
-                    waterOld = lastUtility?.WaterOld ?? 0,
-                    waterNew = lastUtility?.WaterNew ?? 0,
+                    waterOld = oldWater,
+                    waterNew = newWater,
+                    waterPrice = waterUnitPrice,
                     waterUsage = waterUsage,
                     waterCost = waterCost,
                     utilityTotal = utilityTotal,
-                    deductionTotal = deductionItems,
-                    refundAmount = Math.Max(0, refundAmount),
-                    bankName = "Techcombank", // Hoặc lấy từ thông tin tenant nếu có
+                    refundAmount = Math.Max(0, contract.Deposit - utilityTotal),
+                    bankName = "Techcombank",
                     bankAccount = "190334888291",
                     accountHolder = contract.Tenant?.Name?.ToUpper() ?? "KHÁCH THUÊ"
                 });
@@ -767,5 +885,62 @@ namespace Backend.Controllers
                 return StatusCode(500, new { message = "Lỗi lấy chi tiết người thuê", error = ex.Message });
             }
         }
+
+
+         // POST: /api/OwnerContracts/{id}/terminate (Xác nhận Hoàn cọc & Thanh lý hợp đồng)
+         [HttpPost("{id}/terminate")]
+         public async Task<IActionResult> TerminateContract(string id)
+         {
+                try
+                {
+                    var contract = await _context.Contracts
+                        .Include(c => c.Room)
+                        .FirstOrDefaultAsync(c => c.Id == id || c.ContractCode == id);
+
+                    if (contract == null)
+                    {
+                        return NotFound(new { message = "Không tìm thấy hợp đồng." });
+                    }
+
+
+                    contract.Status = "terminated";
+                    contract.TerminatedAt = DateTime.UtcNow;
+                    contract.UpdatedAt = DateTime.UtcNow;
+
+
+                    if (contract.Room != null)
+                    {
+                        contract.Room.Status = "available";
+                        contract.Room.UpdatedAt = DateTime.UtcNow;
+                    }
+
+                     if (!string.IsNullOrEmpty(contract.TenantId))
+                     {
+                                var terminationNotif = new Notification
+                                {
+                                    Id = "notif_" + Guid.NewGuid().ToString("N")[..8],
+                                    UserId = contract.TenantId,
+                                    Title = "Hợp đồng thuê phòng đã được thanh lý 🤝",
+                                    Message = $"Chủ trọ đã xác nhận hoàn cọc và hoàn tất thanh lý hợp đồng {contract.ContractCode} (Phòng {contract.Room?.Name}). Cảm ơn bạn đã lưu trú!",
+                                    Type = "contract_terminated",
+                                    ReferenceId = contract.Id,
+                                    ReferenceType = "contract",
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                };
+                                _context.Notifications.Add(terminationNotif);
+                     }
+
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new { message = "Thanh lý hợp đồng thành công!" });
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(500, new { message = "Lỗi khi thanh lý hợp đồng", error = ex.Message });
+                }
+         }
+
+
     }
 }

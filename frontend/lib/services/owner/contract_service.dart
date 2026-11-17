@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as logger;
 import 'package:http/http.dart' as http;
 
 class ContractSummaryResponse {
@@ -26,18 +27,25 @@ class ContractService {
 
   // 1. Lấy danh sách hợp đồng
   static Future<ContractSummaryResponse> getContracts({
+    String? ownerId,
     String? status,
     String? search,
   }) async {
     List<String> params = [];
+    if (ownerId != null && ownerId.isNotEmpty) {
+      params.add('ownerId=${Uri.encodeComponent(ownerId)}');
+    }
+
     if (status != null && status.isNotEmpty && status != 'Tất cả') {
       params.add('status=${Uri.encodeComponent(status)}');
     }
+
     if (search != null && search.isNotEmpty) {
       params.add('search=${Uri.encodeComponent(search)}');
     }
 
     String url = baseUrl;
+
     if (params.isNotEmpty) {
       url += '?${params.join('&')}';
     }
@@ -51,6 +59,7 @@ class ContractService {
       final data = jsonDecode(response.body);
       return ContractSummaryResponse.fromJson(data);
     }
+
     throw Exception('Lỗi nạp danh sách hợp đồng: ${response.statusCode}');
   }
 
@@ -90,20 +99,30 @@ class ContractService {
   }
 
 
-  // Lấy danh sách phòng trống từ database
-  static Future<List<dynamic>> getAvailableRooms() async {
+  // Lấy danh sách phòng trống theo mã Chủ trọ
+  static Future<List<dynamic>> getAvailableRooms({
+    String? ownerId,
+  }) async {
     try {
+      var url = '$baseUrl/available-rooms';
+
+      if (ownerId != null && ownerId.isNotEmpty) {
+        url += '?ownerId=$ownerId';
+      }
+
       final response = await http.get(
-        Uri.parse('$baseUrl/available-rooms'),
+        Uri.parse(url),
         headers: {'Accept': 'application/json'},
       );
+
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as List<dynamic>;
+        return jsonDecode(response.body);
       }
-      return [];
     } catch (e) {
-      return [];
+      print('Lỗi nạp phòng trống: $e');
     }
+
+    return [];
   }
 
   // Lấy danh sách lịch hẹn để liên kết

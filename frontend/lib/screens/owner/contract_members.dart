@@ -157,62 +157,6 @@ class _TenantManagementScreenState extends State<TenantManagementScreen> {
                     if (val != null) setModalState(() => selectedRelationship = val);
                   },
                 ),
-                const SizedBox(height: 16),
-
-                // Khu vực tải ảnh CCCD 2 mặt
-                const Text('Ảnh chụp CCCD 2 mặt (Lưu trữ xác thực)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          setModalState(() => frontCccdUploaded = !frontCccdUploaded);
-                        },
-                        child: Container(
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: frontCccdUploaded ? Colors.green.shade50 : AppColors.background,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: frontCccdUploaded ? AppColors.primaryGreen : Colors.grey.shade300, width: 1.2),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(frontCccdUploaded ? Icons.check_circle : Icons.add_a_photo_outlined, color: frontCccdUploaded ? AppColors.primaryGreen : Colors.grey, size: 24),
-                              const SizedBox(height: 4),
-                              Text(frontCccdUploaded ? 'Đã tải mặt trước' : 'Mặt trước CCCD', style: TextStyle(fontSize: 11, color: frontCccdUploaded ? AppColors.primaryGreen : Colors.grey.shade700, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          setModalState(() => backCccdUploaded = !backCccdUploaded);
-                        },
-                        child: Container(
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: backCccdUploaded ? Colors.green.shade50 : AppColors.background,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: backCccdUploaded ? AppColors.primaryGreen : Colors.grey.shade300, width: 1.2),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(backCccdUploaded ? Icons.check_circle : Icons.add_a_photo_outlined, color: backCccdUploaded ? AppColors.primaryGreen : Colors.grey, size: 24),
-                              const SizedBox(height: 4),
-                              Text(backCccdUploaded ? 'Đã tải mặt sau' : 'Mặt sau CCCD', style: TextStyle(fontSize: 11, color: backCccdUploaded ? AppColors.primaryGreen : Colors.grey.shade700, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 20),
 
                 // Nút Thêm
@@ -239,22 +183,19 @@ class _TenantManagementScreenState extends State<TenantManagementScreen> {
                         'relationship': selectedRelationship,
                       };
 
-                      final success = await ContractService.addContractMember(_contractId, body);
-                      if (mounted) {
+                      final res = await ContractService.addContractMember(_contractId, body);
+                      if (res != null && mounted) {
                         Navigator.pop(ctx);
-                        if (success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Đã thêm thành viên ở cùng vào phòng!')),
-                          );
-                          _fetchMembers();
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Lỗi khi lưu dữ liệu thành viên.')),
-                          );
-                        }
+                        _fetchMembers();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã thêm thành viên ở cùng thành công!')),
+                        );
                       }
                     },
-                    child: const Text('Xác nhận thêm thành viên', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    child: const Text(
+                      'Lưu thành viên',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
                   ),
                 ),
               ],

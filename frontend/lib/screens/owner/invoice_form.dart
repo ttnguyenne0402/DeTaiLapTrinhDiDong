@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/auth_storage.dart';
 import '../../services/owner/invoice_service.dart';
 import '../../widgets/owner/invoice_form_w.dart';
 import '../../screens/owner/invoices_manage..dart';
+import 'utility_readings.dart';
 
 class Invoice_form extends StatefulWidget {
   final InvoiceData? invoice;
   final String? contractId;
+  final double? initialNewElectric;
+  final double? initialNewWater;
 
-  const Invoice_form({super.key, required this.invoice, this.contractId});
+  const Invoice_form({
+    super.key,
+    required this.invoice,
+    this.contractId,
+    this.initialNewElectric,
+    this.initialNewWater,
+  });
 
   @override
   State<Invoice_form> createState() => _InvoiceFormState();
@@ -103,7 +113,10 @@ class _InvoiceFormState extends State<Invoice_form> {
     setState(() => _isLoading = true);
 
     // 1. Tải danh sách hợp đồng đang hoạt động
-    final contractsRes = await OwnerInvoiceService.getActiveContracts();
+    final ownerId = await AuthStorage.getUserId() ?? '';
+
+
+    final contractsRes = await OwnerInvoiceService.getActiveContracts(ownerId: ownerId);
 
     // 2. Tải danh sách tài khoản ngân hàng của chủ trọ
     try {
@@ -122,6 +135,44 @@ class _InvoiceFormState extends State<Invoice_form> {
 
     if (mounted && contractsRes != null && contractsRes.isNotEmpty) {
       _activeContracts = contractsRes;
+
+      if (widget.invoice != null) {
+        final detail = await OwnerInvoiceService.getInvoiceDetail(widget.invoice!.id);
+        if (mounted && detail is Map<String, dynamic>) {
+          final roomMatched = _activeContracts.firstWhere(
+            (c) => c['roomName']?.toString() == detail['room']?.toString() || c['contractId']?.toString() == widget.contractId,
+            orElse: () => _activeContracts.first,
+          );
+
+          setState(() {
+            _selectedContractId = roomMatched['contractId']?.toString();
+            _selectedPropertyId = roomMatched['propertyId']?.toString();
+
+            _roomName = detail['room']?.toString() ?? 'Phòng';
+            _tenantName = detail['tenant']?.toString() ?? 'Khách thuê';
+            _tenantPhone = detail['phone']?.toString() ?? '';
+
+            _dienCuController.text = _parseNumStr(detail['electricOld'] ?? 0);
+            _dienMoiController.text = _parseNumStr(detail['electricNew'] ?? detail['electricUsage'] ?? 0);
+
+            _nuocCuController.text = _parseNumStr(detail['waterOld'] ?? 0);
+            _nuocMoiController.text = _parseNumStr(detail['waterNew'] ?? detail['waterUsage'] ?? 0);
+
+            _discountController.text = _parseNumStr(detail['discount'] ?? 0);
+
+            _rentPrice = (detail['rentPrice'] is num) ? (detail['rentPrice'] as num).toDouble() : 0.0;
+            _electricUnitPrice = (detail['electricUnitPrice'] is num) ? (detail['electricUnitPrice'] as num).toDouble() : 3800.0;
+            _waterUnitPrice = (detail['waterUnitPrice'] is num) ? (detail['waterUnitPrice'] as num).toDouble() : 25000.0;
+
+            if (detail['bankAccount'] != null && detail['bankAccount'] is Map) {
+              _selectedBankAccountId = detail['bankAccount']['id']?.toString() ?? _selectedBankAccountId;
+            }
+
+            _isLoading = false;
+          });
+          return;
+        }
+      }
 
       if (_selectedContractId != null && _selectedContractId!.isNotEmpty) {
         final matched = _activeContracts.firstWhere(
@@ -184,10 +235,26 @@ class _InvoiceFormState extends State<Invoice_form> {
         final oldEl = _parseNumStr(oldElRaw);
         final oldWt = _parseNumStr(oldWtRaw);
 
+        final newElRaw = data['newElectric'] ?? data['newElectricity'] ?? oldElRaw;
+        final newWtRaw = data['newWater'] ?? data['waterNew'] ?? oldWtRaw;
+
+        final newEl = _parseNumStr(newElRaw);
+        final newWt = _parseNumStr(newWtRaw);
+
         _dienCuController.text = oldEl;
         _nuocCuController.text = oldWt;
-        _dienMoiController.text = oldEl;
-        _nuocMoiController.text = oldWt;
+
+        if (widget.initialNewElectric != null) {
+          _dienMoiController.text = _parseNumStr(widget.initialNewElectric);
+        } else {
+          _dienMoiController.text = newEl;
+        }
+
+        if (widget.initialNewWater != null) {
+          _nuocMoiController.text = _parseNumStr(widget.initialNewWater);
+        } else {
+          _nuocMoiController.text = newWt;
+        }
 
         _isLoading = false;
       });
@@ -305,11 +372,50 @@ class _InvoiceFormState extends State<Invoice_form> {
     final oldEl = double.tryParse(_dienCuController.text) ?? 0;
     final oldWt = double.tryParse(_nuocCuController.text) ?? 0;
 
-    if (newEl < oldEl || newWt < oldWt) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chỉ số mới không được nhỏ hơn chỉ số cũ!')),
+    if (newEl <= oldEl && newWt <= oldWt) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              SizedBox(width: 8),
+              Text('Chưa ghi điện nước', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Phòng này chưa được chốt số điện/nước mới cho kỳ này. Bạn cần vào mục "Ghi điện nước hàng loạt" để nhập chỉ số trước khi lập hóa đơn!',
+            style: TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => InvoiceCreateScreen(
+                      propertyId: _selectedPropertyId,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.bolt, color: Colors.amber, size: 18),
+              label: const Text('Đến Ghi điện nước', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       );
-      return;
+      return; // Dừng lại không cho lập hóa đơn
     }
 
     final now = DateTime.now();
@@ -328,13 +434,15 @@ class _InvoiceFormState extends State<Invoice_form> {
     };
 
     setState(() => _isLoading = true);
-    final res = await OwnerInvoiceService.createInvoice(body);
+    final res = widget.invoice != null
+        ? await OwnerInvoiceService.updateInvoice(widget.invoice!.id, body)
+        : await OwnerInvoiceService.createInvoice(body);
     setState(() => _isLoading = false);
 
     if (mounted) {
       if (res != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(status == 'draft' ? 'Đã lưu hóa đơn nháp!' : 'Đã phát hành hóa đơn thành công!')),
+          SnackBar(content: Text(widget.invoice != null ? 'Cập nhật và phát hành lại hóa đơn thành công!' : (status == 'draft' ? 'Đã lưu hóa đơn nháp!' : 'Đã phát hành hóa đơn thành công!'))),
         );
         Navigator.pop(context, true);
       } else {

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/auth_storage.dart';
 import '../../widgets/owner/contract_form_w.dart';
 import '../../services/owner/contract_service.dart';
 
@@ -123,7 +124,7 @@ class HopDongMoi extends State<Contract_form> {
 
     _tenantNameController = TextEditingController(text: c?['tenantName'] ?? '');
     _tenantPhoneController = TextEditingController(text: c?['tenantPhone'] ?? '');
-    _cccdController = TextEditingController(text: c?['cccd'] ?? '');
+    _cccdController = TextEditingController( text: c?['cccd'] ?? c?['CCCD'] ?? c?['identityCard'] ?? '', );
     _issueDateController = TextEditingController(text: c?['issueDate'] ?? '12/04/2021');
     _issuePlaceController = TextEditingController(text: c?['issuePlace'] ?? 'Cục CSQLHC về trật tự xã hội');
 
@@ -159,7 +160,8 @@ class HopDongMoi extends State<Contract_form> {
 
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingData = true);
-    final rooms = await ContractService.getAvailableRooms();
+    final ownerId = await AuthStorage.getUserId() ?? '';
+    final rooms = await ContractService.getAvailableRooms(ownerId: ownerId);
     final apts = await ContractService.getAppointments();
 
     debugPrint('--> [LOG] Số phòng trống: ${rooms.length} | Số lịch hẹn: ${apts.length}');
@@ -248,16 +250,29 @@ class HopDongMoi extends State<Contract_form> {
         final defaultsRaw = (result['defaultServices'] ?? result['DefaultServices']) as List<dynamic>? ?? [];
         final othersRaw = (result['otherServices'] ?? result['OtherServices']) as List<dynamic>? ?? [];
 
+        // Lấy danh sách ID các dịch vụ đã lưu trong bản nháp (nếu đang xem/sửa bản nháp)
+        final savedServices = widget.contract?['services'] as List<dynamic>?;
+        final Set<String> savedServiceIds = savedServices != null
+            ? savedServices.map((s) => (s['serviceId'] ?? s['ServiceId'] ?? '').toString()).toSet()
+            : {};
+
         setState(() {
           _appliedServices = defaultsRaw.map((item) {
             final m = Map<String, dynamic>.from(item as Map);
             final rawPrice = m['price'] ?? m['Price'];
+            final sId = (m['serviceId'] ?? m['ServiceId'] ?? '').toString();
+
+            bool isSelected = true;
+            if (savedServices != null) {
+              isSelected = savedServiceIds.contains(sId);
+            }
+
             return {
-              'serviceId': m['serviceId'] ?? m['ServiceId'] ?? '',
+              'serviceId': sId,
               'name': m['name'] ?? m['Name'] ?? '',
               'unit': m['unit'] ?? m['Unit'] ?? '',
               'price': rawPrice != null ? (rawPrice as num).toDouble() : 0.0,
-              'selected': true,
+              'selected': isSelected,
             };
           }).toList();
 
