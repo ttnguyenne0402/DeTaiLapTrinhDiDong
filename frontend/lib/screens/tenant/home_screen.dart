@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:http/io_client.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../services/auth_storage.dart';
 import '../../widgets/tenant/room_card.dart';
 import 'search_filter_screen.dart';
 import 'room_detail_screen.dart';
@@ -172,14 +177,40 @@ class _HomeContentState extends State<_HomeContent> {
 
   bool _isLoading = true;
   String? _errorMessage;
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadRooms();
     _loadFavoriteIds();
+    _loadUnreadCount();
   }
+  Future<void> _loadUnreadCount() async {
+    try {
+      final userId = await AuthStorage.getUserId();
+      if (userId == null) return;
 
+      final httpClient = HttpClient()..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+      final client = IOClient(httpClient);
+
+      final url = 'http://10.0.2.2:5093/api/notifications/user/$userId';
+      final response = await client.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> apiData = json.decode(response.body);
+        final unread = apiData.where((n) => n['isRead'] == false).length;
+        if (mounted) {
+          setState(() {
+            _unreadCount = unread;
+          });
+        }
+      }
+      client.close();
+    } catch (e) {
+      debugPrint('Lỗi tải số thông báo: $e');
+    }
+  }
   Future<void> _loadFavoriteIds() async {
     try {
       final ids = await _favoriteService.getFavoriteIds();
@@ -655,20 +686,32 @@ class _HomeContentState extends State<_HomeContent> {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () {
-                      Navigator.pushNamed(context, '/tenant/notifications');
+
+                      Navigator.pushNamed(context, '/tenant/notifications')
+                          .then((_) => _loadUnreadCount());
                     },
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
                       width: 44,
                       height: 44,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(
-                        Icons.notifications_none_rounded,
-                        color: Colors.white,
-                        size: 23,
+
+                      child: Badge(
+                        isLabelVisible: _unreadCount > 0,
+                        label: Text(
+                          _unreadCount > 9 ? '9+' : _unreadCount.toString(),
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                        backgroundColor: Colors.redAccent,
+                        child: const Icon(
+                          Icons.notifications_none_rounded,
+                          color: Colors.white,
+                          size: 23,
+                        ),
                       ),
                     ),
                   ),

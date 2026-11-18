@@ -23,19 +23,51 @@ namespace Backend.Controllers
             _logger = logger;
         }
 
-        // POST: api/viewing-appointments
-        // Nhận dữ liệu từ form Đặt lịch của bạn (booking_screen)
         [HttpPost]
-        public async Task<IActionResult> CreateAppointment([FromBody] ViewingAppointmentRequestDTO request)
+        public async Task<IActionResult> CreateAppointment([FromBody] ViewingAppointmentRequestDTO request, [FromServices] QuanLyPhongTroContext _context)
         {
             if (!ModelState.IsValid)
             {
-                // Tự động báo lỗi nếu Flutter gửi thiếu dữ liệu
                 return BadRequest(ModelState);
             }
 
             var result = await _service.CreateAppointmentAsync(request);
-            // Trả về mã 201 Created cùng dữ liệu xác nhận
+
+            // BẮT ĐẦU CHÈN CODE: Tự động tạo thông báo cho NGƯỜI THUÊ
+            try
+            {
+                var room = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == request.RoomId);
+                string roomName = room != null ? $"{room.Name} ({room.Property?.Name})" : "phòng";
+
+                var tenantNotif = new Notification
+                {
+                    Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                    UserId = request.TenantId, // Gửi cho chính người đặt
+                    Title = "Đặt lịch thành công",
+                    Message = $"Bạn đã gửi yêu cầu xem {roomName} vào lúc {request.AppointmentTime} ngày {request.AppointmentDate}. Vui lòng chờ chủ trọ xác nhận.",
+                    Type = "viewing_appointment",
+                    ReferenceId = "",
+                    ReferenceType = "viewing_appointment",
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now
+                };
+
+                // Lấy Id của lịch hẹn vừa tạo gán vào ReferenceId (Dùng Reflection để tránh lỗi nếu cấu trúc DTO thay đổi)
+                var idProp = result?.GetType().GetProperty("Id");
+                if (idProp != null)
+                {
+                    tenantNotif.ReferenceId = idProp.GetValue(result)?.ToString() ?? "";
+                }
+
+                _context.Notifications.Add(tenantNotif);
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi tạo thông báo đặt lịch cho người thuê.");
+            }
+            
+
             return CreatedAtAction(nameof(GetTenantAppointments), new { tenantId = request.TenantId }, result);
         }
 
@@ -49,21 +81,47 @@ namespace Backend.Controllers
             // Trả về mã 200 OK kèm danh sách JSON
         }
 
-        // PATCH: api/viewing-appointments/{id}/cancel
         [HttpPatch("{id}/cancel")]
         public async Task<IActionResult> CancelAppointment(string id, [FromServices] QuanLyPhongTroContext _context)
         {
             var result = await _service.CancelAppointmentAsync(id);
             if (!result) return NotFound(new { message = "Không tìm thấy lịch hẹn hoặc không thể hủy." });
 
-            // Thông báo cho chủ trọ: lỗi ở đây không được làm client mất kết quả "hủy thành công"
             try
             {
+                // 1. Thông báo cho chủ trọ (Giữ nguyên)
                 await NotifyOwnerAppointmentCancelledAsync(_context, id);
+
+                // 2. THÊM MỚI: Thông báo cho NGƯỜI THUÊ
+                var appointment = await _context.ViewingAppointments
+                    .Include(v => v.Room).ThenInclude(r => r.Property)
+                    .FirstOrDefaultAsync(v => v.Id == id);
+
+                if (appointment != null && !string.IsNullOrEmpty(appointment.TenantId))
+                {
+                    string roomName = appointment.Room?.Name ?? "phòng";
+                    string propName = appointment.Room?.Property?.Name ?? "";
+                    string displayPlace = string.IsNullOrEmpty(propName) ? roomName : $"{roomName} ({propName})";
+
+                    var tenantNotif = new Notification
+                    {
+                        Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                        UserId = appointment.TenantId, // Báo cho người thuê
+                        Title = "Đã hủy lịch xem phòng",
+                        Message = $"Bạn đã hủy lịch hẹn xem {displayPlace} thành công.",
+                        Type = "viewing_appointment",
+                        ReferenceId = appointment.Id,
+                        ReferenceType = "viewing_appointment",
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    };
+                    _context.Notifications.Add(tenantNotif);
+                    await _context.SaveChangesAsync();
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Không thể tạo thông báo hủy lịch hẹn cho chủ trọ. AppointmentId={Id}", id);
+                _logger.LogError(ex, "Không thể tạo thông báo hủy lịch hẹn.");
             }
 
             return Ok(new { message = "Đã hủy lịch hẹn thành công." });

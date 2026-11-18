@@ -8,7 +8,10 @@ namespace Backend.DTOs
         [Required]
         public string Status { get; set; } = null!; 
 
-        public string? OwnerNote { get; set; } 
+        public string? OwnerNote { get; set; }
+        public decimal Cost { get; set; }
+        public int Payer { get; set; }
+        public string? BankAccountId { get; set; }
     }
     // DTO dùng cho Chủ nhà tự tạo sự cố mới
     public class CreateMaintenanceByOwnerDto

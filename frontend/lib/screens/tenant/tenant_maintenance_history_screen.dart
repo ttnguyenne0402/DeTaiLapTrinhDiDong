@@ -61,6 +61,80 @@ class _TenantMaintenanceHistoryScreenState extends State<TenantMaintenanceHistor
       client.close();
     }
   }
+  // HÀM HỦY YÊU CẦU SỬA CHỮA
+  Future<void> _cancelRequest(String requestId) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hủy yêu cầu'),
+        content: const Text('Bạn đã tự sửa xong hoặc không cần hỗ trợ nữa?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Quay lại', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            child: const Text('Hủy ngay', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+
+    final client = _getCustomClient();
+    try {
+      final response = await client.delete(
+        Uri.parse('http://10.0.2.2:5093/api/maintenance/$requestId/cancel'),
+      );
+
+      debugPrint('CANCEL => ${response.statusCode} | ${response.body}');
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Đã hủy yêu cầu thành công'), backgroundColor: AppColors.primaryGreen),
+          );
+          _fetchRequests();
+        }
+      } else {
+        String msg = 'Không thể hủy yêu cầu (mã lỗi ${response.statusCode})';
+        try {
+          final body = json.decode(response.body);
+          if (body is Map && body['message'] != null) msg = body['message'];
+        } catch (_) {}
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: Colors.orange),
+          );
+        }
+      }
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Đã hủy yêu cầu thành công'), backgroundColor: AppColors.primaryGreen)
+          );
+          _fetchRequests();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Không thể hủy lúc này (Chủ trọ đã tiếp nhận)'), backgroundColor: Colors.orange)
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lỗi kết nối mạng'), backgroundColor: Colors.redAccent));
+      }
+    } finally {
+      client.close();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,10 +188,14 @@ class _TenantMaintenanceHistoryScreenState extends State<TenantMaintenanceHistor
     final status = data['status']?.toString() ?? 'pending';
     final title = data['title'] ?? 'Sự cố';
     final description = data['description'] ?? '';
-    final ownerNote = data['ownerNote'] ?? '';
+    final ownerNoteStr = data['ownerNote']?.toString() ?? '';
     final createdAt = data['createdAt']?.toString() ?? '';
+    final completedAt = data['completedAt']?.toString() ?? '';
 
     final statusUI = _getStatusUI(status);
+
+    // Bóc tách Ghi chú chủ nhà nếu có định dạng "Chi phí: X | Phân bổ: Y | Ghi chú: Z"
+    List<String> notes = ownerNoteStr.isNotEmpty ? ownerNoteStr.split(' | ') : [];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -152,25 +230,58 @@ class _TenantMaintenanceHistoryScreenState extends State<TenantMaintenanceHistor
                 Text("Gửi lúc: $createdAt", style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
               ],
             ),
+            if (completedAt.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, size: 16, color: AppColors.primaryGreen),
+                  const SizedBox(width: 6),
+                  Text("Xong lúc: $completedAt", style: const TextStyle(fontSize: 13, color: AppColors.primaryGreen, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
             const Divider(height: 24, color: AppColors.borderLight),
             Text(description, style: const TextStyle(fontSize: 14, color: AppColors.textPrimary)),
-            if (ownerNote.toString().isNotEmpty) ...[
+
+            if (notes.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: Colors.blueGrey.shade50, borderRadius: BorderRadius.circular(8)),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.info_outline, size: 18, color: Colors.blueGrey),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text("Phản hồi từ chủ nhà:\n$ownerNote", style: const TextStyle(fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.w500)),
+                  children: notes.map((note) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.arrow_right, size: 18, color: Colors.blueGrey),
+                        Expanded(child: Text(note.trim(), style: const TextStyle(fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.w600))),
+                      ],
                     ),
-                  ],
+                  )).toList(),
                 ),
               ),
             ],
+
+            // Nút HỦY YÊU CẦU chỉ hiện khi status là pending
+            if (status == 'pending') ...[
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => _cancelRequest(data['id']),
+                  icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 18),
+                  label: const Text('Hủy yêu cầu', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    backgroundColor: Colors.red.shade50,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              )
+            ]
           ],
         ),
       ),
@@ -182,7 +293,7 @@ class _TenantMaintenanceHistoryScreenState extends State<TenantMaintenanceHistor
       case 'pending': return {'text': 'Chờ tiếp nhận', 'bgColor': Colors.orange.shade100, 'textColor': Colors.orange.shade800};
       case 'processing': return {'text': 'Đang xử lý', 'bgColor': Colors.blue.shade100, 'textColor': Colors.blue.shade800};
       case 'completed': return {'text': 'Hoàn thành', 'bgColor': AppColors.lightGreen, 'textColor': AppColors.primaryGreen};
-      case 'rejected': return {'text': 'Từ chối', 'bgColor': Colors.red.shade100, 'textColor': Colors.red.shade800};
+      case 'rejected': return {'text': 'Đã hủy', 'bgColor': Colors.red.shade100, 'textColor': Colors.red.shade800};
       default: return {'text': 'Không xác định', 'bgColor': Colors.grey.shade200, 'textColor': AppColors.textSecondary};
     }
   }

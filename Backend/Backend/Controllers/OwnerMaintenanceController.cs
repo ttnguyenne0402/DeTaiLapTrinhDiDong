@@ -101,32 +101,97 @@ namespace Backend.Controllers
         {
             try
             {
-                // Thêm Include Room để lấy tên phòng ghép vào thông báo
                 var request = await _context.MaintenanceRequests
                     .Include(m => m.Room)
                     .FirstOrDefaultAsync(m => m.Id == id);
 
                 if (request == null) return NotFound(new { message = "Không tìm thấy sự cố." });
 
-                // Cập nhật trạng thái
                 request.Status = req.Status;
 
-                // Nếu chủ nhà có ghi chú chi phí, phân bổ thì lưu vào đây
                 if (!string.IsNullOrEmpty(req.OwnerNote))
                 {
                     request.OwnerNote = req.OwnerNote;
                 }
 
-                // Nếu đổi trạng thái thành hoàn thành thì lưu thời gian lại
+                // Cấu hình múi giờ VN
+                TimeZoneInfo vnTimeZone;
+                try { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"); }
+                catch (TimeZoneNotFoundException) { vnTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"); }
+                DateTime currentVnTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, vnTimeZone);
+
                 if (req.Status == "completed")
                 {
-                    request.CompletedAt = DateTime.UtcNow;
+                    request.CompletedAt = currentVnTime;
+
+                    // =============== BẮT ĐẦU: TỰ ĐỘNG TẠO HÓA ĐƠN ===============
+                    
+                    if (req.Payer == 1 && req.Cost > 0)
+                    {
+                        // Tìm Hợp đồng đang active của khách này
+                        var contract = await _context.Contracts
+                            .FirstOrDefaultAsync(c => c.RoomId == request.RoomId && c.TenantId == request.TenantId && c.Status == "active");
+
+                        if (contract != null)
+                        {
+                            string invoiceId = "INV_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
+
+                            // Tạo hóa đơn mới theo chuẩn file Invoice.cs
+                            var invoice = new Invoice
+                            {
+                                Id = invoiceId,
+                                InvoiceCode = "HD_SC" + currentVnTime.ToString("yyMMddHHmm"), 
+                                ContractId = contract.Id,
+                                BankAccountId = req.BankAccountId,
+                                BillingMonth = DateOnly.FromDateTime(currentVnTime),
+                                IssueDate = DateOnly.FromDateTime(currentVnTime),
+                                DueDate = DateOnly.FromDateTime(currentVnTime.AddDays(7)), 
+                                Subtotal = req.Cost,
+                                Discount = 0,
+                                Total = req.Cost,
+                                Status = "unpaid",
+                                CreatedAt = currentVnTime,
+                                UpdatedAt = currentVnTime
+                            };
+
+                            // Tạo chi tiết mục hóa đơn (InvoiceItem)
+                            var invoiceItem = new InvoiceItem
+                            {
+                                Id = "ITEM_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                                InvoiceId = invoiceId,
+                                Type = "other",
+                                Description = $"Phí sửa chữa sự cố: {request.Title}",
+                                Quantity = 1,
+                                UnitPrice = req.Cost, 
+                                Amount = req.Cost,
+                                CreatedAt = currentVnTime,
+                                UpdatedAt = currentVnTime
+                            };
+
+                            _context.Invoices.Add(invoice);
+                            _context.InvoiceItems.Add(invoiceItem);
+
+                            // Tạo thêm 1 thông báo riêng báo cho khách có hóa đơn mới
+                            _context.Notifications.Add(new Notification
+                            {
+                                Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                                UserId = request.TenantId,
+                                Title = "Hóa đơn sửa chữa mới",
+                                Message = $"Bạn có một hóa đơn {req.Cost:N0}đ cho phí sửa chữa '{request.Title}'. Vui lòng thanh toán trước ngày {invoice.DueDate:dd/MM/yyyy}.",
+                                Type = "invoice",
+                                ReferenceId = invoiceId,
+                                ReferenceType = "invoice",
+                                CreatedAt = currentVnTime,
+                                UpdatedAt = currentVnTime
+                            });
+                        }
+                    }
+                    
                 }
 
-                request.UpdatedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
+                request.UpdatedAt = currentVnTime;
 
-                // BẮT ĐẦU CHÈN CODE TẠO THÔNG BÁO CHO NGƯỜI THUÊ
+                // Tạo thông báo cho người thuê
                 try
                 {
                     string title = "";
@@ -161,15 +226,15 @@ namespace Backend.Controllers
                     {
                         var notif = new Notification
                         {
-                            Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8),
-                            UserId = request.TenantId, // Gửi cho NGƯỜI THUÊ
+                            Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                            UserId = request.TenantId,
                             Title = title,
                             Message = message,
                             Type = "maintenance",
                             ReferenceId = request.Id,
                             ReferenceType = "maintenance",
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
+                            CreatedAt = currentVnTime, 
+                            UpdatedAt = currentVnTime
                         };
                         _context.Notifications.Add(notif);
                         await _context.SaveChangesAsync();
@@ -179,8 +244,7 @@ namespace Backend.Controllers
                 {
                     Console.WriteLine($"Lỗi tạo thông báo sửa chữa cho khách thuê: {ex.Message}");
                 }
-                // KẾT THÚC CHÈN CODE
-
+                await _context.SaveChangesAsync();
                 return Ok(new { message = "Đã cập nhật trạng thái sự cố thành công!" });
             }
             catch (Exception ex)
@@ -258,6 +322,33 @@ namespace Backend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi nạp danh sách phòng", error = ex.Message });
+            }
+        }
+        // 6. GET: api/OwnerMaintenance/bank-accounts
+        // (Lấy danh sách ngân hàng của Chủ nhà để chọn khi tạo hóa đơn sửa chữa)
+        [HttpGet("bank-accounts")]
+        public async Task<IActionResult> GetBankAccounts()
+        {
+            try
+            {
+                var banks = await _context.BankAccounts
+                    .Where(b => b.Status == "active")
+                    .Select(b => new
+                    {
+                        id = b.Id,
+                        bankCode = b.BankCode,
+                        bankName = b.BankName,
+                        accountNumber = b.AccountNumber,
+                        accountHolder = b.AccountHolder,
+                        isDefault = b.IsDefault
+                    })
+                    .ToListAsync();
+
+                return Ok(banks);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi nạp danh sách ngân hàng", error = ex.Message });
             }
         }
     }

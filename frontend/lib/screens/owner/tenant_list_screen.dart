@@ -217,51 +217,54 @@ class _TenantListScreenState extends State<TenantListScreen> {
           border: Border.all(color: Colors.grey.shade300, width: 1.0)
       ),
       // BỌC INKWELL VÀO ĐÂY
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          // CHUYỂN SANG TRANG CHI TIẾT
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => TenantDetailOwnerScreen(
-                contractId: tenant['contractId'].toString(),
+      child:Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            // CHUYỂN SANG TRANG CHI TIẾT
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TenantDetailOwnerScreen(
+                  contractId: tenant['contractId'].toString(),
+                ),
+              ),
+            );
+          },
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: const CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.lightGreen,
+              child: Icon(Icons.person, color: AppColors.primaryGreen, size: 28),
+            ),
+            title: Text(
+              tenant['name'] ?? 'Khách',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                'Phòng ${tenant['room']} • HĐ từ ${tenant['date']}',
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ),
-          );
-        },
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: const CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.lightGreen,
-            child: Icon(Icons.person, color: AppColors.primaryGreen, size: 28),
-          ),
-          title: Text(
-            tenant['name'] ?? 'Khách',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: Text(
-              'Phòng ${tenant['room']} • HĐ từ ${tenant['date']}',
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            trailing: IconButton(
+              icon: const Icon(Icons.phone_in_talk, color: AppColors.primaryGreen),
+              onPressed: () {
+                // Lấy sđt và gọi
+                final phone = tenant['phone'];
+                if (phone != null && phone.toString().isNotEmpty) {
+                  _makePhoneCall(phone.toString());
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Khách hàng này chưa có số điện thoại.')));
+                }
+              },
             ),
           ),
-          trailing: IconButton(
-            icon: const Icon(Icons.phone_in_talk, color: AppColors.primaryGreen),
-            onPressed: () {
-              // Lấy sđt và gọi
-              final phone = tenant['phone'];
-              if (phone != null && phone.toString().isNotEmpty) {
-                _makePhoneCall(phone.toString());
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Khách hàng này chưa có số điện thoại.')));
-              }
-            },
-          ),
         ),
-      ),
+      )
     );
   }
   // Thanh Navigation Item

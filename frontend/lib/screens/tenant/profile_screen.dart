@@ -520,6 +520,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+  // =====================================================
+  // YÊU CẦU SỬA CHỮA
+  // =====================================================
+  Widget _buildMaintenanceHistoryButton() {
+    return Column(
+      children: [
+        _sectionTitle('Hỗ trợ kỹ thuật', Icons.build_circle_outlined),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade100),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Lịch sử báo cáo sự cố và sửa chữa của bạn',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    // Điều hướng sang trang Lịch sử sửa chữa đã cấu hình trong app_routes
+                    Navigator.pushNamed(context, '/tenant/maintenance/history');
+                  },
+                  icon: const Icon(Icons.handyman_outlined),
+                  label: const Text('Xem yêu cầu sửa chữa của bạn'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFF09819), // Màu cam nổi bật để phân biệt
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   // =====================================================
   // THÔNG TIN NGÂN HÀNG
@@ -703,6 +748,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _sectionTitle('Thông tin cá nhân', Icons.person_outline),
                 const SizedBox(height: 12),
                 _buildPersonalInfo(),
+                const SizedBox(height: 24),
+                _buildMaintenanceHistoryButton(),
                 const SizedBox(height: 24),
                 _buildBankInfo(),
                 const SizedBox(height: 24),

@@ -18,18 +18,14 @@ class NotificationItem extends StatelessWidget {
 
 
     IconData getIcon() {
-      switch (notificationData['type']) {
-        case 'invoice':
-          return Icons.receipt_long;
-        case 'viewing_appointment':
-          return Icons.calendar_month;
-        case 'maintenance':
-          return Icons.build;
-        case 'contract':
-          return Icons.description;
-        default:
-          return Icons.notifications;
-      }
+      final type = notificationData['type']?.toString() ?? '';
+
+      if (type == 'invoice') return Icons.receipt_long;
+      if (type == 'maintenance') return Icons.build;
+      if (type == 'contract') return Icons.description;
+      if (type == 'viewing_appointment' || type.startsWith('appointment_')) return Icons.calendar_month;
+
+      return Icons.notifications;
     }
 
     return InkWell(

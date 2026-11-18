@@ -79,7 +79,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         // NẾU LÀ VNPay VÀ CÓ TRẢ VỀ LINK
         if (responseData['paymentUrl'] != null && responseData['paymentUrl'].toString().isNotEmpty) {
           final Uri url = Uri.parse(responseData['paymentUrl']);
-
+          print('LINK VNPAY LÀ: ${responseData['paymentUrl']}');
           try {
 
             await launchUrl(url, mode: LaunchMode.inAppBrowserView);
