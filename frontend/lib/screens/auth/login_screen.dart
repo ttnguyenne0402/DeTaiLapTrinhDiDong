@@ -183,6 +183,7 @@ class _LoginScreenState extends State<LoginScreen>
       final String role = responseData['role']?.toString().toLowerCase() ?? '';
       final String accessToken = responseData['accessToken']?.toString() ?? '';
       final String name = responseData['name']?.toString() ?? '';
+      final String phone = responseData['phone']?.toString() ?? '';
 
       if (userId.isEmpty || role.isEmpty || accessToken.isEmpty) {
         throw Exception('Thiếu ID, quyền hoặc token đăng nhập.');
@@ -194,6 +195,7 @@ class _LoginScreenState extends State<LoginScreen>
         role: role,
         accessToken: accessToken,
         name: name,
+        phone: phone,
       );
 
       if (_rememberMe) {

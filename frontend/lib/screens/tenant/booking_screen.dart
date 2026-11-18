@@ -36,7 +36,8 @@ class _BookingScreenState extends State<booking_screen> {
   final TextEditingController _noteController = TextEditingController();
 
   bool _isSubmitting = false;
-
+  bool _isLoadingPhone = true;
+  bool _phoneLocked = false;
   // Giả lập TenantId (Sau này lấy từ SharedPreferences/Login)
   String _currentTenantId = '';
   @override
@@ -47,10 +48,64 @@ class _BookingScreenState extends State<booking_screen> {
 
   Future<void> _loadTenantData() async {
     final userId = await AuthStorage.getUserId();
-    if (mounted) {
+    final cachedPhone = await AuthStorage.getPhone();
+
+    if (!mounted) return;
+    setState(() => _currentTenantId = userId ?? '');
+
+    // 1. Có cache -> dùng luôn
+    if (cachedPhone != null && cachedPhone.trim().isNotEmpty) {
       setState(() {
-        _currentTenantId = userId ?? '';
+        _phoneController.text = cachedPhone;
+        _phoneLocked = true;
+        _isLoadingPhone = false;
       });
+      return;
+    }
+
+    // 2. Không có userId -> dừng
+    if (userId == null || userId.isEmpty) {
+      setState(() => _isLoadingPhone = false);
+      return;
+    }
+
+    // 3. Gọi API (có kèm token)
+    final token = await AuthStorage.getAccessToken();
+    final client = _getCustomClient();
+    try {
+      final response = await client.get(
+        Uri.parse('http://10.0.2.2:5093/api/users/$userId'),
+        headers: {
+          'Accept': 'application/json',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint('GET user -> ${response.statusCode}: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final data = (decoded is Map && decoded['data'] is Map) ? decoded['data'] : decoded;
+
+        final phone = (data['phone'] ??
+            data['Phone'] ??
+            data['phoneNumber'] ??
+            data['PhoneNumber'])
+            ?.toString();
+
+        if (phone != null && phone.isNotEmpty && mounted) {
+          setState(() {
+            _phoneController.text = phone;
+            _phoneLocked = true;
+          });
+          await AuthStorage.savePhone(phone);
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi lấy thông tin user: $e');
+    } finally {
+      client.close();
+      if (mounted) setState(() => _isLoadingPhone = false);
     }
   }
   @override
@@ -79,7 +134,28 @@ class _BookingScreenState extends State<booking_screen> {
       );
       return;
     }
+    final now = DateTime.now();
+    final isToday = _selectedDate!.year == now.year &&
+        _selectedDate!.month == now.month &&
+        _selectedDate!.day == now.day;
 
+
+    if (isToday) {
+      final selectedDateTime = DateTime(
+        now.year, now.month, now.day,
+        _selectedTime!.hour, _selectedTime!.minute,
+      );
+
+      if (selectedDateTime.isBefore(now)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Giờ hẹn không hợp lệ (phải sau thời gian hiện tại)!"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+    }
     if (_formKey.currentState!.validate()) {
       setState(() => _isSubmitting = true);
 
@@ -255,10 +331,18 @@ class _BookingScreenState extends State<booking_screen> {
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     maxLength: 10,
-                    decoration: _buildInputDecoration(hint: "Nhập số điện thoại của bạn", icon: Icons.phone_outlined),
+                    readOnly: _phoneLocked || _isLoadingPhone,
+                    decoration: _buildInputDecoration(
+                      hint: _isLoadingPhone ? "Đang tải số điện thoại..." : "Nhập số điện thoại",
+                      icon: _phoneLocked ? Icons.lock_outline : Icons.phone_outlined,
+                    ).copyWith(
+                      fillColor: _phoneLocked ? Colors.grey.shade200 : AppColors.cardSurface,
+                    ),
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) return 'Vui lòng nhập số điện thoại';
-                      if (!RegExp(r'^0[0-9]{9}$').hasMatch(value.trim())) return 'Số điện thoại không hợp lệ';
+                      if (_isLoadingPhone) return 'Đang tải số điện thoại, vui lòng chờ...';
+                      final phone = value?.trim() ?? '';
+                      if (phone.isEmpty) return 'Vui lòng nhập số điện thoại';
+                      if (!RegExp(r'^0\d{9}$').hasMatch(phone)) return 'Số điện thoại không hợp lệ';
                       return null;
                     },
                   ),

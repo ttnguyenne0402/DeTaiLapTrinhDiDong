@@ -17,21 +17,31 @@ class CalendarWidget extends StatelessWidget {
   }) : super(key: key);
 
  //chọn ngày
+
   Future<void> _pickDate(BuildContext context) async {
-    // lấy tọa độ của nút bấm để hiển thị popup lịch cho chuẩn
+
     final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
     final DateTime now = DateTime.now();
+
+
+    final DateTime initialDate = selectedDate != null
+        ? DateTime(selectedDate!.year, selectedDate!.month, selectedDate!.day)
+        : DateTime(now.year, now.month, now.day);
+
+    final DateTime minimumDate = DateTime(now.year, now.month, now.day);
+    final DateTime maximumDate = minimumDate.add(const Duration(days: 60));
 
     final DateTime? picked = await showCupertinoCalendarPicker(
       context,
       widgetRenderBox: renderBox,
-      initialDateTime: selectedDate ?? now,
-      minimumDateTime: now,
-      maximumDateTime: now.add(const Duration(days: 60)),
+      initialDateTime: initialDate,
+      minimumDateTime: minimumDate,
+      maximumDateTime: maximumDate,
     );
 
     if (picked != null) {
-      onDateSelected(picked);
+      // Đảm bảo kết quả trả về cũng là ngày thuần túy
+      onDateSelected(DateTime(picked.year, picked.month, picked.day));
     }
   }
 

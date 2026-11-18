@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:http/io_client.dart';
 import '../../services/auth_storage.dart';
 import '../../utils/database_helper.dart';
+import 'my_invoices_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -196,19 +197,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     _markAsRead(notif['id']);
                   }
 
-                  switch (notif['type']) {
-                    case 'invoice':
-                      Navigator.pushNamed(context, '/tenant/invoices/detail');
-                      break;
-                    case 'viewing_appointment':
-                      Navigator.pushNamed(context, '/tenant/booking-history');
-                      break;
-                    case 'contract':
-                      Navigator.pushNamed(context, '/tenant/contracts/detail');
-                      break;
-                    case 'maintenance':
-                      Navigator.pushNamed(context, AppRoutes.tenantMaintenanceHistory);
-                      break;
+                  final type = notif['type']?.toString().toLowerCase() ?? '';
+
+                  if (type.contains('invoice') || type.contains('payment')) {
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => MyInvoicesScreen(key: UniqueKey())),
+                    );
+                  } else if (type == 'contract') {
+                    Navigator.pushNamed(context, '/tenant/contracts/detail');
+                  } else if (type == 'maintenance') {
+                    Navigator.pushNamed(context, AppRoutes.tenantMaintenanceHistory);
+                  } else if (type == 'viewing_appointment' || type.startsWith('appointment_')) {
+                    Navigator.pushNamed(context, '/tenant/booking-history');
                   }
                 },
               );

@@ -10,13 +10,14 @@ class AuthStorage {
   static const String _roleKey = 'userRole';
   static const String _tokenKey = 'accessToken';
   static const String _nameKey = 'userName';
-
+  static const String _phoneKey = 'userPhone';
   // Lưu thông tin sau khi đăng nhập thành công
   static Future<void> saveLogin({
     required String userId,
     required String role,
     required String accessToken,
     String? name,
+    String? phone,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -24,8 +25,17 @@ class AuthStorage {
     await prefs.setString(_roleKey, role);
     await prefs.setString(_tokenKey, accessToken);
     await prefs.setString(_nameKey, name ?? '');
+    await prefs.setString(_phoneKey, phone ?? '');
   }
-
+  //HÀM LẤY SỐ ĐIỆN THOẠI
+  static Future<String?> getPhone() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_phoneKey);
+  }
+  static Future<void> savePhone(String phone) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_phoneKey, phone);
+  }
   // Lấy ID người dùng
   static Future<String?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
@@ -58,6 +68,7 @@ class AuthStorage {
     await prefs.remove(_roleKey);
     await prefs.remove(_tokenKey);
     await prefs.remove(_nameKey);
+    await prefs.remove(_phoneKey);
   }
 
   static Future<Map<String, String>?> getRememberedCredentials() async {

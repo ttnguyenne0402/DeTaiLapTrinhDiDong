@@ -573,7 +573,7 @@ class _MaintenanceManageScreenState
 
                           final isCompleted = status == 'completed';
                           final isPending = status == 'pending';
-
+                          final isCancelled = status == 'rejected';
                           return Column(
                           children: [
                           _buildMaintenanceCard(
@@ -599,7 +599,8 @@ class _MaintenanceManageScreenState
                           priorityColor: request['priority'] == 'urgent' ? Colors.red
                               : AppColors.warningOrange,
 
-                          statusText: isPending ? 'Chờ tiếp nhận'
+                          statusText: isCancelled ? 'Khách đã hủy'
+                              : isPending ? 'Chờ tiếp nhận'
                               : isCompleted ? 'Đã hoàn thành'
                               : 'Đang xử lý',
                           statusColor: isPending ? AppColors.textSecondary

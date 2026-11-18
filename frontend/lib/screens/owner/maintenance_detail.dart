@@ -19,6 +19,8 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   String _errorMessage = '';
+  List<dynamic> _bankAccounts = [];
+  String? _selectedBankAccountId;
 
   int _costPayerGroup = 0; // 0: chủ nhà chịu, 1: trừ vào cọc/khách
   final TextEditingController _costController = TextEditingController();
@@ -68,19 +70,51 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
         _errorMessage = 'Lỗi kết nối ứng dụng: $e';
         _isLoading = false;
       });
-    } finally {
+    }
+    try {
+      final bankUrl = 'http://10.0.2.2:5093/api/OwnerMaintenance/bank-accounts';
+      final bankClient = _getCustomClient();
+      final bankRes = await bankClient.get(Uri.parse(bankUrl));
+      if (bankRes.statusCode == 200) {
+        final List<dynamic> banks = json.decode(bankRes.body);
+        if (mounted && banks.isNotEmpty) {
+          setState(() {
+            _bankAccounts = banks;
+            // Chọn mặc định ngân hàng đầu tiên (hoặc ngân hàng isDefault)
+            final defaultBank = banks.firstWhere(
+                    (b) => b['isDefault'] == true || b['isDefault'] == 1,
+                orElse: () => banks.first);
+            _selectedBankAccountId = defaultBank['id'].toString();
+          });
+        }
+      }
+      bankClient.close();
+    } catch (_) {}
+    finally {
       client.close();
     }
   }
 
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _isSubmitting = true);
-
+    if (newStatus == 'completed' && _costPayerGroup == 1 && _selectedBankAccountId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn tài khoản ngân hàng để nhận tiền!'), backgroundColor: Colors.red),
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
     String? ownerNoteFinal;
+    int parsedCost = 0;
+
     if (newStatus == 'completed') {
       final payer = _costPayerGroup == 0 ? "Chủ nhà chịu" : "Trừ cọc/Khách trả";
-      final cost = _costController.text.isNotEmpty ? _costController.text : "0";
+      final costStr = _costController.text.trim();
+      final cost = costStr.isNotEmpty ? costStr : "0";
       ownerNoteFinal = "Chi phí: $cost đ | Phân bổ: $payer | Ghi chú: ${_noteController.text}";
+
+
+      parsedCost = int.tryParse(cost.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
     }
 
     final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/${widget.issueId}/process';
@@ -92,10 +126,12 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
         headers: {"Content-Type": "application/json"},
         body: json.encode({
           "status": newStatus,
-          "ownerNote": ownerNoteFinal
+          "ownerNote": ownerNoteFinal,
+          "cost": parsedCost,
+          "payer": _costPayerGroup,
+          "bankAccountId": _selectedBankAccountId
         }),
       );
-
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cập nhật thành công!'), backgroundColor: AppColors.primaryGreen),
@@ -202,7 +238,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
     Color statusColor = AppColors.textSecondary;
     if (status == 'processing') { statusText = 'Đang xử lý'; statusColor = AppColors.warningOrange; }
     if (status == 'completed') { statusText = 'Hoàn thành'; statusColor = AppColors.primaryGreen; }
-
+    if (status == 'rejected') { statusText = 'Đã hủy'; statusColor = Colors.redAccent; }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.borderLight)),
@@ -407,6 +443,36 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
               ),
             ],
           ),
+          if (_costPayerGroup == 1 && _bankAccounts.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Tài khoản nhận tiền bồi thường:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  hint: const Text('Chọn tài khoản ngân hàng', style: TextStyle(fontSize: 12)),
+                  value: _selectedBankAccountId,
+                  items: _bankAccounts.map((b) => DropdownMenuItem(
+                    value: b['id']?.toString(),
+                    child: Text(
+                      '${b['bankName'] ?? b['bankCode']} - ${b['accountNumber']} (${b['accountHolder']})',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    ),
+                  )).toList(),
+                  onChanged: (bankId) {
+                    if (bankId != null) setState(() => _selectedBankAccountId = bankId);
+                  },
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           TextField(
             controller: _noteController,
@@ -446,7 +512,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
   Widget _buildTimelineCard(String status) {
     bool isProcessing = status == 'processing' || status == 'completed';
     bool isCompleted = status == 'completed';
-
+    bool isCancelled = status == 'rejected';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: AppColors.cardSurface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.borderLight)),
@@ -461,21 +527,30 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildTimelineItem(title: 'Khách báo sự cố', subtitle: 'Hệ thống ghi nhận', isDone: true),
-          _buildTimelineItem(title: 'Chủ trọ tiếp nhận', subtitle: 'Chuyển sang Đang xử lý', isDone: isProcessing),
-          _buildTimelineItem(title: 'Nghiệm thu & Hoàn thành', subtitle: 'Lưu chi phí & Đóng', isDone: isCompleted, isLast: true),
+          if (isCancelled) ...[
+            _buildTimelineItem(title: 'Khách báo sự cố', subtitle: 'Hệ thống ghi nhận', isDone: true, isCancelled: false),
+            _buildTimelineItem(title: 'Đã hủy', subtitle: 'Khách đã tự hủy yêu cầu', isDone: false, isCancelled: true, isLast: true),
+          ] else ...[
+            _buildTimelineItem(title: 'Khách báo sự cố', subtitle: 'Hệ thống ghi nhận', isDone: true, isCancelled: false),
+            _buildTimelineItem(title: 'Chủ trọ tiếp nhận', subtitle: 'Chuyển sang Đang xử lý', isDone: isProcessing, isCancelled: false),
+            _buildTimelineItem(title: 'Nghiệm thu & Hoàn thành', subtitle: 'Lưu chi phí & Đóng', isDone: isCompleted, isCancelled: false, isLast: true),
+          ]
         ],
       ),
     );
   }
 
-  Widget _buildTimelineItem({required String title, required String subtitle, required bool isDone, bool isLast = false}) {
+  Widget _buildTimelineItem({required String title, required String subtitle, required bool isDone, bool isLast = false, bool isCancelled = false}) {
+    IconData iconData = isCancelled ? Icons.cancel : (isDone ? Icons.check_circle : Icons.radio_button_unchecked);
+    Color iconColor = isCancelled ? Colors.redAccent : (isDone ? AppColors.primaryGreen : AppColors.textSecondary);
+    Color textColor = isCancelled ? Colors.redAccent : (isDone ? AppColors.textPrimary : AppColors.textSecondary);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
           children: [
-            Icon(isDone ? Icons.check_circle : Icons.radio_button_unchecked, size: 16, color: isDone ? AppColors.primaryGreen : AppColors.textSecondary),
+            Icon(iconData, size: 16, color: iconColor),
             if (!isLast) Container(width: 2, height: 30, color: AppColors.borderLight),
           ],
         ),
@@ -484,7 +559,7 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isDone ? AppColors.textPrimary : AppColors.textSecondary)),
+              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textColor)),
               Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
               const SizedBox(height: 12),
             ],
