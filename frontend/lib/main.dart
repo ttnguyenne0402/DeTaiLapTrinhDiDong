@@ -1,8 +1,8 @@
-
-import 'dart:io' ; // 1. Thư viện xử lý HTTP Overrides để bypass SSL trên máy ảo
+import 'dart:io'; // 1. Thư viện xử lý HTTP Overrides để bypass SSL trên máy ảo
 import 'package:flutter/material.dart';
 import 'route/app_router.dart';
 import 'screens/auth/login_screen.dart';
+import 'services/local_notification_service.dart'; // <--- THÊM DÒNG NÀY
 
 // 2. Class cấu hình bỏ qua lỗi chứng chỉ SSL tự ký của .NET trên máy ảo Android
 class MyHttpOverrides extends HttpOverrides {
@@ -13,10 +13,15 @@ class MyHttpOverrides extends HttpOverrides {
   }
 }
 
+// <--- THÊM KEY ĐIỀU HƯỚNG TOÀN CỤC
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() {
-
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = MyHttpOverrides();
+//KHỞI TẠO THÔNG BÁO
+  await LocalNotificationService.instance.init(navigatorKey);
+
   runApp(const MyApp());
 }
 
@@ -26,16 +31,14 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      // initialRoute: AppRoutes.invoicesManage,
       onGenerateRoute: AppRouter.generateRoute,
       title: 'Trọ Ơi',
       theme: ThemeData(
-        // Đã sửa lỗi cú pháp dấu chấm thừa trước fromSeed
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: LoginScreen(),
     );
   }
 }
-

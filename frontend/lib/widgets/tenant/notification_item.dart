@@ -23,6 +23,7 @@ class NotificationItem extends StatelessWidget {
       if (type == 'invoice') return Icons.receipt_long;
       if (type == 'maintenance') return Icons.build;
       if (type == 'contract') return Icons.description;
+      if (type == 'payment') return Icons.attach_money;
       if (type == 'viewing_appointment' || type.startsWith('appointment_')) return Icons.calendar_month;
 
       return Icons.notifications;
