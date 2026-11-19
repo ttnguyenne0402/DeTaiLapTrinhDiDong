@@ -21,6 +21,8 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _districtController = TextEditingController();
   final TextEditingController _wardController = TextEditingController();
+  final TextEditingController _latController = TextEditingController(text: '10.805566');
+  final TextEditingController _longController = TextEditingController(text: '106.628899');
   final TextEditingController _roomsController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 
@@ -120,6 +122,8 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         'address': _addressController.text.trim(),
         'district': _districtController.text.trim(),
         'ward': _wardController.text.trim(),
+        'latitude': double.tryParse(_latController.text.trim().replaceAll(',', '.')) ?? 10.805566,
+        'longitude': double.tryParse(_longController.text.trim().replaceAll(',', '.')) ?? 106.628899,
         'totalRooms': int.tryParse(_roomsController.text.trim()) ?? 1,
         'status': _selectedStatus == 'Đang hoạt động' ? 'active' : 'inactive',
         'description': _descController.text.trim(),
@@ -165,6 +169,8 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
     _addressController.dispose();
     _districtController.dispose();
     _wardController.dispose();
+    _latController.dispose();
+    _longController.dispose();
     _roomsController.dispose();
     _descController.dispose();
     super.dispose();
@@ -265,6 +271,30 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                                     validator: (val) => val == null || val.isEmpty
                                         ? 'Nhập phường'
                                         : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _latController,
+                                    label: 'Vĩ độ (Latitude)',
+                                    hint: 'VD: 10.805566',
+                                    icon: Icons.explore_outlined,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _longController,
+                                    label: 'Kinh độ (Longitude)',
+                                    hint: 'VD: 106.628899',
+                                    icon: Icons.explore_outlined,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   ),
                                 ),
                               ],

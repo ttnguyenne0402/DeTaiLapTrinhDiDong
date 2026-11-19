@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../widgets/owner/owner_drawer.dart';
+import '../tenant/profile_screen.dart';
 import 'owner_dashboard.dart';
 import 'owner_profile_screen.dart';
 import 'owner_notifications_screen.dart';

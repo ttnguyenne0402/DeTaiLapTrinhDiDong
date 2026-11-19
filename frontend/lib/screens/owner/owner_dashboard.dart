@@ -11,6 +11,7 @@ import 'tenant_list_screen.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/owner_dashboard_service.dart';
 import '../../services/owner/owner_notification_service.dart';
+import '../../services/auth_storage.dart';
 import '../../utils/phone_helper.dart';
 
 class OwnerDashboard extends StatefulWidget {
@@ -22,24 +23,36 @@ class OwnerDashboard extends StatefulWidget {
 
 class _OwnerDashboardState extends State<OwnerDashboard> {
   final Color primaryColor = const Color(0xFF1B5E55);
-  late Future<OwnerDashboardModel> _dashboardFuture;
+  Future<OwnerDashboardModel>? _dashboardFuture;
   int _unreadNotifCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _refreshDashboard();
+    _dashboardFuture = _fetchDashboardForLoggedInUser();
   }
 
   void _refreshDashboard() {
-    setState(() {
-      _dashboardFuture = OwnerDashboardService.fetchDashboardData('USER_OWNER_01');
-    });
-    _loadUnreadCount();
+    if (mounted) {
+      setState(() {
+        _dashboardFuture = _fetchDashboardForLoggedInUser();
+      });
+    } else {
+      _dashboardFuture = _fetchDashboardForLoggedInUser();
+    }
   }
 
-  Future<void> _loadUnreadCount() async {
-    final list = await OwnerNotificationService.fetchNotifications('USER_OWNER_01');
+  Future<OwnerDashboardModel> _fetchDashboardForLoggedInUser() async {
+    final loggedInOwnerId = await AuthStorage.getUserId();
+    final ownerId = (loggedInOwnerId != null && loggedInOwnerId.trim().isNotEmpty)
+        ? loggedInOwnerId.trim()
+        : 'USER_OWNER_01';
+    _loadUnreadCount(ownerId);
+    return OwnerDashboardService.fetchDashboardData(ownerId);
+  }
+
+  Future<void> _loadUnreadCount(String ownerId) async {
+    final list = await OwnerNotificationService.fetchNotifications(ownerId);
     if (mounted) {
       setState(() {
         _unreadNotifCount = list.where((n) => !n.isRead).length;
@@ -128,7 +141,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         child: FutureBuilder<OwnerDashboardModel>(
           future: _dashboardFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (_dashboardFuture == null ||
+                snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
               return Center(child: Text('Lỗi tải dữ liệu: ${snapshot.error}'));

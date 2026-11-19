@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/owner_notification_service.dart';
+import '../../services/auth_storage.dart';
 import 'appointments_manage.dart';
 import 'posts_manage.dart';
 import 'maintenance_manage.dart';
@@ -31,7 +32,11 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
       _errorMessage = null;
     });
     try {
-      final list = await OwnerNotificationService.fetchNotifications('USER_OWNER_01');
+      final loggedInOwnerId = await AuthStorage.getUserId();
+      final ownerId = (loggedInOwnerId != null && loggedInOwnerId.trim().isNotEmpty)
+          ? loggedInOwnerId.trim()
+          : 'USER_OWNER_01';
+      final list = await OwnerNotificationService.fetchNotifications(ownerId);
       if (mounted) {
         setState(() {
           _notifications = list;
@@ -57,7 +62,11 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
       }
     });
     try {
-      await OwnerNotificationService.markAllAsRead('USER_OWNER_01');
+      final loggedInOwnerId = await AuthStorage.getUserId();
+      final ownerId = (loggedInOwnerId != null && loggedInOwnerId.trim().isNotEmpty)
+          ? loggedInOwnerId.trim()
+          : 'USER_OWNER_01';
+      await OwnerNotificationService.markAllAsRead(ownerId);
       messenger.showSnackBar(
         const SnackBar(
           content: Text('Đã đánh dấu đã đọc tất cả thông báo'),
@@ -116,16 +125,35 @@ class _OwnerNotificationsScreenState extends State<OwnerNotificationsScreen> {
     if (_selectedFilter == 'unread') {
       return _notifications.where((n) => !n.isRead).toList();
     } else if (_selectedFilter == 'appointment') {
-      return _notifications.where((n) => n.type.toLowerCase().contains('appointment')).toList();
+      return _notifications.where((n) {
+        final t = n.type.toLowerCase();
+        final title = n.title.toLowerCase();
+        return t.contains('appointment') ||
+            t.contains('lịch') ||
+            title.contains('lịch') ||
+            title.contains('hẹn');
+      }).toList();
     } else if (_selectedFilter == 'post') {
-      return _notifications.where((n) => n.type.toLowerCase().contains('post')).toList();
+      return _notifications.where((n) {
+        final t = n.type.toLowerCase();
+        final title = n.title.toLowerCase();
+        return t.contains('post') ||
+            title.contains('bài đăng') ||
+            title.contains('tin');
+      }).toList();
     } else if (_selectedFilter == 'other') {
-      return _notifications
-          .where((n) =>
-              n.type.toLowerCase().contains('maintenance') ||
-              n.type.toLowerCase().contains('invoice') ||
-              n.type.toLowerCase().contains('payment'))
-          .toList();
+      return _notifications.where((n) {
+        final t = n.type.toLowerCase();
+        final title = n.title.toLowerCase();
+        return t.contains('maintenance') ||
+            t.contains('invoice') ||
+            t.contains('payment') ||
+            title.contains('thanh toán') ||
+            title.contains('hóa đơn') ||
+            title.contains('sự cố') ||
+            title.contains('bảo trì') ||
+            title.contains('hỏng');
+      }).toList();
     }
     return _notifications;
   }
