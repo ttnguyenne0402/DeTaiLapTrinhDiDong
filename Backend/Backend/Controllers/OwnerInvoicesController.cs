@@ -400,14 +400,37 @@ namespace Backend.Controllers
         {
             try
             {
-                var invoice = await _context.Invoices.FindAsync(id);
+                // Dùng Include để lấy được Contract.TenantId
+                var invoice = await _context.Invoices
+                    .Include(i => i.Contract)
+                    .FirstOrDefaultAsync(i => i.Id == id);
+
                 if (invoice == null)
                 {
                     return NotFound(new { message = "Không tìm thấy hóa đơn." });
                 }
 
+                var oldStatus = invoice.Status;
                 invoice.Status = req.Status;
-                invoice.UpdatedAt = DateTime.UtcNow;
+                invoice.UpdatedAt = DateTime.Now;
+
+                // Nếu chủ trọ vừa xác nhận đã thanh toán (tránh gửi trùng nếu hóa đơn đã paid trước đó)
+                if (req.Status == "paid" && oldStatus != "paid" && !string.IsNullOrEmpty(invoice.Contract?.TenantId))
+                {
+                    var period = invoice.BillingMonth.ToString("MM/yyyy");
+                    _context.Notifications.Add(new Notification
+                    {
+                        Id = "NOTIF_" + Guid.NewGuid().ToString("N")[..8],
+                        UserId = invoice.Contract.TenantId,
+                        Title = "Thanh toán hóa đơn thành công",
+                        Message = $"Chủ trọ đã xác nhận thanh toán {invoice.Total:N0}đ cho hóa đơn {invoice.InvoiceCode} (kỳ {period}).",
+                        Type = "invoice",
+                        ReferenceId = invoice.Id,
+                        ReferenceType = "invoice",
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    });
+                }
 
                 await _context.SaveChangesAsync();
 

@@ -80,8 +80,13 @@ namespace Backend.Controllers
                 var payment = await PaymentWithContext(_context)
                     .FirstOrDefaultAsync(p => p.PaymentCode == vnp_TxnRef || p.Id == vnp_TxnRef);
 
-                if (payment != null)
+                if (payment != null) 
+                { 
                     await NotifyOwnerAsync(_context, payment, awaitingApproval: false);
+                    await NotifyTenantAsync(_context, payment);
+                }
+                    
+
             }
             catch (Exception ex)
             {
@@ -158,6 +163,44 @@ namespace Backend.Controllers
                 UserId = contract.OwnerId,
                 Title = title,
                 Message = message,
+                Type = "invoice",
+                ReferenceId = invoice.Id,
+                ReferenceType = "invoice",
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
+            });
+
+            await context.SaveChangesAsync();
+        }
+        /// <summary>
+        /// Báo cho khách thuê khi thanh toán VNPay thành công.
+        /// </summary>
+        private async Task NotifyTenantAsync(QuanLyPhongTroContext context, Payment payment)
+        {
+            var invoice = payment.Invoice;
+            if (invoice == null || string.IsNullOrEmpty(payment.PayerId)) return;
+
+            // Chỉ gửi khi giao dịch thật sự thành công
+            if (payment.Status != "success") return;
+
+            // Chống trùng (VNPay gọi lại / F5): mỗi mã giao dịch chỉ báo 1 lần
+            bool alreadyNotified = await context.Notifications.AnyAsync(n =>
+                n.UserId == payment.PayerId &&
+                n.Type == "invoice" &&
+                n.ReferenceId == invoice.Id &&
+                n.Message.Contains(payment.PaymentCode));
+
+            if (alreadyNotified) return;
+
+            var amountStr = payment.Amount.ToString("N0", ViCulture) + "đ";
+            var period = invoice.BillingMonth.ToString("MM/yyyy");
+
+            context.Notifications.Add(new Notification
+            {
+                Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8),
+                UserId = payment.PayerId,
+                Title = "Thanh toán hóa đơn thành công",
+                Message = $"Bạn đã thanh toán thành công {amountStr} cho hóa đơn {invoice.InvoiceCode} (kỳ {period}). Mã GD: {payment.PaymentCode}.",
                 Type = "invoice",
                 ReferenceId = invoice.Id,
                 ReferenceType = "invoice",
