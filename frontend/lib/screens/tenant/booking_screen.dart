@@ -7,7 +7,9 @@ import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../widgets/tenant/calendar_widget.dart';
+import '../../widgets/tenant/tenant_bottom_nav.dart';
 import '../../services/auth_storage.dart';
+import 'home_screen.dart';
 class booking_screen extends StatefulWidget {
 
   final String roomId;
@@ -40,6 +42,16 @@ class _BookingScreenState extends State<booking_screen> {
   bool _phoneLocked = false;
   // Giả lập TenantId (Sau này lấy từ SharedPreferences/Login)
   String _currentTenantId = '';
+
+  void _navigateToTab(int index) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => HomeScreen(initialTabIndex: index),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -192,7 +204,7 @@ class _BookingScreenState extends State<booking_screen> {
               ),
             );
 
-            Navigator.pushReplacementNamed(context, '/tenant/booking-history');
+            _navigateToTab(2);
           }
         } else {
           print("Lỗi server: ${response.body}");
@@ -364,41 +376,60 @@ class _BookingScreenState extends State<booking_screen> {
         ),
       ),
 
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-            color: AppColors.cardSurface,
-            boxShadow: [
-              BoxShadow(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.cardSurface,
+              boxShadow: [
+                BoxShadow(
                   color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
-                  offset: const Offset(0, -4))
-            ]),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitBooking,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryGreen,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSubmitting ? null : _submitBooking,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            "GỬI LỊCH HẸN",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
               ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2))
-                  : const Text("GỬI LỊCH HẸN",
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
             ),
           ),
-        ),
+          TenantBottomNav(selectedIndex: 2, onItemTapped: _navigateToTab),
+        ],
       ),
     );
   }

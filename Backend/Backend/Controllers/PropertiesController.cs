@@ -89,6 +89,13 @@ namespace Backend.Controllers
                     return BadRequest(new { message = "Tên bất động sản và mã chủ trọ không được để trống." });
                 }
 
+                if (!dto.Latitude.HasValue || !dto.Longitude.HasValue ||
+                    dto.Latitude < -90 || dto.Latitude > 90 ||
+                    dto.Longitude < -180 || dto.Longitude > 180)
+                {
+                    return BadRequest(new { message = "Vui lòng chọn tọa độ hợp lệ trên bản đồ." });
+                }
+
                 var newProperty = new Property
                 {
                     Id = "PROP_" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
@@ -98,8 +105,8 @@ namespace Backend.Controllers
                     Address = dto.Address,
                     District = string.IsNullOrEmpty(dto.District) ? "Chưa rõ" : dto.District,
                     Ward = string.IsNullOrEmpty(dto.Ward) ? "Chưa rõ" : dto.Ward,
-                    Latitude = dto.Latitude ?? 10.8231m,
-                    Longitude = dto.Longitude ?? 106.6297m,
+                    Latitude = dto.Latitude.Value,
+                    Longitude = dto.Longitude.Value,
                     Description = dto.Description,
                     Status = string.IsNullOrEmpty(dto.Status) ? "active" : dto.Status
                 };
