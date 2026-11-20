@@ -6,9 +6,16 @@ import 'dart:io';
 import '../../services/auth_storage.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/common/status_badge.dart';
+import '../../widgets/tenant/tenant_bottom_nav.dart';
+import 'home_screen.dart';
 
 class booking_history_screen extends StatefulWidget {
-  const booking_history_screen({Key? key}) : super(key: key);
+  final bool showBottomNavigation;
+
+  const booking_history_screen({
+    Key? key,
+    this.showBottomNavigation = true,
+  }) : super(key: key);
 
   @override
   State<booking_history_screen> createState() => _BookingHistoryScreenState();
@@ -21,6 +28,15 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
   // URL API Backend
   final String _baseUrl = 'http://10.0.2.2:5093/api/viewing-appointments';
   String _tenantId = '';
+
+  void _navigateToTab(int index) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => HomeScreen(initialTabIndex: index),
+      ),
+      (route) => false,
+    );
+  }
 
   @override
   void initState() {
@@ -164,7 +180,10 @@ class _BookingHistoryScreenState extends State<booking_history_screen> {
             ),
           ),
         )
-    )
+        ),
+        bottomNavigationBar: widget.showBottomNavigation
+            ? TenantBottomNav(selectedIndex: 2, onItemTapped: _navigateToTab)
+            : null,
     );
   }
 

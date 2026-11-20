@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../services/owner/room_service.dart';
 import '../../services/owner/property_service.dart';
 import '../../services/auth_storage.dart';
+import '../../widgets/tenant/open_street_map_widget.dart';
 
 // Màn hình biểu mẫu thêm mới hoặc chỉnh sửa phòng trọ
 class RoomFormScreen extends StatefulWidget {
@@ -287,6 +288,8 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                         ),
                         const SizedBox(height: 8),
                         _buildPropertyDropdown(),
+                        const SizedBox(height: 10),
+                        _buildPropertyLocationPreview(),
                         const SizedBox(height: 20),
 
                         // Tải ảnh thực tế phòng (Từ Gallery hoặc Camera)
@@ -673,6 +676,30 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildPropertyLocationPreview() {
+    final selected = _properties.where(
+      (property) => property.id == _selectedPropertyId,
+    );
+    if (selected.isEmpty) return const SizedBox.shrink();
+
+    final property = selected.first;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Vị trí phòng sẽ theo dãy trọ đã chọn',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        OpenStreetMapWidget(
+          address: property.address,
+          latitude: property.latitude,
+          longitude: property.longitude,
+        ),
+      ],
     );
   }
 

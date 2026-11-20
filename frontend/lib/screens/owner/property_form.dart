@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/property_service.dart';
 import '../../services/auth_storage.dart';
@@ -21,8 +23,8 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _districtController = TextEditingController();
   final TextEditingController _wardController = TextEditingController();
-  final TextEditingController _latController = TextEditingController(text: '10.805566');
-  final TextEditingController _longController = TextEditingController(text: '106.628899');
+  final TextEditingController _latController = TextEditingController();
+  final TextEditingController _longController = TextEditingController();
   final TextEditingController _roomsController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 
@@ -113,6 +115,21 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
 
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
+      final latitude = double.tryParse(
+        _latController.text.trim().replaceAll(',', '.'),
+      );
+      final longitude = double.tryParse(
+        _longController.text.trim().replaceAll(',', '.'),
+      );
+      if (latitude == null || longitude == null ||
+          latitude < -90 || latitude > 90 ||
+          longitude < -180 || longitude > 180) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng chọn vị trí hợp lệ trên bản đồ.')),
+        );
+        return;
+      }
+
       setState(() => _isLoading = true);
       final ownerId = await AuthStorage.getUserId();
       final data = {
@@ -122,8 +139,8 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         'address': _addressController.text.trim(),
         'district': _districtController.text.trim(),
         'ward': _wardController.text.trim(),
-        'latitude': double.tryParse(_latController.text.trim().replaceAll(',', '.')) ?? 10.805566,
-        'longitude': double.tryParse(_longController.text.trim().replaceAll(',', '.')) ?? 106.628899,
+        'latitude': latitude,
+        'longitude': longitude,
         'totalRooms': int.tryParse(_roomsController.text.trim()) ?? 1,
         'status': _selectedStatus == 'Đang hoạt động' ? 'active' : 'inactive',
         'description': _descController.text.trim(),
@@ -285,6 +302,11 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                                     hint: 'VD: 10.805566',
                                     icon: Icons.explore_outlined,
                                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    validator: (value) =>
+                                        double.tryParse((value ?? '').replaceAll(',', '.')) == null
+                                            ? 'Chọn vị trí trên bản đồ'
+                                            : null,
+                                    onChanged: (_) => setState(() {}),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -295,10 +317,17 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                                     hint: 'VD: 106.628899',
                                     icon: Icons.explore_outlined,
                                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    validator: (value) =>
+                                        double.tryParse((value ?? '').replaceAll(',', '.')) == null
+                                            ? 'Chọn vị trí trên bản đồ'
+                                            : null,
+                                    onChanged: (_) => setState(() {}),
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 12),
+                            _buildLocationPicker(),
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -421,12 +450,14 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
     String? Function(String?)? validator,
+    void Function(String)? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -452,6 +483,75 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
           borderSide: BorderSide(color: primaryColor, width: 1.5),
         ),
       ),
+    );
+  }
+
+  Widget _buildLocationPicker() {
+    final latitude = double.tryParse(
+      _latController.text.trim().replaceAll(',', '.'),
+    );
+    final longitude = double.tryParse(
+      _longController.text.trim().replaceAll(',', '.'),
+    );
+    final selected = latitude != null && longitude != null &&
+            latitude >= -90 && latitude <= 90 &&
+            longitude >= -180 && longitude <= 180
+        ? LatLng(latitude, longitude)
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Chạm vào bản đồ để ghim vị trí dãy trọ',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 250,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: selected ?? const LatLng(10.7769, 106.7009),
+                initialZoom: selected == null ? 12 : 16,
+                onTap: (_, point) {
+                  setState(() {
+                    _latController.text = point.latitude.toStringAsFixed(6);
+                    _longController.text = point.longitude.toStringAsFixed(6);
+                  });
+                },
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.doanlaptrinhdidong',
+                ),
+                if (selected != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: selected,
+                        width: 44,
+                        height: 44,
+                        child: const Icon(
+                          Icons.location_pin,
+                          color: Colors.red,
+                          size: 42,
+                        ),
+                      ),
+                    ],
+                  ),
+                const RichAttributionWidget(
+                  attributions: [
+                    TextSourceAttribution('OpenStreetMap contributors'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

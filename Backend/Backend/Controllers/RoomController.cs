@@ -91,6 +91,8 @@ namespace Backend.Controllers
                     street = r.Property.Address,
                     district = r.Property.District,
                     ward = r.Property.Ward,
+                    latitude = r.Property.Latitude,
+                    longitude = r.Property.Longitude,
                     area = r.Area,
                     price = r.Price,
                     deposit = r.Deposit,
@@ -131,6 +133,8 @@ namespace Backend.Controllers
                     street = r.Property.Address,
                     district = r.Property.District,
                     ward = r.Property.Ward,
+                    latitude = r.Property.Latitude,
+                    longitude = r.Property.Longitude,
 
                     // Thông tin phòng
                     title = r.Name,

@@ -7,6 +7,7 @@ import 'package:http/io_client.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
 import '../../widgets/tenant/room_card.dart';
+import '../../widgets/tenant/tenant_bottom_nav.dart';
 import 'search_filter_screen.dart';
 import 'room_detail_screen.dart';
 
@@ -23,7 +24,9 @@ import '../../services/tenant/favorite_service.dart';
 // KHUNG CHỨA THANH ĐIỀU HƯỚNG CỐ ĐỊNH
 // ============================================================
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTabIndex;
+
+  const HomeScreen({super.key, this.initialTabIndex = 0});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -32,6 +35,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialTabIndex.clamp(0, 5).toInt();
+  }
 
 
   void _onItemTapped(int index) {
@@ -40,40 +48,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Widget _buildBottomNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-  }) {
-    final selected = _selectedIndex == index;
-    final color = selected ? AppColors.primaryGreen : AppColors.textSecondary;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onItemTapped(index),
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox.expand(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 22, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10.5,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
   Widget _getScreen() {
     switch (_selectedIndex) {
       case 0:
@@ -83,12 +57,15 @@ class _HomeScreenState extends State<HomeScreen> {
         return MyInvoicesScreen(key: UniqueKey());
       case 2:
       // Thêm UniqueKey() để ép làm mới Đặt lịch
-        return booking_history_screen(key: UniqueKey());
+        return booking_history_screen(
+          key: UniqueKey(),
+          showBottomNavigation: false,
+        );
       case 3:
       // Thêm UniqueKey() để ép làm mới Hợp đồng
         return MyContractsScreen(key: UniqueKey());
       case 4:
-        return const FavoritesScreen();
+        return const FavoritesScreen(showBottomNavigation: false);
       case 5:
         return const ProfileScreen();
       default:
@@ -103,50 +80,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: AnimatedSwitcher(duration: const Duration(milliseconds: 200),
         child: _getScreen(),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 68,
-          child: BottomAppBar(
-            color: const Color(0xFFF4EEF5),
-            elevation: 12,
-            padding: EdgeInsets.zero,
-            child: Row(
-              children: [
-                _buildBottomNavItem(
-                  icon: Icons.home_rounded,
-                  label: 'Trang chủ',
-                  index: 0,
-                ),
-                _buildBottomNavItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Hóa đơn',
-                  index: 1,
-                ),
-                _buildBottomNavItem(
-                  icon: Icons.event_note_rounded,
-                  label: 'Đặt lịch',
-                  index: 2,
-                ),
-                _buildBottomNavItem(
-                  icon: Icons.description_outlined,
-                  label: 'Hợp đồng',
-                  index: 3,
-                ),
-                _buildBottomNavItem(
-                  icon: Icons.favorite_border_rounded,
-                  label: 'Yêu thích',
-                  index: 4,
-                ),
-                _buildBottomNavItem(
-                  icon: Icons.person_outline_rounded,
-                  label: 'Cá nhân',
-                  index: 5,
-                ),
-              ],
-            ),
-          ),
-        ),
+      bottomNavigationBar: TenantBottomNav(
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
       ),
     );
   }
@@ -184,8 +120,11 @@ class _HomeContentState extends State<_HomeContent> {
     super.initState();
     _loadRooms();
     _loadFavoriteIds();
+    _favoriteService.favoritesChanged.addListener(_onFavoriteServiceChanged);
     _loadUnreadCount();
   }
+
+  void _onFavoriteServiceChanged() => _loadFavoriteIds();
   Future<void> _loadUnreadCount() async {
     try {
       final userId = await AuthStorage.getUserId();
@@ -308,6 +247,7 @@ class _HomeContentState extends State<_HomeContent> {
 
   @override
   void dispose() {
+    _favoriteService.favoritesChanged.removeListener(_onFavoriteServiceChanged);
     _searchController.dispose();
     super.dispose();
   }
