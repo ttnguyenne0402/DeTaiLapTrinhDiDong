@@ -280,7 +280,9 @@ namespace Backend.Controllers
                     Rent = req.RentPrice > 0 ? req.RentPrice : room.Price,
                     Deposit = req.DepositPrice > 0 ? req.DepositPrice : room.Deposit,
                     PaymentCycle = "monthly",
-                    Status = (req.Status == "Chờ ký" || req.Status == "pending") ? "pending" : "draft",
+                    Status = (req.Status == "active" || req.Status == "Đang hiệu lực")
+                        ? "active"
+                        : ((req.Status == "pending" || req.Status == "Chờ ký") ? "pending" : "draft"),
                     Terms = $"CCCD:{req.Cccd}|IssueDate:{req.IssueDate}|IssuePlace:{req.IssuePlace}",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
