@@ -117,6 +117,8 @@ namespace Backend.Controllers
                         CycleText = c.PaymentCycle == "quarterly" ? "Kỳ thu: Hàng quý" : "Kỳ thu: Hàng tháng (Ngày 05)",
                         NoteText = note,
                         Cccd = c.Terms?.StartsWith("CCCD:") == true ? c.Terms.Split('|')[0].Replace("CCCD:", ""): "",
+                        OwnerSignature = c.OwnerSignature,
+                        TenantSignature = c.TenantSignature,
                         Services = c.ContractServices.Select(cs => new ContractServiceItemDto
                         {
                             ServiceId = cs.ServiceId,

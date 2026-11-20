@@ -64,7 +64,18 @@ namespace Backend.Controllers
                     })
                     .ToListAsync();
 
-                return Ok(contracts);
+                // 🔴 LỌC BỎ NHỮNG PHÒNG ĐÃ THANH TOÁN HÓA ĐƠN THÁNG NÀY RỒI (KHÔNG CHO LẬP TRÙNG TRONG DROPDOWN LẬP HÓA ĐƠN)
+                var currentMonth = new DateOnly(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+                var paidContractIds = await _context.Invoices
+                    .Where(i => i.BillingMonth == currentMonth && i.Status == "paid")
+                    .Select(i => i.ContractId)
+                    .ToListAsync();
+
+                var availableContracts = contracts
+                    .Where(c => !paidContractIds.Contains(c.ContractId))
+                    .ToList();
+
+                return Ok(availableContracts);
             }
             catch (Exception ex)
             {
@@ -314,6 +325,14 @@ namespace Backend.Controllers
                var billingMonth = new DateOnly(req.Year, req.Month, 1);
                var dueDate = today.AddDays(5);
 
+               var existingInvoice = await _context.Invoices
+                   .FirstOrDefaultAsync(i => i.ContractId == contract.Id && i.BillingMonth == billingMonth && i.Status != "cancelled");
+
+               if (existingInvoice != null)
+               {
+                   return BadRequest(new { message = $"Phòng {contract.Room?.Name} đã được phát hành hóa đơn cho Tháng {req.Month}/{req.Year} rồi!" });
+               }
+
                string? validBankId = string.IsNullOrWhiteSpace(req.BankAccountId) ? null : req.BankAccountId;
 
 
@@ -555,6 +574,9 @@ namespace Backend.Controllers
                             .ThenByDescending(u => u.CreatedAt)
                             .FirstOrDefaultAsync();
 
+                        var paidInvoice = await _context.Invoices
+                            .FirstOrDefaultAsync(i => i.ContractId == c.Id && i.BillingMonth == currentMonth && i.Status == "paid");
+
                         decimal oldElectric = currentMonthReading != null
                             ? currentMonthReading.ElectricityOld
                             : (lastReading != null ? lastReading.ElectricityNew : c.InitialElectricityReading);
@@ -566,6 +588,7 @@ namespace Backend.Controllers
                         decimal? elecNew = currentMonthReading != null ? currentMonthReading.ElectricityNew : null;
                         decimal? waterNew = currentMonthReading != null ? currentMonthReading.WaterNew : null;
                         bool isRecorded = currentMonthReading != null;
+                        bool isPaid = paidInvoice != null;
 
                         result.Add(new
                         {
@@ -578,7 +601,8 @@ namespace Backend.Controllers
                             waterOld = oldWater,
                             elecNew = elecNew,
                             waterNew = waterNew,
-                            isRecorded = isRecorded
+                            isRecorded = isRecorded,
+                            isPaid = isPaid
                         });
                     }
 
@@ -686,6 +710,14 @@ namespace Backend.Controllers
                 int y = req.Year ?? DateTime.UtcNow.Year;
                 var billingMonth = new DateOnly(y, m, 1);
 
+                var paidInvoice = await _context.Invoices
+                    .FirstOrDefaultAsync(i => i.ContractId == contract.Id && i.BillingMonth == billingMonth && i.Status == "paid");
+
+                if (paidInvoice != null)
+                {
+                    return BadRequest(new { message = $"Hóa đơn Tháng {m}/{y} của phòng {contract.Room?.Name} đã được người thuê thanh toán thành công! Không thể sửa đổi chỉ số điện nước nữa." });
+                }
+
                 var existingReading = await _context.UtilityReadings
                     .FirstOrDefaultAsync(u => u.RoomId == contract.RoomId && u.Month == billingMonth);
 
@@ -792,7 +824,9 @@ namespace Backend.Controllers
                 var reading = await _context.UtilityReadings.FirstOrDefaultAsync(u => u.RoomId == contract.RoomId && u.Month == invoice.BillingMonth);
                 if (reading != null)
                 {
+                    reading.ElectricityOld = req.OldElectric;
                     reading.ElectricityNew = req.NewElectric;
+                    reading.WaterOld = req.OldWater;
                     reading.WaterNew = req.NewWater;
                     reading.UpdatedAt = DateTime.UtcNow;
                 }

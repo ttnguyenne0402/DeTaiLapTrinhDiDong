@@ -440,14 +440,42 @@ class _InvoiceFormState extends State<Invoice_form> {
     setState(() => _isLoading = false);
 
     if (mounted) {
-      if (res != null) {
+      if (res != null && res['error'] != true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.invoice != null ? 'Cập nhật và phát hành lại hóa đơn thành công!' : (status == 'draft' ? 'Đã lưu hóa đơn nháp!' : 'Đã phát hành hóa đơn thành công!'))),
+          SnackBar(
+            backgroundColor: AppColors.primaryGreen,
+            content: Text(widget.invoice != null ? 'Cập nhật và phát hành lại hóa đơn thành công!' : (status == 'draft' ? 'Đã lưu hóa đơn nháp!' : 'Đã phát hành hóa đơn thành công!')),
+          ),
         );
         Navigator.pop(context, true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lỗi khi lập hóa đơn. Vui lòng kiểm tra lại!')),
+        final errorMsg = res != null ? (res['message'] ?? 'Phòng này đã có hóa đơn rồi!') : 'Không thể lập hóa đơn.';
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 26),
+                SizedBox(width: 8),
+                Text('Thông báo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              errorMsg,
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         );
       }
     }

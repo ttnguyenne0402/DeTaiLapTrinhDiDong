@@ -232,17 +232,19 @@ class ContractCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onTapDetail,
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    side: BorderSide(color: Colors.grey.shade300),
+              if (onTapDetail != null) ...[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onTapDetail,
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    child: const Text('Xem chi tiết', style: TextStyle(color: Colors.black87, fontSize: 12)),
                   ),
-                  child: const Text('Xem chi tiết', style: TextStyle(color: Colors.black87, fontSize: 12)),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: ElevatedButton(
                   onPressed: onTapPrimaryBtn,

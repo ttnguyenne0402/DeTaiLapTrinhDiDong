@@ -46,6 +46,7 @@ class RoomUtilityCard extends StatefulWidget {
   final String? warningTag;
   final String? warningMessage;
   final int proofImagesCount;
+  final bool isPaid;
 
   // Callback để màn hình cha cập nhật trạng thái phòng.
   final VoidCallback? onEnterInput;
@@ -57,6 +58,7 @@ class RoomUtilityCard extends StatefulWidget {
     required this.tenantName,
     this.phone,
     required this.status,
+    this.isPaid = false,
     this.totalAmount,
     this.elecOld,
     this.elecNew,
@@ -347,6 +349,27 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
   }
 
   Widget _buildStatusBadge() {
+    if (widget.isPaid) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: RoomCardColors.accentGreen.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.verified, size: 12, color: RoomCardColors.accentGreen),
+            SizedBox(width: 4),
+            Text(
+              'Đã thanh toán',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: RoomCardColors.accentGreen),
+            ),
+          ],
+        ),
+      );
+    }
+
     Color color;
     String label;
 
@@ -706,7 +729,22 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
             ],
           ),
         ],
-        if (widget.status == RoomUtilityStatus.completed)
+        if (widget.isPaid)
+          const Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock, size: 14, color: RoomCardColors.accentGreen),
+                  SizedBox(width: 4),
+                  Text('Đã thanh toán (Khóa)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: RoomCardColors.accentGreen)),
+                ],
+              ),
+            ),
+          )
+        else if (widget.status == RoomUtilityStatus.completed)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(

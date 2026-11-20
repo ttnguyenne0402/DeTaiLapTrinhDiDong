@@ -62,12 +62,16 @@ class OwnerInvoiceService {
         body: jsonEncode(data),
       );
 
+      final body = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return body;
       }
-      return null;
+      return {
+        'error': true,
+        'message': body['message'] ?? 'Không thể lập hóa đơn.'
+      };
     } catch (e) {
-      return null;
+      return {'error': true, 'message': 'Lỗi kết nối máy chủ.'};
     }
   }
 
@@ -201,7 +205,7 @@ class OwnerInvoiceService {
     return null;
   }
 
-  // 3. Cập nhật và phát hành lại hóa đơn
+  // Cập nhật và phát hành lại hóa đơn
   static Future<dynamic> updateInvoice(String invoiceId, Map<String, dynamic> body) async {
     try {
       final res = await http.put(
@@ -209,14 +213,17 @@ class OwnerInvoiceService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
+      final resBody = jsonDecode(res.body);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body);
+        return resBody;
       }
-      print('Lỗi updateInvoice: ${res.statusCode} - ${res.body}');
+      return {
+        'error': true,
+        'message': resBody['message'] ?? 'Không thể cập nhật hóa đơn.'
+      };
     } catch (e) {
-      print('Lỗi gọi updateInvoice: $e');
+      return {'error': true, 'message': 'Lỗi kết nối máy chủ.'};
     }
-    return null;
   }
 
   // 3. Lưu vĩnh viễn chỉ số điện nước vào CSDL SQL Server ngay khi bấm nút "Lưu chỉ số"
