@@ -65,6 +65,11 @@ namespace Backend.Services
                 initialWaterReading = contract.InitialWaterReading,
                 ownerName = contract.Owner != null ? contract.Owner.Name : "Đang cập nhật",
                 ownerPhone = contract.Owner != null ? contract.Owner.Phone : "Đang cập nhật",
+                ownerSignature = contract.OwnerSignature,
+                tenantSignature = contract.TenantSignature,
+                pdfUrl = !string.IsNullOrWhiteSpace(contract.Terms) && contract.Terms.Contains("PdfUrl:")
+                    ? contract.Terms.Split('|').FirstOrDefault(p => p.StartsWith("PdfUrl:"))?.Replace("PdfUrl:", "")
+                    : "http://10.0.2.2:5093/uploads/contracts/sample_contract.pdf",
 
            
                 services = contract.ContractServices.Select(cs => new

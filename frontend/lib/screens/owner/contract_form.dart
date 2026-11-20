@@ -1,10 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
 import '../../widgets/owner/contract_form_w.dart';
 import '../../services/owner/contract_service.dart';
+
 
 class Contract_form extends StatefulWidget {
   final Map<String, dynamic>? contract;
@@ -98,13 +102,215 @@ class HopDongMoi extends State<Contract_form> {
   late final SignatureController _ownerSignatureController;
   late final SignatureController _tenantSignatureController;
 
+  String? _selectedPdfFileName;
+
+  Future<void> _pickPdfFile() async {
+    try {
+      final result = await FilePickerPlatform.instance.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result.isNotEmpty) {
+        final platformFile = result.first;
+        final fileName = platformFile.name;
+        String extractedText = '';
+
+        try {
+          if (platformFile.path != null) {
+            final bytes = await File(platformFile.path!).readAsBytes();
+            if (bytes.isNotEmpty) {
+              final PdfDocument document = PdfDocument(inputBytes: bytes);
+              final PdfTextExtractor extractor = PdfTextExtractor(document);
+              extractedText = extractor.extractText();
+              document.dispose();
+            }
+          }
+        } catch (e) {
+          debugPrint('Lỗi đọc nội dung PDF bằng Syncfusion: $e');
+        }
+
+        setState(() {
+          _selectedPdfFileName = fileName;
+          if (extractedText.trim().isNotEmpty) {
+            _parseAndPopulatePdfText(extractedText);
+          }
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(extractedText.trim().isNotEmpty
+                  ? 'Đã bóc tách dữ liệu từ "$fileName"! 🎉'
+                  : 'Không đọc được chữ từ "$fileName".'),
+              backgroundColor: extractedText.trim().isNotEmpty ? AppColors.primaryGreen : Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi chọn file PDF: $e');
+    }
+  }
+
+  void _parseAndPopulatePdfText(String text) {
+    final flat = text
+        .replaceAll(RegExp(r'[\r\n\t\u00A0]+'), ' ')
+        .replaceAll(RegExp(r' +'), ' ')
+        .trim();
+
+
+
+    // 2. SỐ ĐIỆN THOẠI BÊN B (đưa lên trước để làm mốc bắt Tên Bên B)
+    final allPhones = RegExp(r'\b(0[35789]\d{8})\b').allMatches(flat).map((m) => m.group(1)!).toList();
+    String? tenantPhone;
+    if (allPhones.length >= 2) {
+      tenantPhone = allPhones[1];
+      _tenantPhoneController.text = tenantPhone;
+    } else if (allPhones.length == 1) {
+      tenantPhone = allPhones[0];
+      _tenantPhoneController.text = tenantPhone;
+    }
+
+    // 1. TÊN KHÁCH THUÊ: Cắt trực tiếp chuỗi nằm giữa dấu ":" và số điện thoại Bên B (0328091979)
+    if (tenantPhone != null) {
+      final beforePhone = flat.split(tenantPhone).first;
+      final parts = beforePhone.split(':');
+      if (parts.length >= 2) {
+        String candidate = parts[parts.length - 2].trim();
+        // Cắt bỏ từ chữ "S" (bắt đầu nhãn "Số điện thoại") trở về cuối
+        candidate = candidate.replaceAll(RegExp(r'\s+S\S*.*$'), '').trim();
+        if (candidate.isNotEmpty) {
+          _tenantNameController.text = candidate;
+        }
+      }
+    }
+
+    // Dự phòng nếu chưa có tên: lấy phần sau dấu ":" của cụm "Họ ... tên" thứ 2
+    if (_tenantNameController.text.trim().isEmpty) {
+      final fallbackName = RegExp(r':\s*([^\d:]{4,40}?)\s*\S+\s+\S+\s+\S+\s*:\s*0[35789]\d{8}')
+          .allMatches(flat)
+          .toList();
+      if (fallbackName.isNotEmpty) {
+        _tenantNameController.text = fallbackName.last.group(1)!.trim();
+      }
+    }
+
+    // 3. SỐ CCCD: Bắt chuỗi đúng 12 chữ số trong văn bản
+    final cccdMatch = RegExp(r'\b(\d{12})\b').firstMatch(flat);
+    if (cccdMatch != null) {
+      _cccdController.text = cccdMatch.group(1)!;
+    }
+
+    // 4. CÁC MỐC NGÀY (dd/MM/yyyy):
+    // Thứ tự trong file: [0] Ngày lập (01/11/2026), [1] Ngày cấp CCCD (15/08/2022), [2] Ngày bắt đầu (01/11/2026), [3] Ngày kết thúc (31/10/2027)
+    final allDates = RegExp(r'\b(\d{2}\/\d{2}\/\d{4})\b').allMatches(flat).map((m) => m.group(1)!).toList();
+    if (allDates.length >= 4) {
+      _issueDateController.text = allDates[1];
+      _startDateController.text = allDates[2];
+      _endDateController.text = allDates[3];
+    } else if (allDates.length >= 2) {
+      _startDateController.text = allDates[allDates.length - 2];
+      _endDateController.text = allDates[allDates.length - 1];
+    }
+
+    // 5. NƠI CẤP
+    final issuePlaceMatch = RegExp(r'N[ơo]i\s*c[ấa]p\s*:\s*(.+?)(?=\s*ĐIỀU|$)', caseSensitive: false).firstMatch(flat);
+    if (issuePlaceMatch != null) {
+      _issuePlaceController.text = issuePlaceMatch.group(1)!.trim();
+    }
+
+    // 6. GIÁ THUÊ & TIỀN CỌC: Bắt các số tiền có định dạng dấu chấm hàng nghìn (VD: 4.200.000)
+    final moneyMatches = RegExp(r'\b(\d{1,3}(?:\.\d{3})+)\b')
+        .allMatches(flat)
+        .map((m) => m.group(1)!.replaceAll('.', ''))
+        .toList();
+    if (moneyMatches.isNotEmpty) {
+      _rentPriceController.text = moneyMatches[0];
+      _depositPriceController.text = moneyMatches.length >= 2 ? moneyMatches[1] : moneyMatches[0];
+    }
+
+    // 7. CHỈ SỐ ĐIỆN & NƯỚC
+    final elecMatch = RegExp(r'(\d+)\s*kWh', caseSensitive: false).firstMatch(flat);
+    if (elecMatch != null) {
+      _electricIndexController.text = elecMatch.group(1)!;
+      // Lấy chuỗi ngay sau "kWh" và bắt con số đầu tiên xuất hiện -> chính là chỉ số nước (92)
+      final afterKwh = flat.substring(elecMatch.end);
+      final nextNumMatch = RegExp(r':\s*(\d+)').firstMatch(afterKwh) ?? RegExp(r'\b(\d{1,5})\b').firstMatch(afterKwh);
+      if (nextNumMatch != null) {
+        _waterIndexController.text = nextNumMatch.group(1)!;
+      }
+    }
+
+    // 8. Tự động chọn phòng (VD: Studio A1)
+    if (_availableRooms.isNotEmpty) {
+      for (final r in _availableRooms) {
+        final rName = (r['roomName'] ?? r['name'] ?? '').toString().trim();
+        if (rName.isNotEmpty && flat.toLowerCase().contains(rName.toLowerCase())) {
+          _selectedRoom = Map<String, dynamic>.from(r as Map);
+          final rId = _getRoomId(_selectedRoom);
+          if (rId.isNotEmpty) _fetchRoomServices(rId);
+          break;
+        }
+      }
+    }
+  }
+
+  Widget _buildPdfUploadSection() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.picture_as_pdf, color: Colors.blue.shade800, size: 20),
+              const SizedBox(width: 8),
+              const Text('Đính kèm File PDF Hợp đồng (Mẫu / Bản Scan)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _selectedPdfFileName ?? 'Chưa chọn file PDF hợp đồng mẫu',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _selectedPdfFileName != null ? AppColors.primaryGreen : Colors.grey.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.upload_file, size: 16, color: Colors.white),
+                label: const Text('Tải PDF', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                onPressed: _pickPdfFile,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   bool get _isDraft => widget.contract?['status'] == 'Bản nháp' || widget.contract?['status'] == 'draft';
   bool get _isPendingSignature => widget.contract?['status'] == 'Chờ ký' || widget.contract?['status'] == 'pending';
   bool get _isActive => widget.contract?['status'] == 'Đang hiệu lực' || widget.contract?['status'] == 'active';
 
-  bool get _ownerHasSigned => _ownerSignatureController.points.isNotEmpty;
-  bool get _tenantHasSigned => _tenantSignatureController.points.isNotEmpty;
-  bool get _bothSigned => _ownerHasSigned && _tenantHasSigned;
+  bool get _ownerHasSigned => _ownerSignatureController.points.isNotEmpty || (_existingOwnerSignature != null && _existingOwnerSignature!.isNotEmpty);
+  bool get _tenantHasSigned => _tenantSignatureController.points.isNotEmpty || (_existingTenantSignature != null && _existingTenantSignature!.isNotEmpty);
+  bool get _bothSigned => _ownerHasSigned || _tenantHasSigned;
 
   String get _title {
     if (_isDraft) return 'Tiếp tục hợp đồng';
@@ -116,11 +322,16 @@ class HopDongMoi extends State<Contract_form> {
     return 'Tạo hợp đồng mới';
   }
 
+  String? _existingOwnerSignature;
+  String? _existingTenantSignature;
+
   @override
   void initState() {
     super.initState();
 
     final c = widget.contract;
+    _existingOwnerSignature = c?['ownerSignature']?.toString() ?? c?['OwnerSignature']?.toString();
+    _existingTenantSignature = c?['tenantSignature']?.toString() ?? c?['TenantSignature']?.toString();
 
     _tenantNameController = TextEditingController(text: c?['tenantName'] ?? '');
     _tenantPhoneController = TextEditingController(text: c?['tenantPhone'] ?? '');
@@ -473,6 +684,11 @@ class HopDongMoi extends State<Contract_form> {
 
   // 2. Hoàn tất & Gửi ký
   Future<void> _completeContract() async {
+    if (_selectedRoom == null || _getRoomId(_selectedRoom).isEmpty) {
+      _showMessage('Vui lòng chọn phòng trống trong hệ thống để tạo hợp đồng!');
+      return;
+    }
+
     if (_tenantNameController.text.trim().isEmpty) {
       _showMessage('Vui lòng nhập họ và tên khách thuê.');
       return;
@@ -517,6 +733,8 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
+    final String initialStatus = _selectedPdfFileName != null ? 'active' : 'pending';
+
     final body = {
       'viewingAppointmentId': _selectedAppointment?['id'] ?? _selectedAppointment?['Id'],
       'roomId': _getRoomId(_selectedRoom),
@@ -531,14 +749,18 @@ class HopDongMoi extends State<Contract_form> {
       'depositPrice': depositPrice,
       'electricIndex': int.tryParse(_electricIndexController.text.trim()) ?? 0,
       'waterIndex': int.tryParse(_waterIndexController.text.trim()) ?? 0,
-      'status': 'pending',
+      'status': initialStatus,
+      'pdfUrl': _selectedPdfFileName != null ? 'http://10.0.2.2:5093/uploads/contracts/$_selectedPdfFileName' : null,
       'services': _appliedServices.where((s) => s['selected'] == true).toList(),
     };
 
     final success = await ContractService.createContract(body);
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã tạo hợp đồng và gửi ký thành công!')),
+        SnackBar(
+          content: Text(initialStatus == 'active' ? 'Đã đính kèm PDF hợp đồng và kích hoạt hợp đồng thành công!' : 'Đã tạo hợp đồng và gửi ký thành công!'),
+          backgroundColor: AppColors.primaryGreen,
+        ),
       );
       Navigator.pop(context, true);
     } else {
@@ -585,8 +807,11 @@ class HopDongMoi extends State<Contract_form> {
     final ownerBytes = await _ownerSignatureController.toPngBytes();
     final tenantBytes = await _tenantSignatureController.toPngBytes();
 
-    if (ownerBytes == null || tenantBytes == null) {
-      _showMessage('Không thể lưu chữ ký. Vui lòng ký lại.');
+    String ownerBase64 = ownerBytes != null ? base64Encode(ownerBytes) : (_existingOwnerSignature ?? '');
+    String tenantBase64 = tenantBytes != null ? base64Encode(tenantBytes) : (_existingTenantSignature ?? '');
+
+    if (ownerBase64.isEmpty && tenantBase64.isEmpty) {
+      _showMessage('Vui lòng vẽ chữ ký trước khi xác nhận.');
       return;
     }
 
@@ -598,8 +823,8 @@ class HopDongMoi extends State<Contract_form> {
 
     final success = await ContractService.signContract(
       contractId: contractId.toString(),
-      ownerSignatureBase64: base64Encode(ownerBytes),
-      tenantSignatureBase64: base64Encode(tenantBytes),
+      ownerSignatureBase64: ownerBase64,
+      tenantSignatureBase64: tenantBase64,
     );
 
     if (success && mounted) {
@@ -1186,6 +1411,8 @@ class HopDongMoi extends State<Contract_form> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _buildPdfUploadSection(),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -1303,18 +1530,24 @@ class HopDongMoi extends State<Contract_form> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildSignatureBox(title: 'Chữ ký chủ trọ', controller: _ownerSignatureController, hasSigned: _ownerHasSigned),
+          _buildSignatureBox(title: 'Chữ ký chủ trọ (Bên A)', controller: _ownerSignatureController, existingBase64: _existingOwnerSignature),
           const SizedBox(height: 12),
-          _buildSignatureBox(title: 'Chữ ký khách thuê', controller: _tenantSignatureController, hasSigned: _tenantHasSigned),
+          _buildSignatureBox(title: 'Chữ ký khách thuê (Bên B)', controller: _tenantSignatureController, existingBase64: _existingTenantSignature),
         ],
       ),
     );
   }
 
-  Widget _buildSignatureBox({required String title, required SignatureController controller, required bool hasSigned}) {
+  Widget _buildSignatureBox({required String title, required SignatureController controller, String? existingBase64}) {
+    final bool hasSavedSig = existingBase64 != null && existingBase64.isNotEmpty;
+
     return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: hasSigned ? Colors.green : Colors.grey.shade300)),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: hasSavedSig ? AppColors.primaryGreen : Colors.grey.shade300, width: 1.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1322,21 +1555,54 @@ class HopDongMoi extends State<Contract_form> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-              TextButton.icon(
-                onPressed: () => controller.clear(),
-                icon: const Icon(Icons.refresh, size: 14),
-                label: const Text('Ký lại', style: TextStyle(fontSize: 11)),
+              Row(
+                children: [
+                  Icon(hasSavedSig ? Icons.check_circle : Icons.edit_note, size: 14, color: hasSavedSig ? AppColors.primaryGreen : Colors.orange),
+                  const SizedBox(width: 4),
+                  Text(
+                    hasSavedSig ? 'Đã ký số' : 'Vẽ chữ ký',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: hasSavedSig ? AppColors.primaryGreen : Colors.orange),
+                  ),
+                  if (!hasSavedSig) ...[
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () => controller.clear(),
+                      icon: const Icon(Icons.refresh, size: 12),
+                      label: const Text('Ký lại', style: TextStyle(fontSize: 10)),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
-          Container(
-            height: 120,
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(6)),
-            child: Signature(controller: controller, backgroundColor: Colors.white),
-          ),
+          const SizedBox(height: 8),
+          if (hasSavedSig)
+            _renderSignatureImage(existingBase64)
+          else
+            Container(
+              height: 100,
+              decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(6)),
+              child: Signature(controller: controller, backgroundColor: Colors.white),
+            ),
         ],
       ),
     );
+  }
+
+  Widget _renderSignatureImage(String base64Str) {
+    try {
+      final clean = base64Str.contains(',') ? base64Str.split(',').last : base64Str;
+      final bytes = base64Decode(clean);
+      return Container(
+        height: 100,
+        width: double.infinity,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.primaryGreen)),
+        child: Image.memory(bytes, fit: BoxFit.contain),
+      );
+    } catch (_) {
+      return const SizedBox(height: 60, child: Center(child: Text('Đã có chữ ký điện tử', style: TextStyle(color: AppColors.primaryGreen))));
+    }
   }
 
   Widget _buildActiveContractInfo() {

@@ -1,13 +1,16 @@
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'dart:convert';
 import 'dart:io';
+
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
 import '../../utils/database_helper.dart';
 import 'contract_detail_screen.dart';
 import '../../services/auth_storage.dart';
+
 class MyContractsScreen extends StatefulWidget {
   const MyContractsScreen({super.key});
 
@@ -16,14 +19,18 @@ class MyContractsScreen extends StatefulWidget {
 }
 
 class _MyContractsScreenState extends State<MyContractsScreen> {
-  // LỌC
   String selectedFilter = 'Tất cả';
-  final List<String> filters = ['Tất cả', 'Hiệu lực', 'Đã hết hạn'];
+
+  final List<String> filters = [
+    'Tất cả',
+    'Chờ ký',
+    'Hiệu lực',
+    'Đã hết hạn',
+    'Đã thanh lý'
+  ];
 
   List _contracts = [];
   bool _isLoading = true;
-
-  // URL API Backend
   late String _apiUrl;
 
   @override
@@ -31,21 +38,28 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
     super.initState();
     _initData();
   }
+
   Future<void> _initData() async {
     final userId = await AuthStorage.getUserId();
-    _apiUrl = 'http://10.0.2.2:5093/api/contracts/tenant/${userId ?? ""}';
+
+    _apiUrl =
+    'http://10.0.2.2:5093/api/contracts/tenant/${userId ?? ""}';
+
     await _loadData();
   }
-  // Hàm tạo Client tùy chỉnh bỏ qua lỗi SSL
+
   IOClient _getCustomClient() {
     final httpClient = HttpClient()
-      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+
     return IOClient(httpClient);
   }
 
   Future<void> _loadData() async {
-    // 1. Lấy dữ liệu từ SQLite
-    final localData = await DatabaseHelper.instance.getLocalContracts();
+    final localData =
+    await DatabaseHelper.instance.getLocalContracts();
+
     if (localData.isNotEmpty) {
       setState(() {
         _contracts = List.from(localData);
@@ -53,18 +67,17 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
       });
     }
 
-    // 2. Gọi API để lấy dữ liệu mới nhất
     final client = _getCustomClient();
+
     try {
       final response = await client.get(Uri.parse(_apiUrl));
 
       if (response.statusCode == 200) {
-        final List<dynamic> apiData = json.decode(response.body);
+        final List<dynamic> apiData =
+        json.decode(response.body);
 
-        // 3. Lưu đè dữ liệu mới vào SQLite
         await DatabaseHelper.instance.insertContracts(apiData);
 
-        // 4. Cập nhật lại UI
         if (mounted) {
           setState(() {
             _contracts = List.from(apiData);
@@ -72,11 +85,11 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
           });
         }
       } else {
-        print("Lỗi server: ${response.statusCode}");
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
-      print("Lỗi khi lấy hợp đồng từ server: $e");
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -87,11 +100,28 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // XỬ LÝ LỌC TRÊN DỮ LIỆU THẬT
+    // 🔴 2. LỌC ĐÚNG TRẠNG THÁI THEO TAB ĐƯỢC CHỌN
     List filteredContracts = _contracts.where((contract) {
+      final st = contract['status'] ?? '';
+
       if (selectedFilter == 'Tất cả') return true;
-      if (selectedFilter == 'Hiệu lực') return contract['status'] == 'active';
-      if (selectedFilter == 'Đã hết hạn') return contract['status'] == 'expired';
+
+      if (selectedFilter == 'Chờ ký') {
+        return st == 'pending' || st == 'Chờ ký';
+      }
+
+      if (selectedFilter == 'Hiệu lực') {
+        return st == 'active' || st == 'Đang hiệu lực';
+      }
+
+      if (selectedFilter == 'Đã hết hạn') {
+        return st == 'expired' || st == 'Đã hết hạn';
+      }
+
+      if (selectedFilter == 'Đã thanh lý') {
+        return st == 'terminated' || st == 'Đã thanh lý';
+      }
+
       return false;
     }).toList();
 
@@ -102,7 +132,10 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
         centerTitle: true,
         title: const Text(
           'Hợp đồng của tôi',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         elevation: 0,
       ),
@@ -110,37 +143,55 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
         width: double.infinity,
         decoration: const BoxDecoration(
           color: AppColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(24),
+          ),
         ),
         child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(24),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ---  LỌC  ---
+              // --- TABS LỌC ---
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
+                ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: filters.map((filter) {
-                      bool isSelected = selectedFilter == filter;
+                      bool isSelected =
+                          selectedFilter == filter;
+
                       return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
+                        padding:
+                        const EdgeInsets.only(right: 8.0),
                         child: ChoiceChip(
                           label: Text(
                             filter,
                             style: TextStyle(
-                              color: isSelected ? Colors.white : AppColors.textSecondary,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                           selected: isSelected,
-                          selectedColor: AppColors.primaryGreen,
-                          backgroundColor: AppColors.cardSurface,
+                          selectedColor:
+                          AppColors.primaryGreen,
+                          backgroundColor:
+                          AppColors.cardSurface,
                           showCheckmark: false,
                           side: BorderSide(
-                            color: isSelected ? AppColors.primaryGreen : Colors.grey.shade300,
+                            color: isSelected
+                                ? AppColors.primaryGreen
+                                : Colors.grey.shade300,
                           ),
                           onSelected: (bool selected) {
                             setState(() {
@@ -154,117 +205,217 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                 ),
               ),
 
-              // --- DANH SÁCH HỢP ĐỒNG  ---
+              // --- DANH SÁCH HỢP ĐỒNG ---
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                  child: CircularProgressIndicator(),
+                )
                     : filteredContracts.isEmpty
                     ? const Center(
-                  child: Text('Không có hợp đồng nào.', style: TextStyle(color: AppColors.textSecondary)),
+                  child: Text(
+                    'Không có hợp đồng nào.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 )
-                    : ListView.builder(
-                  itemCount: filteredContracts.length,
-                  padding: const EdgeInsets.only(bottom: 20),
-                  itemBuilder: (context, index) {
-                    final contract = filteredContracts[index];
-                    bool isActive = contract['status'] == 'active';
+                    : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: ListView.builder(
+                    itemCount:
+                    filteredContracts.length,
+                    padding:
+                    const EdgeInsets.only(
+                      bottom: 20,
+                    ),
+                    itemBuilder: (context, index) {
+                      final contract =
+                      filteredContracts[index];
 
-                    // Lấy tên phòng
-                    String roomName = contract['roomId'] ?? 'Phòng trống';
-                    if (contract['contractCode'] != null) {
-                      roomName = 'Hợp đồng: ${contract['contractCode']}';
-                    }
+                      final st =
+                          contract['status'] ?? '';
 
-                    return Card(
-                      color: AppColors.cardSurface,
-                      elevation: 2,
-                      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
+                      // 🔴 3. HIỂN THỊ ĐÚNG MÀU SẮC VÀ TÊN NHÃN TRẠNG THÁI
+                      String statusText;
+                      Color statusBg;
+                      Color statusColor;
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ContractDetailScreen(),
-                              settings: RouteSettings(arguments: contract['id']),
-                            ),
-                          );
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      roomName,
-                                      style: const TextStyle(
-                                        color: AppColors.textPrimary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                      if (st == 'pending' ||
+                          st == 'Chờ ký') {
+                        statusText = 'Chờ ký';
+                        statusBg =
+                            Colors.orange.shade100;
+                        statusColor =
+                            Colors.orange.shade900;
+                      } else if (st == 'active' ||
+                          st == 'Đang hiệu lực') {
+                        statusText = 'Đang hiệu lực';
+                        statusBg =
+                            AppColors.lightGreen;
+                        statusColor =
+                            AppColors.primaryGreen;
+                      } else if (st == 'expired' ||
+                          st == 'Đã hết hạn') {
+                        statusText = 'Đã hết hạn';
+                        statusBg =
+                            Colors.grey.shade200;
+                        statusColor =
+                            Colors.grey.shade700;
+                      } else {
+                        statusText = 'Đã thanh lý';
+                        statusBg =
+                            Colors.red.shade100;
+                        statusColor =
+                            Colors.red.shade800;
+                      }
+
+                      String title =
+                          contract['title'] ??
+                              contract['roomName'] ??
+                              'Hợp đồng thuê phòng';
+
+                      if (contract['contractCode'] !=
+                          null) {
+                        title =
+                        '$title (${contract['contractCode']})';
+                      }
+
+                      return Card(
+                        color: AppColors.cardSurface,
+                        elevation: 2,
+                        margin:
+                        const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 8.0,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                          BorderRadius.circular(12),
+                        ),
+                        child: InkWell(
+                          borderRadius:
+                          BorderRadius.circular(12),
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                const ContractDetailScreen(),
+                                settings: RouteSettings(
+                                  arguments:
+                                  contract['id'],
+                                ),
+                              ),
+                            );
+
+                            _loadData();
+                          },
+                          child: Padding(
+                            padding:
+                            const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        style:
+                                        const TextStyle(
+                                          color: AppColors
+                                              .textPrimary,
+                                          fontSize: 15,
+                                          fontWeight:
+                                          FontWeight.bold,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const Icon(
-                                    Icons.arrow_forward_ios,
-                                    size: 16,
-                                    color: AppColors.textSecondary,
-                                  )
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Trạng thái: ',
-                                    style: TextStyle(color: AppColors.textSecondary),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isActive ? AppColors.lightGreen : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      isActive ? 'Hiệu lực' : (contract['status'] == 'expired' ? 'Đã hết hạn' : 'Đã thanh lý'),
+                                    const Icon(
+                                      Icons
+                                          .arrow_forward_ios,
+                                      size: 16,
+                                      color: AppColors
+                                          .textSecondary,
+                                    )
+                                  ],
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Trạng thái: ',
                                       style: TextStyle(
-                                        color: isActive ? AppColors.primaryGreen : AppColors.textSecondary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                                        color: AppColors
+                                            .textSecondary,
+                                        fontSize: 13,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Bắt đầu: ',
-                                    style: TextStyle(color: AppColors.textSecondary),
-                                  ),
-                                  Text(
-                                    contract['startDate'] ?? 'N/A',
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.w500,
+                                    Container(
+                                      padding:
+                                      const EdgeInsets
+                                          .symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration:
+                                      BoxDecoration(
+                                        color: statusBg,
+                                        borderRadius:
+                                        BorderRadius
+                                            .circular(6),
+                                      ),
+                                      child: Text(
+                                        statusText,
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontSize: 12,
+                                          fontWeight:
+                                          FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              )
-                            ],
+                                  ],
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Thời hạn: ',
+                                      style: TextStyle(
+                                        color: AppColors
+                                            .textSecondary,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${contract['startDate'] ?? 'N/A'} - ${contract['endDate'] ?? 'N/A'}',
+                                      style:
+                                      const TextStyle(
+                                        color: AppColors
+                                            .textPrimary,
+                                        fontWeight:
+                                        FontWeight.w500,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ],

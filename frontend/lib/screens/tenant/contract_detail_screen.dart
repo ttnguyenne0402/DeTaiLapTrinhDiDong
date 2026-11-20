@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:signature/signature.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../core/constants/app_colors.dart';
@@ -233,6 +234,38 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
               const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
             ],
 
+            // 🔴 HIỂN THỊ TRẠNG THÁI CHỮ KÝ CỦA CẢ 2 BÊN
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('CHỮ KÝ ĐIỆN TỬ HAI BÊN', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSignatureDisplayBox(
+                          role: 'Chủ nhà (Bên A)',
+                          name: ownerName,
+                          signatureBase64: _contractDetail!['ownerSignature']?.toString(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildSignatureDisplayBox(
+                          role: 'Khách thuê (Bên B)',
+                          name: _contractDetail!['tenantName'] ?? 'Khách thuê',
+                          signatureBase64: _contractDetail!['tenantSignature']?.toString(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
+
             if (_contractDetail!['status'] == 'pending') ...[
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -375,7 +408,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                       ),
                       icon: const Icon(Icons.picture_as_pdf, color: AppColors.primaryGreen),
                       label: const Text('XEM FILE HỢP ĐỒNG (PDF)', style: TextStyle(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-                      onPressed: () { /* Xử lý tải/xem PDF sau */ },
+                      onPressed: _openPdfContract,
                     ),
                   ),
                 ],
@@ -386,6 +419,71 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _openPdfContract() async {
+    final pdfUrl = _contractDetail?['pdfUrl']?.toString() ?? 'http://10.0.2.2:5093/uploads/contracts/sample_contract.pdf';
+    final uri = Uri.parse(pdfUrl);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Mở file Hợp đồng PDF: $pdfUrl')));
+      }
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Mở file Hợp đồng PDF: $pdfUrl')));
+    }
+  }
+
+  Widget _buildSignatureDisplayBox({
+    required String role,
+    required String name,
+    String? signatureBase64,
+  }) {
+    final bool hasSig = signatureBase64 != null && signatureBase64.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: hasSig ? AppColors.primaryGreen : Colors.grey.shade300, width: 1.5),
+      ),
+      child: Column(
+        children: [
+          Text(role, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
+          if (hasSig)
+            tryDecodeImage(signatureBase64)
+          else
+            const SizedBox(
+              height: 50,
+              child: Center(child: Text('Chưa ký', style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic))),
+            ),
+          const SizedBox(height: 8),
+          Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(hasSig ? Icons.check_circle : Icons.hourglass_empty, size: 14, color: hasSig ? AppColors.primaryGreen : Colors.orange),
+              const SizedBox(width: 4),
+              Text(hasSig ? 'Đã ký số' : 'Chờ ký', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: hasSig ? AppColors.primaryGreen : Colors.orange)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget tryDecodeImage(String base64Str) {
+    try {
+      final clean = base64Str.contains(',') ? base64Str.split(',').last : base64Str;
+      final bytes = base64Decode(clean);
+      return Image.memory(bytes, height: 50, fit: BoxFit.contain);
+    } catch (_) {
+      return const SizedBox(height: 50, child: Icon(Icons.draw, color: AppColors.primaryGreen));
+    }
   }
 
   Widget _buildInfoRow(String label, String value) {

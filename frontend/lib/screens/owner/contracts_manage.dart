@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
 import '../../widgets/owner/contract_card.dart';
 import '../../route/app_routes.dart';
+import '../tenant/profile_screen.dart';
 import 'contract_detail_owner.dart';
 import 'properties_manage.dart';
 import '../../widgets/owner/owner_drawer.dart';
@@ -302,7 +303,9 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(Icons.home, 'Trang chủ', true, () {}),
+            _buildNavItem(Icons.home, 'Trang chủ', true, () {
+              Navigator.pushNamed(context, AppRoutes.OwnerDashboard);
+            }),
             _buildNavItem(Icons.apartment, 'Tòa nhà', false, () {
               Navigator.push(
                 context,
@@ -316,7 +319,22 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
                 MaterialPageRoute(builder: (context) => const TenantListScreen()),
               );
             }),
-            _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {}),
+            _buildNavItem(Icons.person_outline, 'Cá nhân', false, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProfileScreen(
+                    user: {
+                      'Name': 'Nguyễn Văn A',
+                      'Email': '',
+                      'Phone': '',
+                      'Avatar': '',
+                      'Role': 'owner',
+                    },
+                  ),
+                ),
+              );
+            }),
           ],
         ),
       ),

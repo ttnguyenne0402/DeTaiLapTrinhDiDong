@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../widgets/owner/utility_card_w.dart';
+import '../../services/auth_storage.dart';
 import '../../services/owner/invoice_service.dart';
+import '../../widgets/owner/utility_card_w.dart';
 import 'invoice_form.dart';
+import 'invoices_manage..dart';
 
 class InvoiceCreateScreen extends StatefulWidget {
   final String? propertyId;
@@ -22,6 +24,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   final Map<String, RoomUtilityStatus> _roomStatuses = {};
   final Map<String, String> _elecNewValues = {};
   final Map<String, String> _waterNewValues = {};
+  final Map<String, bool> _roomIsPaid = {};
 
   @override
   void initState() {
@@ -49,6 +52,9 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           final elecNew = item['elecNew']?.toString();
           final waterNew = item['waterNew']?.toString();
           final isRecorded = item['isRecorded'] == true;
+          final isPaid = item['isPaid'] == true;
+
+          _roomIsPaid[id] = isPaid;
 
           if (isRecorded && elecNew != null && waterNew != null) {
             _elecNewValues[id] = elecNew;
@@ -84,6 +90,38 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
   }
 
   void _enterInput(String room) {
+    if (_roomIsPaid[room] == true) {
+      final targetRoom = _rooms.firstWhere((r) => r.id == room, orElse: () => _rooms.first);
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.verified_user_outlined, color: AppColors.primaryGreen, size: 26),
+              SizedBox(width: 8),
+              Text('Đã thanh toán', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'Hóa đơn phòng ${targetRoom.roomName} đã được người thuê thanh toán thành công! Không thể sửa chỉ số điện nước nữa.',
+            style: const TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _roomStatuses[room] = RoomUtilityStatus.inputting;
     });
@@ -107,12 +145,40 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success
-              ? 'Đã lưu vĩnh viễn chỉ số phòng ${targetRoom.roomName} vào CSDL thành công!'
-              : 'Đã ghi nhận chỉ số phòng ${targetRoom.roomName}.'),
-          backgroundColor: success ? AppColors.primaryGreen : Colors.orange,
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(
+                success ? Icons.check_circle : Icons.info_outline,
+                color: success ? AppColors.primaryGreen : Colors.orange,
+                size: 26,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                success ? 'Đã lưu chỉ số' : 'Thông báo',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            success
+                ? 'Đã lưu chỉ số điện nước cho phòng ${targetRoom.roomName} vào CSDL thành công!'
+                : 'Đã ghi nhận chỉ số phòng ${targetRoom.roomName}.',
+            style: const TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
       );
     }
@@ -144,19 +210,110 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
       return;
     }
 
-    int issuedCount = 0;
+    final now = DateTime.now();
+    final ownerId = await AuthStorage.getUserId() ?? '';
+    final monthlyData = await OwnerInvoiceService.getMonthlyInvoices(
+      ownerId: ownerId,
+      month: now.month,
+      year: now.year,
+    );
+
+    List<dynamic> existingInvoices = [];
+    if (monthlyData != null && monthlyData is Map && monthlyData['invoices'] is List) {
+      existingInvoices = monthlyData['invoices'];
+    }
+
+    // Lọc ra các phòng đã thanh toán xong
+    final paidRoomNames = <String>[];
+    final processRooms = <_RoomInfo>[];
 
     for (var room in completedRooms) {
+      final matchedInvoice = existingInvoices.firstWhere(
+        (inv) {
+          final rName = (inv['room'] ?? '').toString().toLowerCase();
+          return rName.contains(room.roomName.toLowerCase()) || inv['id']?.toString() == room.contractId;
+        },
+        orElse: () => null,
+      );
+
+      if (matchedInvoice != null) {
+        final invData = InvoiceData.fromJson(matchedInvoice as Map<String, dynamic>);
+        if (invData.status == InvoiceStatus.paid) {
+          paidRoomNames.add(room.roomName);
+          continue;
+        }
+      }
+      processRooms.add(room);
+    }
+
+    // Nếu TẤT CẢ các phòng được chọn đều ĐÃ THANH TOÁN
+    if (processRooms.isEmpty && paidRoomNames.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.verified_user_outlined, color: AppColors.primaryGreen, size: 26),
+              SizedBox(width: 8),
+              Text('Tất cả đã thanh toán', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            'Hóa đơn Tháng ${now.month}/${now.year} của các phòng (${paidRoomNames.join(', ')}) đều đã được thanh toán thành công! Không cần lập hoặc cập nhật nữa.',
+            style: const TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Nếu có phòng đã thanh toán xen kẽ phòng chưa thanh toán -> Báo nhẹ tên phòng đã thanh toán
+    if (paidRoomNames.isNotEmpty && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Bỏ qua ${paidRoomNames.join(', ')} do đã thanh toán xong.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+
+    int issuedCount = 0;
+
+    for (var room in processRooms) {
       if (!mounted) break;
 
       final newEl = double.tryParse(_elecNewValues[room.id] ?? '') ?? double.tryParse(room.elecOld ?? '0') ?? 0;
       final newWt = double.tryParse(_waterNewValues[room.id] ?? '') ?? double.tryParse(room.waterOld ?? '0') ?? 0;
 
+      final matchedInvoice = existingInvoices.firstWhere(
+        (inv) {
+          final rName = (inv['room'] ?? '').toString().toLowerCase();
+          return rName.contains(room.roomName.toLowerCase()) || inv['id']?.toString() == room.contractId;
+        },
+        orElse: () => null,
+      );
+
+      InvoiceData? invData;
+      if (matchedInvoice != null) {
+        invData = InvoiceData.fromJson(matchedInvoice as Map<String, dynamic>);
+      }
+
       final result = await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => Invoice_form(
-            invoice: null,
+            invoice: invData,
             contractId: room.contractId,
             initialNewElectric: newEl,
             initialNewWater: newWt,
@@ -257,6 +414,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                                 tenantName: room.tenant,
                                 phone: room.phone,
                                 status: _roomStatuses[room.id] ?? room.status,
+                                isPaid: _roomIsPaid[room.id] == true,
                                 totalAmount: room.totalAmount,
                                 elecOld: (double.tryParse(room.elecOld ?? '') ?? 0).toInt(),
                                 elecNew: (double.tryParse(_elecNewValues[room.id] ?? '') ?? 0).toInt(),
@@ -467,7 +625,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           ),
           label: Text(
             completed > 0
-                ? 'Đến trang Lập hóa đơn ($completed phòng)'
+                ? 'Xem / Cập nhật Hóa đơn ($completed phòng)'
                 : 'Nhập số điện nước để lập hóa đơn',
             style: TextStyle(
               fontWeight: FontWeight.bold,
