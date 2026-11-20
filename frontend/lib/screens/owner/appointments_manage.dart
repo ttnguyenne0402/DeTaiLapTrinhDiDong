@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../services/auth_storage.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import '../../services/owner/appointment_service.dart';
 import '../../utils/phone_helper.dart';
@@ -715,7 +716,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
               ),
             if (status == 'confirmed')
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   ElevatedButton.icon(
                     onPressed: () => _updateStatus(

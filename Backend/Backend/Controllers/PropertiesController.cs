@@ -60,6 +60,8 @@ namespace Backend.Controllers
                     Id = p.Id ?? string.Empty,
                     Name = p.Name ?? string.Empty,
                     Address = p.Address ?? string.Empty,
+                    Latitude = p.Latitude,
+                    Longitude = p.Longitude,
                     TotalRooms = allRooms.Count(r => r.PropertyId == p.Id),
                     RentedRooms = allRooms.Count(r => r.PropertyId == p.Id && r.Status == "rented"),
                     EmptyRooms = allRooms.Count(r => r.PropertyId == p.Id && r.Status == "available"),
@@ -96,6 +98,8 @@ namespace Backend.Controllers
                     Address = dto.Address,
                     District = string.IsNullOrEmpty(dto.District) ? "Chưa rõ" : dto.District,
                     Ward = string.IsNullOrEmpty(dto.Ward) ? "Chưa rõ" : dto.Ward,
+                    Latitude = dto.Latitude ?? 10.8231m,
+                    Longitude = dto.Longitude ?? 106.6297m,
                     Description = dto.Description,
                     Status = string.IsNullOrEmpty(dto.Status) ? "active" : dto.Status
                 };

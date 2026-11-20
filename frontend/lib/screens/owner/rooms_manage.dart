@@ -118,6 +118,7 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
               MaterialPageRoute(
                 builder: (context) => RoomFormScreen(
                   initialPropertyId: widget.propertyId,
+                  initialPropertyName: widget.propertyName,
                 ),
               ),
             );
@@ -172,11 +173,11 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
       },
       child: FutureBuilder<List<RoomModel>>(
         key: ValueKey('$filter-${widget.propertyId ?? 'all'}-$_refreshCounter'),
-        future: RoomService.fetchRooms(
-          'USER_OWNER_01',
+        future: AuthStorage.getUserId().then((ownerId) => RoomService.fetchRooms(
+          (ownerId != null && ownerId.trim().isNotEmpty) ? ownerId.trim() : 'USER_OWNER_01',
           status: filter,
           propertyId: widget.propertyId,
-        ),
+        )),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -354,7 +355,11 @@ class _RoomsManageScreenState extends State<RoomsManageScreen> {
               final res = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => RoomFormScreen(initialData: room),
+                  builder: (context) => RoomFormScreen(
+                    initialData: room,
+                    initialPropertyId: widget.propertyId,
+                    initialPropertyName: widget.propertyName,
+                  ),
                 ),
               );
               if (res == true) {

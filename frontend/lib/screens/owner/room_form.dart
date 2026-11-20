@@ -4,16 +4,19 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/room_service.dart';
 import '../../services/owner/property_service.dart';
+import '../../services/auth_storage.dart';
 
 // Màn hình biểu mẫu thêm mới hoặc chỉnh sửa phòng trọ
 class RoomFormScreen extends StatefulWidget {
   final RoomModel? initialData;
   final String? initialPropertyId;
+  final String? initialPropertyName;
 
   const RoomFormScreen({
     super.key,
     this.initialData,
     this.initialPropertyId,
+    this.initialPropertyName,
   });
 
   @override
@@ -77,9 +80,10 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
 
   Future<void> _loadInitialData() async {
     try {
+      final ownerId = await AuthStorage.getUserId() ?? 'USER_OWNER_01';
       final results = await Future.wait([
-        PropertyService.fetchProperties('USER_OWNER_01', 'all'),
-        RoomService.fetchRooms('USER_OWNER_01', status: 'all'),
+        PropertyService.fetchProperties(ownerId, 'all'),
+        RoomService.fetchRooms(ownerId, status: 'all'),
       ]);
       if (mounted) {
         final props = results[0] as List<PropertyModel>;
@@ -275,7 +279,12 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Chọn bất động sản / tòa nhà trực tiếp từ CSDL
-                        _buildSectionTitle('Chọn Tòa nhà / Bất động sản'),
+                        _buildSectionTitle(
+                          (widget.initialPropertyId != null &&
+                                  widget.initialPropertyId!.isNotEmpty)
+                              ? 'Tòa nhà / Bất động sản trực thuộc'
+                              : 'Chọn Tòa nhà / Bất động sản',
+                        ),
                         const SizedBox(height: 8),
                         _buildPropertyDropdown(),
                         const SizedBox(height: 20),
@@ -394,10 +403,13 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                     return;
                                   }
 
-                                  final targetPropId = _selectedPropertyId ??
-                                      (_properties.isNotEmpty
-                                          ? _properties.first.id
-                                          : 'prop_01');
+                                  final targetPropId = (widget.initialPropertyId != null &&
+                                          widget.initialPropertyId!.isNotEmpty)
+                                      ? widget.initialPropertyId!
+                                      : (_selectedPropertyId ??
+                                          (_properties.isNotEmpty
+                                              ? _properties.first.id
+                                              : 'prop_01'));
                                   final targetFloor =
                                       int.tryParse(_floorController.text.trim()) ?? 1;
 
@@ -530,6 +542,88 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
   }
 
   Widget _buildPropertyDropdown() {
+    final bool isLocked = widget.initialPropertyId != null &&
+        widget.initialPropertyId!.isNotEmpty;
+
+    if (isLocked) {
+      String propName = widget.initialPropertyName ?? '';
+      String propAddress = '';
+      final match = _properties.where(
+        (p) => p.id.toLowerCase() == widget.initialPropertyId!.toLowerCase(),
+      );
+      if (match.isNotEmpty) {
+        propName = match.first.name;
+        propAddress = match.first.address;
+      } else if (propName.isEmpty) {
+        propName = 'Bất động sản hiện tại';
+      }
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.apartment, color: primaryColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    propName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (propAddress.isNotEmpty)
+                    Text(
+                      propAddress,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Đã chọn',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_loadingProperties) {
       return const Center(
         child: Padding(

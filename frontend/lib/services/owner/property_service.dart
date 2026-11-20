@@ -5,6 +5,8 @@ class PropertyModel {
   final String id;
   final String name;
   final String address;
+  final double? latitude;
+  final double? longitude;
   final int totalRooms;
   final int rentedRooms;
   final int emptyRooms;
@@ -15,6 +17,8 @@ class PropertyModel {
     required this.id,
     required this.name,
     required this.address,
+    this.latitude,
+    this.longitude,
     required this.totalRooms,
     required this.rentedRooms,
     required this.emptyRooms,
@@ -27,6 +31,8 @@ class PropertyModel {
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       address: json['address'] ?? '',
+      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
+      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
       totalRooms: json['totalRooms'] ?? 0,
       rentedRooms: json['rentedRooms'] ?? 0,
       emptyRooms: json['emptyRooms'] ?? 0,

@@ -1,5 +1,5 @@
 -- ============================================================
--- SCRIPT CƠ SỞ DỮ LIỆU ĐẦY ĐỦ: QUẢN LÝ PHÒNG TRỌ (SQL SERVER)
+-- SCRIPT CƠ SỞ DỮ LIỆU ĐẦY ĐỦ (HỢP NHẤT): QUẢN LÝ PHÒNG TRỌ (SQL SERVER)
 -- TỔNG HỢP TOÀN BỘ CẤU TRÚC (DDL), KHÓA NGOẠI, CẬP NHẬT MỚI & DỮ LIỆU MẪU (DML)
 -- ============================================================
 
@@ -13,6 +13,11 @@ END
 GO
 
 USE QuanLyPhongTro;
+GO
+
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
 GO
 
 -- ============================================================
@@ -117,7 +122,7 @@ BEGIN
 END
 GO
 
--- 6. Bảng rental_posts: Tin đăng cho thuê (bao gồm price, amenities, views, submit_note)
+-- 6. Bảng rental_posts: Tin đăng cho thuê (tổng hợp đầy đủ các cột mới và expired_at)
 IF OBJECT_ID('dbo.rental_posts', 'U') IS NULL
 BEGIN
     CREATE TABLE rental_posts (
@@ -132,6 +137,7 @@ BEGIN
         status NVARCHAR(50) NOT NULL CHECK (status IN ('draft', 'pending', 'published', 'rejected', 'hidden')),
         rejection_reason NVARCHAR(MAX) NULL,
         published_at DATETIME2 NULL,
+        expired_at DATETIME2 NULL,
         created_at DATETIME2 DEFAULT GETDATE(),
         updated_at DATETIME2 DEFAULT GETDATE(),
         CONSTRAINT FK_rental_posts_rooms FOREIGN KEY (room_id) REFERENCES rooms(id)
@@ -143,8 +149,12 @@ BEGIN
         ALTER TABLE dbo.rental_posts ADD price DECIMAL(15,2) NULL;
     IF COL_LENGTH('dbo.rental_posts', 'amenities') IS NULL
         ALTER TABLE dbo.rental_posts ADD amenities NVARCHAR(MAX) NULL;
-    IF COL_LENGTH('dbo.rental_posts', 'expired_at') IS NOT NULL
-        ALTER TABLE dbo.rental_posts DROP COLUMN expired_at;
+    IF COL_LENGTH('dbo.rental_posts', 'views') IS NULL
+        ALTER TABLE dbo.rental_posts ADD views INT NOT NULL DEFAULT 0;
+    IF COL_LENGTH('dbo.rental_posts', 'submit_note') IS NULL
+        ALTER TABLE dbo.rental_posts ADD submit_note NVARCHAR(MAX) NULL;
+    IF COL_LENGTH('dbo.rental_posts', 'expired_at') IS NULL
+        ALTER TABLE dbo.rental_posts ADD expired_at DATETIME2 NULL;
 END
 GO
 
@@ -221,7 +231,7 @@ BEGIN
 END
 GO
 
--- 10. Bảng services: Dịch vụ chung/chủ nhà tự tạo (bao gồm price, is_mandatory, icon)
+-- 10. Bảng services: Dịch vụ chung/chủ nhà tự tạo (tổng hợp đầy đủ price, is_mandatory, icon)
 IF OBJECT_ID('dbo.services', 'U') IS NULL
 BEGIN
     CREATE TABLE services (
@@ -238,6 +248,15 @@ BEGIN
         updated_at DATETIME2 DEFAULT GETDATE(),
         CONSTRAINT FK_services_users FOREIGN KEY (owner_id) REFERENCES users(id)
     );
+END
+ELSE
+BEGIN
+    IF COL_LENGTH('dbo.services', 'price') IS NULL
+        ALTER TABLE dbo.services ADD price DECIMAL(15,2) NOT NULL DEFAULT 0;
+    IF COL_LENGTH('dbo.services', 'is_mandatory') IS NULL
+        ALTER TABLE dbo.services ADD is_mandatory BIT NOT NULL DEFAULT 0;
+    IF COL_LENGTH('dbo.services', 'icon') IS NULL
+        ALTER TABLE dbo.services ADD icon NVARCHAR(50) NULL DEFAULT 'bolt';
 END
 GO
 
@@ -493,7 +512,7 @@ GO
 -- PHẦN 2: DỮ LIỆU MẪU ĐỒNG BỘ (SAMPLE SEED DATA)
 -- ============================================================
 
--- 1. Users
+-- 1. Users (bao gồm cả usr_owner1 và USER_OWNER_01)
 IF NOT EXISTS (SELECT 1 FROM users WHERE id = 'usr_admin')
 BEGIN
     INSERT INTO users (id, name, email, password, phone, avatar, role, status, email_verified_at, created_at, updated_at) VALUES
@@ -559,16 +578,16 @@ BEGIN
 END
 GO
 
--- 6. Rental Posts & Images
+-- 6. Rental Posts & Images (Kết hợp đầy đủ các cột price, amenities, views, submit_note, expired_at)
 IF NOT EXISTS (SELECT 1 FROM rental_posts WHERE id = 'post_01')
 BEGIN
-    INSERT INTO rental_posts (id, room_id, title, description, price, amenities, views, submit_note, status, rejection_reason, published_at, created_at, updated_at) VALUES
-    ('post_01', 'room_101', N'Cho thuê phòng trọ khép kín Tân Phú giá tốt', N'Phòng sạch sẽ, giờ giấc tự do, không chung chủ, có gác lửng.', 3300000, N'Wifi,Điều hòa,Chỗ để xe,Giờ giấc tự do', 214, N'Đã bổ sung giấy kiểm định PCCC', 'published', NULL, DATEADD(day, -35, GETDATE()), DATEADD(day, -35, GETDATE()), GETDATE()),
-    ('post_02', 'room_102', N'Phòng trọ ban công thoáng mát gần ĐH Công Thương', N'Phù hợp cho sinh viên, bảo vệ an ninh nghiêm ngặt.', 3500000, N'Wifi,Điều hòa,Chỗ để xe,An ninh 24/7', 158, N'Đăng tin phòng giá sinh viên', 'published', NULL, DATEADD(day, -20, GETDATE()), DATEADD(day, -20, GETDATE()), GETDATE()),
-    ('post_03', 'room_201', N'Phòng lầu 1 yên tĩnh, view cây xanh mát mẻ', N'Gần chợ Tây Thạnh, đường rộng ô tô đỗ tận cửa.', 2900000, N'Wifi,Chỗ để xe,Giờ giấc tự do', 95, NULL, 'published', NULL, DATEADD(day, -10, GETDATE()), DATEADD(day, -10, GETDATE()), GETDATE()),
-    ('post_04', 'room_a1',  N'Studio cao cấp full nội thất Sơn Kỳ', N'Chỉ cần xách vali vào ở, máy lạnh, tủ lạnh, bàn làm việc.', 5200000, N'Wifi,Điều hòa,Máy giặt,Tủ lạnh,An ninh 24/7', 312, NULL, 'published', NULL, DATEADD(day, -25, GETDATE()), DATEADD(day, -25, GETDATE()), GETDATE()),
-    ('post_05', 'room_a2',  N'Căn hộ dịch vụ Studio hiện đại', N'Căn hộ ban công lớn đón gió tự nhiên, tòa nhà có thang máy.', 4800000, N'Wifi,Điều hòa,Máy giặt,Chỗ để xe', 45, N'Đang chờ phê duyệt tiêu chuẩn', 'pending', NULL, NULL, DATEADD(day, -2, GETDATE()), GETDATE()),
-    ('post_06', 'room_b1',  N'Cho thuê căn hộ 1PN VIP Cộng Hòa', N'Giá thuê bao gồm phí quản lý, bảo vệ 24/7.', 6000000, N'Wifi,Điều hòa,Tủ lạnh,An ninh 24/7', 12, NULL, 'rejected', N'Hình ảnh phòng mờ và thiếu thông tin chi phí dịch vụ', NULL, DATEADD(day, -1, GETDATE()), GETDATE());
+    INSERT INTO rental_posts (id, room_id, title, description, price, amenities, views, submit_note, status, rejection_reason, published_at, expired_at, created_at, updated_at) VALUES
+    ('post_01', 'room_101', N'Cho thuê phòng trọ khép kín Tân Phú giá tốt', N'Phòng sạch sẽ, giờ giấc tự do, không chung chủ, có gác lửng.', 3300000, N'Wifi,Điều hòa,Chỗ để xe,Giờ giấc tự do', 214, N'Đã bổ sung giấy kiểm định PCCC', 'published', NULL, DATEADD(day, -35, GETDATE()), DATEADD(day, 25, GETDATE()), DATEADD(day, -35, GETDATE()), GETDATE()),
+    ('post_02', 'room_102', N'Phòng trọ ban công thoáng mát gần ĐH Công Thương', N'Phù hợp cho sinh viên, bảo vệ an ninh nghiêm ngặt.', 3500000, N'Wifi,Điều hòa,Chỗ để xe,An ninh 24/7', 158, N'Đăng tin phòng giá sinh viên', 'published', NULL, DATEADD(day, -20, GETDATE()), DATEADD(day, 40, GETDATE()), DATEADD(day, -20, GETDATE()), GETDATE()),
+    ('post_03', 'room_201', N'Phòng lầu 1 yên tĩnh, view cây xanh mát mẻ', N'Gần chợ Tây Thạnh, đường rộng ô tô đỗ tận cửa.', 2900000, N'Wifi,Chỗ để xe,Giờ giấc tự do', 95, NULL, 'published', NULL, DATEADD(day, -10, GETDATE()), DATEADD(day, 50, GETDATE()), DATEADD(day, -10, GETDATE()), GETDATE()),
+    ('post_04', 'room_a1',  N'Studio cao cấp full nội thất Sơn Kỳ', N'Chỉ cần xách vali vào ở, máy lạnh, tủ lạnh, bàn làm việc.', 5200000, N'Wifi,Điều hòa,Máy giặt,Tủ lạnh,An ninh 24/7', 312, NULL, 'published', NULL, DATEADD(day, -25, GETDATE()), DATEADD(day, 35, GETDATE()), DATEADD(day, -25, GETDATE()), GETDATE()),
+    ('post_05', 'room_a2',  N'Căn hộ dịch vụ Studio hiện đại', N'Căn hộ ban công lớn đón gió tự nhiên, tòa nhà có thang máy.', 4800000, N'Wifi,Điều hòa,Máy giặt,Chỗ để xe', 45, N'Đang chờ phê duyệt tiêu chuẩn', 'pending', NULL, NULL, NULL, DATEADD(day, -2, GETDATE()), GETDATE()),
+    ('post_06', 'room_b1',  N'Cho thuê căn hộ 1PN VIP Cộng Hòa', N'Giá thuê bao gồm phí quản lý, bảo vệ 24/7.', 6000000, N'Wifi,Điều hòa,Tủ lạnh,An ninh 24/7', 12, NULL, 'rejected', N'Hình ảnh phòng mờ và thiếu thông tin chi phí dịch vụ', NULL, NULL, DATEADD(day, -1, GETDATE()), GETDATE());
 
     INSERT INTO rental_post_images (id, rental_post_id, image_path, is_thumbnail, sort_order, created_at, updated_at) VALUES
     ('img_01', 'post_01', 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267', 1, 0, GETDATE(), GETDATE()),
@@ -598,7 +617,7 @@ BEGIN
 END
 GO
 
--- 9. Services & Property Services
+-- 9. Services & Property Services (Bao gồm giá mặc định, is_mandatory, icon)
 IF NOT EXISTS (SELECT 1 FROM services WHERE id = 'srv_elec')
 BEGIN
     INSERT INTO services (id, owner_id, name, description, price, unit, is_mandatory, icon, status, created_at, updated_at) VALUES
@@ -664,21 +683,81 @@ BEGIN
 END
 GO
 
--- 14. Reviews & Notifications
+-- 14. Reviews
 IF NOT EXISTS (SELECT 1 FROM reviews WHERE id = 'rev_01')
 BEGIN
     INSERT INTO reviews (id, room_id, tenant_id, rating, comment, status, created_at, updated_at) VALUES
     ('rev_01', 'room_101', 'usr_tenant1', 5, N'Chủ nhà thân thiện, phòng sạch sẽ và rất thoáng mát!', 'visible', DATEADD(day, -10, GETDATE()), GETDATE()),
     ('rev_02', 'room_a1',  'usr_tenant2', 4, N'Nội thất xịn, mỗi tội đường giờ cao điểm hơi đông xe.', 'visible', DATEADD(day, -5, GETDATE()), GETDATE());
-
-    INSERT INTO notifications (id, user_id, title, message, type, reference_id, reference_type, read_at, created_at, updated_at) VALUES
-    ('notif_01', 'usr_admin', N'Tin đăng mới chờ duyệt', N'Chủ trọ Nguyễn Văn An vừa đăng tin cho phòng Studio A2', 'post_approval', 'post_05', 'rental_post', NULL, DATEADD(minute, -10, GETDATE()), GETDATE()),
-    ('notif_02', 'usr_admin', N'Lịch hẹn mới', N'Có khách hẹn xem phòng tại Nhà Trọ An Khang', 'appointment', 'apt_01', 'viewing_appointment', NULL, DATEADD(hour, -2, GETDATE()), GETDATE()),
-    ('notif_own_01', 'usr_owner1', N'Khách đặt lịch xem phòng mới', N'Khách Đỗ Hoàng Yến (0966554433) vừa đặt lịch xem Phòng Studio A2 - Căn Hộ Mini Xanh vào lúc 09:30 ngày mai.', 'appointment_new', 'apt_02', 'viewing_appointment', NULL, DATEADD(minute, -15, GETDATE()), GETDATE()),
-    ('notif_own_02', 'usr_owner1', N'Admin từ chối bài đăng', N'Tin đăng [Cho thuê căn hộ 1PN VIP Cộng Hòa] bị từ chối. Lý do: Hình ảnh phòng mờ và thiếu thông tin chi phí dịch vụ.', 'post_rejected', 'post_06', 'rental_post', NULL, DATEADD(hour, -1, GETDATE()), GETDATE()),
-    ('notif_own_03', 'usr_owner1', N'Khách báo hỏng / bảo trì phòng', N'Khách Lê Quốc Việt (Phòng 101 - Nhà Trọ An Khang) báo sự cố: Máy lạnh không mát và bị chảy nước ở dàn lạnh.', 'maintenance_request', 'room_101', 'maintenance', NULL, DATEADD(hour, -3, GETDATE()), GETDATE()),
-    ('notif_own_04', 'usr_owner1', N'Khách thanh toán hóa đơn', N'Khách Lê Quốc Việt (Phòng 101) đã chuyển khoản thanh toán hóa đơn kỳ Tháng 11/2026 (INV-2026-002) số tiền 3.730.000đ.', 'invoice_payment', 'inv_02', 'invoice', NULL, DATEADD(hour, -5, GETDATE()), GETDATE()),
-    ('notif_own_05', 'usr_owner1', N'Khách hủy lịch hẹn xem phòng', N'Khách Phạm Minh Tuấn đã báo hủy lịch hẹn xem Phòng Studio A1 ngày 10/11/2026 lúc 14:00 do bận đột xuất.', 'appointment_cancelled', 'apt_04', 'viewing_appointment', NULL, DATEADD(day, -1, GETDATE()), GETDATE()),
-    ('notif_own_06', 'usr_owner1', N'Bài đăng đã được Admin duyệt', N'Tin đăng [Cho thuê phòng trọ khép kín Tân Phú giá tốt] (Phòng 101 - Nhà Trọ An Khang) đã được duyệt và hiển thị.', 'post_approved', 'post_01', 'rental_post', GETDATE(), DATEADD(day, -2, GETDATE()), GETDATE());
 END
+GO
+
+-- 15. Notifications
+IF NOT EXISTS (SELECT 1 FROM notifications WHERE id = 'notif_01')
+BEGIN
+    INSERT INTO notifications (id, user_id, title, message, type, reference_id, reference_type, created_at, updated_at) VALUES
+    ('notif_01', 'usr_admin', N'Tin đăng mới chờ duyệt', N'Chủ trọ Nguyễn Văn An vừa đăng tin cho phòng Studio A2', 'post_approval', 'post_05', 'rental_post', DATEADD(minute, -10, GETDATE()), GETDATE()),
+    ('notif_02', 'usr_admin', N'Lịch hẹn mới', N'Có khách hẹn xem phòng tại Nhà Trọ An Khang', 'appointment', 'apt_01', 'viewing_appointment', DATEADD(hour, -2, GETDATE()), GETDATE());
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM notifications WHERE id = 'notif_own_01')
+BEGIN
+    INSERT INTO notifications (id, user_id, title, message, type, reference_id, reference_type, created_at, updated_at) VALUES
+    -- Thông báo của chủ trọ 1 (Nguyễn Văn An / Nhà Trọ An Khang & Căn Hộ Mini Xanh)
+    ('notif_own_01', 'usr_owner1', N'Khách đặt lịch xem phòng mới', N'Khách Đỗ Hoàng Yến (0966554433) vừa đặt lịch xem Phòng Studio A2 - Căn Hộ Mini Xanh vào lúc 09:30 ngày mai.', 'appointment', 'apt_02', 'viewing_appointment', DATEADD(minute, -15, GETDATE()), GETDATE()),
+    ('notif_own_02', 'usr_owner1', N'Admin từ chối bài đăng', N'Tin đăng [Cho thuê căn hộ 1PN VIP Cộng Hòa] bị từ chối duyệt. Lý do: Hình ảnh phòng mờ và thiếu thông tin chi phí dịch vụ.', 'post_rejected', 'post_06', 'rental_post', DATEADD(hour, -1, GETDATE()), GETDATE()),
+    ('notif_own_03', 'usr_owner1', N'Khách báo hỏng / bảo trì phòng', N'Khách Lê Quốc Việt (Phòng 101 - Nhà Trọ An Khang) báo sự cố: Máy lạnh không mát và bị chảy nước ở dàn lạnh.', 'maintenance', 'room_101', 'maintenance', DATEADD(hour, -3, GETDATE()), GETDATE()),
+    ('notif_own_04', 'usr_owner1', N'Khách thanh toán hóa đơn', N'Khách Lê Quốc Việt (Phòng 101) đã chuyển khoản thanh toán hóa đơn kỳ Tháng 11/2026 (INV-2026-002) số tiền 3.730.000đ.', 'invoice', 'inv_02', 'invoice', DATEADD(hour, -5, GETDATE()), GETDATE()),
+    ('notif_own_05', 'usr_owner1', N'Một lịch hẹn vừa bị hủy', N'Lê Quốc Việt đã hủy lịch xem phòng (Studio A2 - Căn Hộ Mini Xanh) vào lúc 20:00 ngày hôm nay.', 'appointment_cancelled', 'apt_04', 'viewing_appointment', DATEADD(day, -1, GETDATE()), GETDATE()),
+    ('notif_own_06', 'usr_owner1', N'Bài đăng đã được Admin duyệt', N'Tin đăng [Cho thuê phòng trọ khép kín Tân Phú giá tốt] (Phòng 101 - Nhà Trọ An Khang) đã được duyệt và hiển thị.', 'post', 'post_01', 'rental_post', DATEADD(day, -2, GETDATE()), GETDATE());
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM notifications WHERE id = 'notif_own2_01')
+BEGIN
+    INSERT INTO notifications (id, user_id, title, message, type, reference_id, reference_type, created_at, updated_at) VALUES
+    -- Thông báo của chủ trọ 2 (Trần Thị Mai / Chung Cư Mini Tân Bình)
+    ('notif_own2_01', 'usr_owner2', N'Khách đặt lịch xem phòng VIP', N'Khách Phạm Minh Tuấn (0944223344) đặt lịch xem Phòng VIP 1 vào lúc 16:00 ngày mai.', 'appointment', 'apt_01', 'viewing_appointment', DATEADD(minute, -30, GETDATE()), GETDATE()),
+    ('notif_own2_02', 'usr_owner2', N'Khách thanh toán hóa đơn cọc', N'Khách thuê đã hoàn tất nộp tiền cọc hợp đồng tại Chung Cư Mini Tân Bình.', 'invoice', NULL, 'invoice', DATEADD(hour, -4, GETDATE()), GETDATE());
+END
+GO
+
+-- Kiểm tra truy vấn bảng services sau khi khởi tạo
+SELECT * FROM services;
+GO
+
+
+-- Cập Nhập
+-- 1. Tìm và xóa constraint cũ gắn với cột status của bảng contracts
+DECLARE @ConstraintName NVARCHAR(200);
+
+SELECT @ConstraintName = cc.name
+FROM sys.check_constraints cc
+JOIN sys.columns c ON cc.parent_object_id = c.object_id AND cc.parent_column_id = c.column_id
+WHERE cc.parent_object_id = OBJECT_ID('contracts') 
+  AND c.name = 'status';
+
+IF @ConstraintName IS NOT NULL
+BEGIN
+    EXEC('ALTER TABLE contracts DROP CONSTRAINT ' + @ConstraintName);
+END
+GO
+
+-- 2. Thêm constraint mới cho phép chứa cả 'pending' (nếu chưa tồn tại)
+IF NOT EXISTS (
+    SELECT * FROM sys.check_constraints 
+    WHERE name = 'CK_contracts_status' 
+    AND parent_object_id = OBJECT_ID('contracts')
+)
+BEGIN
+    ALTER TABLE contracts ADD CONSTRAINT CK_contracts_status 
+    CHECK (status IN ('draft', 'pending', 'active', 'expired', 'terminated'));
+END
+GO
+
+-- 3. Cập nhật tọa độ mặc định cho các bất động sản chưa có vĩ độ/kinh độ
+UPDATE properties 
+SET latitude = 10.805566, longitude = 106.628899 
+WHERE latitude IS NULL OR longitude IS NULL;
 GO

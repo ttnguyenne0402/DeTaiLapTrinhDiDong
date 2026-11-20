@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../services/local/sqlite_helper.dart';
 import '../../services/owner/post_service.dart';
 import '../../services/owner/room_service.dart';
+import '../../services/auth_storage.dart';
 
 class PostFormScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -93,7 +94,8 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
   Future<void> _loadRooms() async {
     try {
-      final list = await RoomService.fetchRooms('USER_OWNER_01', status: 'all');
+      final ownerId = await AuthStorage.getUserId() ?? 'USER_OWNER_01';
+      final list = await RoomService.fetchRooms(ownerId, status: 'all');
       if (mounted) {
         setState(() {
           _rooms = list;

@@ -1,10 +1,12 @@
-﻿namespace Backend.DT0s
+namespace Backend.DT0s
 {
     public class PropertyDto
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
         public int TotalRooms { get; set; }
         public int RentedRooms { get; set; }
         public int EmptyRooms { get; set; }
@@ -20,6 +22,8 @@
         public string Address { get; set; } = string.Empty;
         public string District { get; set; } = string.Empty;
         public string Ward { get; set; } = string.Empty;
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
         public int TotalRooms { get; set; }
         public string Status { get; set; } = "active";
         public string Description { get; set; } = string.Empty;
