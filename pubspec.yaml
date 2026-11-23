@@ -31,14 +31,16 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Biểu đồ
+  # Biểu đồ & PDF
   syncfusion_flutter_charts: ^28.2.3
+  syncfusion_flutter_pdf: ^28.2.3
   fl_chart: ^1.2.0
 
   # Giao diện và tiện ích
   cupertino_icons: ^1.0.8
   cupertino_calendar_picker: ^2.2.6
   image_picker: ^1.2.0
+  file_picker: ^13.4.0
   signature: ^6.4.0
 
   # Bản đồ OpenStreetMap
