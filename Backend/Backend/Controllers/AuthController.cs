@@ -57,10 +57,27 @@ namespace Backend.Controllers
                 }
 
                 string email = model.Email.Trim().ToLowerInvariant();
-                string phone = model.Phone.Trim();
+                string phone = NormalizePhone(model.Phone);
 
-                bool existingUser = await _context.Users.AnyAsync(u =>
-                    u.Email.ToLower() == email || u.Phone == phone);
+                if (phone.Length is < 9 or > 12)
+                {
+                    return BadRequest(new { message = "Số điện thoại không hợp lệ." });
+                }
+
+                if (!IsStrongPassword(model.Password))
+                {
+                    return BadRequest(new
+                    {
+                        message = "Mật khẩu cần ít nhất 8 ký tự."
+                    });
+                }
+
+                var existingUsers = await _context.Users
+                    .Select(u => new { u.Email, u.Phone, u.GoogleId })
+                    .ToListAsync();
+                bool existingUser = existingUsers.Any(u =>
+                    string.Equals(u.Email.Trim(), email, StringComparison.OrdinalIgnoreCase) ||
+                    (u.GoogleId == null && NormalizePhone(u.Phone) == phone));
 
                 if (existingUser)
                 {
@@ -135,9 +152,13 @@ namespace Backend.Controllers
         {
             try
             {
+                string identifier = model.EmailOrPhone.Trim();
+                string email = identifier.ToLowerInvariant();
+                string phone = NormalizePhone(identifier);
+
                 var user = await _context.Users.FirstOrDefaultAsync(u =>
-                    (u.Email == model.EmailOrPhone ||
-                     u.Phone == model.EmailOrPhone) &&
+                    (u.Email.ToLower() == email ||
+                     u.Phone == phone) &&
                     u.Password == model.Password);
 
                 if (user == null)
@@ -470,6 +491,25 @@ namespace Backend.Controllers
                 });
             }
 
+            if (string.IsNullOrWhiteSpace(model.Phone))
+            {
+                return BadRequest(new { message = "Vui lòng nhập số điện thoại liên hệ." });
+            }
+
+            if (!IsStrongPassword(model.Password))
+            {
+                return BadRequest(new
+                {
+                    message = "Mật khẩu cần ít nhất 8 ký tự."
+                });
+            }
+
+            string phone = NormalizePhone(model.Phone);
+            if (phone.Length is < 9 or > 12)
+            {
+                return BadRequest(new { message = "Số điện thoại không hợp lệ." });
+            }
+
             string role = NormalizeRole(model.Role);
 
             if (role == null)
@@ -562,6 +602,18 @@ namespace Backend.Controllers
                     });
                 }
 
+                var registeredPhones = await _context.Users
+                    .Where(u => u.Phone != null && u.GoogleId == null)
+                    .Select(u => u.Phone!)
+                    .ToListAsync();
+                if (registeredPhones.Any(existing => NormalizePhone(existing) == phone))
+                {
+                    return Conflict(new
+                    {
+                        message = "Số điện thoại đã đăng ký tài khoản trên hệ thống."
+                    });
+                }
+
                 // Zalo Social API không nhất thiết trả về email.
                 // Tạo email nội bộ để đáp ứng cột email bắt buộc.
                 string email = $"zalo_{zaloId}@zalo.local";
@@ -588,8 +640,8 @@ namespace Backend.Controllers
                         : name.Trim(),
                     Email = email,
                     ZaloId = zaloId,
-                    Password = Convert.ToHexString(
-                        RandomNumberGenerator.GetBytes(32)),
+                    Phone = phone,
+                    Password = model.Password,
                     Avatar = avatar,
                     Role = role,
                     Status = "active",
@@ -1006,6 +1058,30 @@ namespace Backend.Controllers
             return role == "tenant" || role == "owner"
                 ? role
                 : null;
+        }
+
+        private static string NormalizePhone(string? input)
+        {
+            string digits = new string((input ?? string.Empty)
+                .Where(char.IsDigit)
+                .ToArray());
+
+            if (digits.StartsWith("84", StringComparison.Ordinal) && digits.Length >= 11)
+            {
+                return "0" + digits[2..];
+            }
+
+            return digits;
+        }
+
+        private static bool IsStrongPassword(string? password)
+        {
+            if (string.IsNullOrEmpty(password) || password.Length < 8 || password.Length > 128)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }

@@ -205,6 +205,8 @@ class AuthService {
   static Future<Map<String, dynamic>> zaloRegister({
     required String accessToken,
     required String role,
+    required String phone,
+    required String password,
   }) async {
     final url = Uri.parse('$baseUrl/zalo-register');
 
@@ -216,7 +218,12 @@ class AuthService {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-            body: jsonEncode({'accessToken': accessToken, 'role': role}),
+            body: jsonEncode({
+              'accessToken': accessToken,
+              'role': role,
+              'phone': phone,
+              'password': password,
+            }),
           )
           .timeout(const Duration(seconds: 20));
 

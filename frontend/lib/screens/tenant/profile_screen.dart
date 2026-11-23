@@ -192,6 +192,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           bankName: (account?['bankName'] ?? account?['bankCode'] ?? '').toString(),
           bankAccount: (account?['accountNumber'] ?? '').toString(),
           accountHolder: (account?['accountHolder'] ?? '').toString(),
+          existingAccounts: _bankAccounts,
+          editingAccountId: account?['id']?.toString(),
         );
       },
     );
@@ -804,22 +806,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             )
           : ListView(
               padding: const EdgeInsets.all(16),
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 24),
-                _sectionTitle('Thông tin cá nhân', Icons.person_outline),
-                const SizedBox(height: 12),
-                _buildPersonalInfo(),
-                const SizedBox(height: 24),
-                _buildMaintenanceHistoryButton(),
-                const SizedBox(height: 24),
-                _buildBankInfo(),
-                const SizedBox(height: 24),
-                _buildPrivacyNote(),
-                const SizedBox(height: 24),
-                _buildLogoutButton(),
-                const SizedBox(height: 24),
-              ],
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 24),
+          _sectionTitle('Thông tin cá nhân', Icons.person_outline),
+          const SizedBox(height: 12),
+          _buildPersonalInfo(),
+          const SizedBox(height: 24),
+          if (_userRole == 'tenant') ...[
+            _buildMaintenanceHistoryButton(),
+            const SizedBox(height: 24),
+          ],
+          _buildBankInfo(),
+          const SizedBox(height: 24),
+          _buildPrivacyNote(),
+          const SizedBox(height: 24),
+          _buildLogoutButton(),
+          const SizedBox(height: 24),
+        ],
             ),
     );
   }
@@ -846,6 +850,7 @@ class EditProfileDialog extends StatefulWidget {
 }
 
 class _EditProfileDialogState extends State<EditProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
@@ -869,14 +874,11 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
   }
 
   void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
-
-    if (name.isEmpty) {
-      _showDialogMessage('Họ và tên không được để trống');
-      return;
-    }
 
     Navigator.of(context).pop({'name': name, 'email': email, 'phone': phone});
   }
@@ -894,8 +896,10 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
     String label,
     IconData icon, {
     TextInputType? keyboardType,
+    required String fieldName,
+    bool isEmail = false,
   }) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       decoration: InputDecoration(
@@ -906,6 +910,14 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
           borderSide: BorderSide(color: primaryColor),
         ),
       ),
+      validator: (value) {
+        final text = value?.trim() ?? '';
+        if (text.isEmpty) return 'Vui lòng nhập $fieldName';
+        if (isEmail && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) {
+          return 'Email không hợp lệ';
+        }
+        return null;
+      },
     );
   }
 
@@ -914,16 +926,20 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
     return AlertDialog(
       title: const Text('Chỉnh sửa thông tin'),
       content: SingleChildScrollView(
-        child: Column(
+        child: Form(
+          key: _formKey,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _field(_nameController, 'Họ và tên', Icons.person_outline),
+            _field(_nameController, 'Họ và tên', Icons.person_outline, fieldName: 'họ và tên'),
             const SizedBox(height: 12),
             _field(
               _emailController,
               'Email',
               Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
+              fieldName: 'email',
+              isEmail: true,
             ),
             const SizedBox(height: 12),
             _field(
@@ -931,8 +947,10 @@ class _EditProfileDialogState extends State<EditProfileDialog> {
               'Số điện thoại',
               Icons.phone_outlined,
               keyboardType: TextInputType.phone,
+              fieldName: 'số điện thoại',
             ),
           ],
+          ),
         ),
       ),
       actions: [
@@ -958,12 +976,16 @@ class BankDialog extends StatefulWidget {
   final String bankName;
   final String bankAccount;
   final String accountHolder;
+  final List<Map<String, dynamic>> existingAccounts;
+  final String? editingAccountId;
 
   const BankDialog({
     super.key,
     required this.bankName,
     required this.bankAccount,
     required this.accountHolder,
+    required this.existingAccounts,
+    this.editingAccountId,
   });
 
   @override
@@ -971,6 +993,7 @@ class BankDialog extends StatefulWidget {
 }
 
 class _BankDialogState extends State<BankDialog> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _bankController;
   late final TextEditingController _accountController;
   late final TextEditingController _holderController;
@@ -996,12 +1019,32 @@ class _BankDialogState extends State<BankDialog> {
   }
 
   void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
     final bank = _bankController.text.trim();
     final account = _accountController.text.trim();
     final holder = _holderController.text.trim();
 
-    if (bank.isEmpty || account.isEmpty || holder.isEmpty) {
-      _showDialogMessage('Vui lòng nhập đầy đủ thông tin ngân hàng');
+    String normalize(String value) => value.trim().toLowerCase();
+
+    final duplicateAccount = widget.existingAccounts.any((existing) {
+      final existingId = existing['id']?.toString();
+      final existingBank = (existing['bankName'] ?? existing['bankCode'] ?? '')
+          .toString();
+      final existingAccount = (existing['accountNumber'] ?? '').toString();
+      final existingHolder = (existing['accountHolder'] ?? '').toString().trim().toLowerCase();
+      final sameBank = normalize(existingBank) == normalize(bank);
+      final sameAccountNumber = normalize(existingAccount) == normalize(account);
+      final sameAccountHolder = existingHolder == normalize(holder);
+
+      return existingId != widget.editingAccountId &&
+          sameBank &&
+          (sameAccountNumber || sameAccountHolder);
+    });
+    if (duplicateAccount) {
+      _showDialogMessage(
+        'Trong cùng ngân hàng, số tài khoản và tên chủ tài khoản phải khác các tài khoản đã lưu',
+      );
       return;
     }
 
@@ -1024,8 +1067,9 @@ class _BankDialogState extends State<BankDialog> {
     IconData icon, {
     String? hint,
     TextInputType? keyboardType,
+    required String fieldName,
   }) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       decoration: InputDecoration(
@@ -1037,6 +1081,9 @@ class _BankDialogState extends State<BankDialog> {
           borderSide: BorderSide(color: primaryColor),
         ),
       ),
+      validator: (value) => (value == null || value.trim().isEmpty)
+          ? 'Vui lòng nhập $fieldName'
+          : null,
     );
   }
 
@@ -1049,7 +1096,9 @@ class _BankDialogState extends State<BankDialog> {
             : 'Chỉnh sửa tài khoản ngân hàng',
       ),
       content: SingleChildScrollView(
-        child: Column(
+        child: Form(
+          key: _formKey,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             _field(
@@ -1057,6 +1106,7 @@ class _BankDialogState extends State<BankDialog> {
               'Tên ngân hàng',
               Icons.account_balance_outlined,
               hint: 'Ví dụ: Vietcombank',
+              fieldName: 'tên ngân hàng',
             ),
             const SizedBox(height: 12),
             _field(
@@ -1064,14 +1114,17 @@ class _BankDialogState extends State<BankDialog> {
               'Số tài khoản',
               Icons.credit_card_outlined,
               keyboardType: TextInputType.number,
+              fieldName: 'số tài khoản',
             ),
             const SizedBox(height: 12),
             _field(
               _holderController,
               'Tên chủ tài khoản',
               Icons.person_outline,
+              fieldName: 'tên chủ tài khoản',
             ),
           ],
+          ),
         ),
       ),
       actions: [

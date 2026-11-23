@@ -21,6 +21,42 @@ namespace Backend.Controllers
             _context = context;
         }
 
+        private async Task<bool> HasDuplicateBankAccountAsync(
+            string userId,
+            string bankName,
+            string accountNumber,
+            string accountHolder,
+            string? excludedAccountId = null)
+        {
+            var existingAccounts = await _context.BankAccounts
+                .Where(b => b.UserId == userId)
+                .Select(b => new { b.Id, b.BankName, b.AccountNumber, b.AccountHolder })
+                .ToListAsync();
+
+            static string Normalize(string? value) =>
+                (value ?? string.Empty).Trim();
+
+            return existingAccounts.Any(b =>
+            {
+                var sameBank = string.Equals(
+                    Normalize(b.BankName),
+                    Normalize(bankName),
+                    StringComparison.OrdinalIgnoreCase);
+                var sameAccountNumber = string.Equals(
+                    Normalize(b.AccountNumber),
+                    Normalize(accountNumber),
+                    StringComparison.OrdinalIgnoreCase);
+                var sameAccountHolder = string.Equals(
+                    Normalize(b.AccountHolder),
+                    Normalize(accountHolder),
+                    StringComparison.OrdinalIgnoreCase);
+
+                return b.Id != excludedAccountId &&
+                    sameBank &&
+                    (sameAccountNumber || sameAccountHolder);
+            });
+        }
+
         // GET: api/Profile
         // Lấy thông tin cá nhân và danh sách tài khoản ngân hàng
         [HttpGet]
@@ -196,6 +232,18 @@ namespace Backend.Controllers
                 });
             }
 
+            if (await HasDuplicateBankAccountAsync(
+                userId,
+                request.BankName,
+                request.AccountNumber,
+                request.AccountHolder))
+            {
+                return Conflict(new
+                {
+                    message = "Trong cùng ngân hàng, số tài khoản và tên chủ tài khoản phải khác các tài khoản đã lưu."
+                });
+            }
+
             var bankAccount = new BankAccount
             {
                 Id = Guid.NewGuid().ToString(),
@@ -274,6 +322,19 @@ namespace Backend.Controllers
                 return BadRequest(new
                 {
                     message = "Một hoặc nhiều thông tin vượt quá độ dài cho phép."
+                });
+            }
+
+            if (await HasDuplicateBankAccountAsync(
+                userId,
+                request.BankName,
+                request.AccountNumber,
+                request.AccountHolder,
+                bankAccount.Id))
+            {
+                return Conflict(new
+                {
+                    message = "Trong cùng ngân hàng, số tài khoản và tên chủ tài khoản phải khác các tài khoản đã lưu."
                 });
             }
 

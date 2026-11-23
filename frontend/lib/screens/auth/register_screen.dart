@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_zalo/flutter_zalo.dart';
@@ -33,6 +35,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
 
   String _selectedRole = 'tenant';
+
+  String _suggestStrongPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    final random = Random.secure();
+    return List.generate(
+      10,
+      (_) => chars[random.nextInt(chars.length)],
+    ).join();
+  }
+
+  bool _isStrongPassword(String value) =>
+      value.length >= 8 && value.length <= 128;
 
   @override
   void initState() {
@@ -250,9 +264,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint('[ZALO] 8. Đang gửi yêu cầu đăng ký đến backend');
 
       // Gửi access token và vai trò đã chọn đến ASP.NET Core.
+      final credentials = await showDialog<Map<String, String>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const _ZaloRegistrationDetailsDialog(),
+      );
+      if (!mounted || credentials == null) return;
+
       final resultApi = await AuthService.zaloRegister(
         accessToken: accessToken,
         role: _selectedRole == 'landlord' ? 'owner' : 'tenant',
+        phone: credentials['phone']!,
+        password: credentials['password']!,
       );
 
       debugPrint('[ZALO] 9. Backend trả kết quả: $resultApi');
@@ -441,13 +464,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
                     }
-                    if (value.length < 8) {
-                      return 'Mật khẩu phải từ 8 ký tự trở lên';
+                    if (!_isStrongPassword(value)) {
+                      return 'Mật khẩu cần ít nhất 8 ký tự';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            final suggestion = _suggestStrongPassword();
+                            setState(() {
+                              _passwordController.text = suggestion;
+                              _confirmPasswordController.text = suggestion;
+                            });
+                          },
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Gợi ý mật khẩu mạnh'),
+                  ),
+                ),
 
                 _CustomInputField(
                   controller: _confirmPasswordController,
@@ -593,6 +633,139 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ZaloRegistrationDetailsDialog extends StatefulWidget {
+  const _ZaloRegistrationDetailsDialog();
+
+  @override
+  State<_ZaloRegistrationDetailsDialog> createState() =>
+      _ZaloRegistrationDetailsDialogState();
+}
+
+class _ZaloRegistrationDetailsDialogState
+    extends State<_ZaloRegistrationDetailsDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  bool _isStrongPassword(String value) =>
+      value.length >= 8 && value.length <= 128;
+
+  String _suggestPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    final random = Random.secure();
+    return List.generate(
+      10,
+      (_) => chars[random.nextInt(chars.length)],
+    ).join();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(context, {
+      'phone': _phoneController.text.trim(),
+      'password': _passwordController.text,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Hoàn tất đăng ký Zalo'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Nhập số điện thoại liên hệ và tạo mật khẩu cho Trọ Ơi.'),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Số điện thoại',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
+                  if (digits.length < 9 || digits.length > 12) {
+                    return 'Vui lòng nhập số điện thoại hợp lệ';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: 'Mật khẩu Trọ Ơi',
+                  helperText: 'Tối thiểu 8 ký tự',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                  ),
+                ),
+                validator: (value) => _isStrongPassword(value ?? '')
+                    ? null
+                    : 'Mật khẩu cần ít nhất 8 ký tự',
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () {
+                    final suggestion = _suggestPassword();
+                    setState(() {
+                      _passwordController.text = suggestion;
+                      _confirmPasswordController.text = suggestion;
+                    });
+                  },
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Gợi ý mật khẩu mạnh'),
+                ),
+              ),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirmPassword,
+                decoration: InputDecoration(
+                  labelText: 'Xác nhận mật khẩu',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                  ),
+                ),
+                validator: (value) => value == _passwordController.text
+                    ? null
+                    : 'Mật khẩu xác nhận không trùng khớp',
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Tạo tài khoản')),
+      ],
     );
   }
 }

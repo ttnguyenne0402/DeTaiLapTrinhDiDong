@@ -47,9 +47,9 @@ class PropertyService {
   static const String baseUrl = 'http://10.0.2.2:5093';
 
   static Future<List<PropertyModel>> fetchProperties(
-    String ownerId,
-    String filter,
-  ) async {
+    String ownerId, [
+    String filter = 'All',
+  ]) async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/owner/properties/$ownerId?status=$filter'),
     );

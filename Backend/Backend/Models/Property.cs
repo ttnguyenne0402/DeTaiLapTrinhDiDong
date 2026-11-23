@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Backend.Models;
@@ -35,6 +35,8 @@ public partial class Property
     public virtual User Owner { get; set; } = null!;
 
     public virtual ICollection<PropertyService> PropertyServices { get; set; } = new List<PropertyService>();
+
+    public virtual ICollection<PropertyAmenity> PropertyAmenities { get; set; } = new List<PropertyAmenity>();
 
     public virtual ICollection<Room> Rooms { get; set; } = new List<Room>();
 }

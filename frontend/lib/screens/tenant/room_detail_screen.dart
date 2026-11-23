@@ -10,6 +10,7 @@ import '../../widgets/tenant/open_street_map_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/tenant/room_service.dart';
 import '../../services/tenant/review_service.dart';
+import '../../services/tenant/favorite_service.dart';
 
 class RoomDetailScreen extends StatefulWidget {
   final Map<String, dynamic> room;
@@ -59,24 +60,35 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
         .toString()
         .trim();
 
-    final parts = <String>[
-      if (street.isNotEmpty)
-        street
-      else if (rawAddress.isNotEmpty)
-        rawAddress,
+    final addressParts = (street.isNotEmpty ? street : rawAddress)
+        .split(',')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty);
+    final candidates = <String>[
+      ...addressParts,
       if (ward.isNotEmpty) ward,
       if (district.isNotEmpty) district,
       'TP. Hồ Chí Minh',
       'Việt Nam',
     ];
 
-    // Loại bỏ các phần địa chỉ bị trùng.
+    // So sánh tên khu vực sau khi bỏ tiền tố hành chính, ví dụ
+    // "Phường Tây Thạnh" và "Tây Thạnh" là cùng một địa danh.
+    String normalize(String value) => value
+        .toLowerCase()
+        .replaceAll(
+          RegExp(
+            r'^(phường\s*|p\.?\s+|xã\s*|x\.?\s+|quận\s*|q\.?\s+|huyện\s*|h\.?\s+|thị xã\s*|thành phố\s*|tp\.?\s*|thị trấn\s*)',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .replaceAll(RegExp(r'[\s.,/-]'), '');
+
     final uniqueParts = <String>[];
     final seen = <String>{};
-
-    for (final part in parts) {
-      final normalized = part.toLowerCase().trim();
-
+    for (final part in candidates) {
+      final normalized = normalize(part);
       if (normalized.isNotEmpty && seen.add(normalized)) {
         uniqueParts.add(part);
       }
@@ -108,7 +120,14 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       if (!mounted) return;
 
       setState(() {
-        _roomData = {..._roomData, ...result};
+        _roomData = {
+          ..._roomData,
+          ...result,
+          // Chi tiết cũ hoặc API chưa trả tọa độ thì giữ tọa độ đã có
+          // từ danh sách phòng, tránh rơi về dò vị trí bằng địa chỉ.
+          'latitude': result['latitude'] ?? _roomData['latitude'],
+          'longitude': result['longitude'] ?? _roomData['longitude'],
+        };
         _isDetailLoading = false;
         _detailError = null;
       });
@@ -234,6 +253,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
     super.initState();
 
     _roomData = Map<String, dynamic>.from(widget.room);
+    _loadFavoriteStatus();
 
     _animationController = AnimationController(
       vsync: this,
@@ -341,42 +361,54 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   // FAVORITE
   // ============================================================
 
-  void _toggleFavorite() {
-    setState(() {
-      _isFavorite = !_isFavorite;
-    });
+  Future<void> _loadFavoriteStatus() async {
+    final roomId = _roomData['id']?.toString();
+    if (roomId == null || roomId.isEmpty) return;
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    try {
+      final isFavorite = await FavoriteService.instance.isFavorite(roomId);
+      if (mounted) setState(() => _isFavorite = isFavorite);
+    } catch (error) {
+      debugPrint('Không thể đọc trạng thái yêu thích: $error');
+    }
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(milliseconds: 1300),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primaryGreen,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
-        content: Row(
-          children: [
-            Icon(
-              _isFavorite
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
-              color: _isFavorite
-                  ? AppColors.accentYellow
-                  : Colors.white,
+  Future<void> _toggleFavorite() async {
+    final roomId = room['id']?.toString();
+    if (roomId == null || roomId.isEmpty) return;
+
+    try {
+      final wasFavorite = await FavoriteService.instance.isFavorite(roomId);
+      if (wasFavorite) {
+        await FavoriteService.instance.removeFavorite(roomId);
+      } else {
+        await FavoriteService.instance.addFavorite(room);
+      }
+
+      if (!mounted) return;
+      setState(() => _isFavorite = !wasFavorite);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            duration: const Duration(milliseconds: 1300),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.primaryGreen,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(width: 10),
-            Text(
-              _isFavorite
-                  ? 'Đã thêm vào yêu thích'
-                  : 'Đã bỏ khỏi yêu thích',
+            content: Text(
+              wasFavorite ? 'Đã bỏ khỏi yêu thích' : 'Đã thêm vào yêu thích',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể cập nhật yêu thích: $error')),
+      );
+    }
   }
 
   // ============================================================

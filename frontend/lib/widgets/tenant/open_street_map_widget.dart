@@ -36,9 +36,7 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
   @override
   void initState() {
     super.initState();
-
-    _roomLocation = null;
-    _loading = false;
+    _loadRoomLocation();
   }
 
   @override
@@ -59,11 +57,16 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
     });
 
     // 1. Ưu tiên dùng tọa độ có sẵn nếu có
-    if (widget.latitude != null && widget.longitude != null) {
+    final latitude = widget.latitude;
+    final longitude = widget.longitude;
+    if (latitude != null && longitude != null &&
+        latitude >= -90 && latitude <= 90 &&
+        longitude >= -180 && longitude <= 180) {
       setState(() {
-        _roomLocation = LatLng(widget.latitude!, widget.longitude!);
+        _roomLocation = LatLng(latitude, longitude);
         _loading = false;
       });
+      _moveMapTo(_roomLocation!);
       return;
     }
 
@@ -116,6 +119,7 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
         _roomLocation = location;
         _loading = false;
       });
+      _moveMapTo(location);
     } on Exception catch (e) {
       if (!mounted) return;
 
@@ -140,6 +144,17 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
         _errorMessage = 'Đã xảy ra lỗi khi xác định vị trí phòng.';
       });
     }
+  }
+
+  void _moveMapTo(LatLng location) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        _mapController.move(location, 16);
+      } catch (_) {
+        // The map controller is not attached yet; initialCenter will use the location.
+      }
+    });
   }
 
   Future<void> _openGoogleMaps() async {
@@ -181,15 +196,30 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
             borderRadius: BorderRadius.circular(12),
             child: FlutterMap(
               mapController: _mapController,
-              options: const MapOptions(
-                initialCenter: LatLng(10.7769, 106.7009),
-                initialZoom: 12,
+              options: MapOptions(
+                initialCenter: center,
+                initialZoom: _roomLocation == null ? 12 : 16,
               ),
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.doanlaptrinhdidong',
                 ),
+                if (_roomLocation != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: _roomLocation!,
+                        width: 44,
+                        height: 44,
+                        child: const Icon(
+                          Icons.location_pin,
+                          color: Colors.red,
+                          size: 42,
+                        ),
+                      ),
+                    ],
+                  ),
                 const RichAttributionWidget(
                   attributions: [
                     TextSourceAttribution('OpenStreetMap contributors'),
@@ -200,10 +230,16 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          widget.address,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-        ),
+        if (_loading)
+          const Text(
+            'Đang xác định vị trí phòng…',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          )
+        else if (_roomLocation == null && _errorMessage != null)
+          Text(
+            _errorMessage!,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,

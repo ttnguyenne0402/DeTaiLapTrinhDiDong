@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import 'room_detail_screen.dart';
 import 'home_screen.dart';
-import 'booking_screen.dart';
-import 'my_invoices_screen.dart';
-import 'my_contracts_screen.dart';
-import 'profile_screen.dart';
 import '../../services/tenant/favorite_service.dart';
+import '../../widgets/tenant/tenant_bottom_nav.dart';
 
 class FavoritesScreen extends StatefulWidget {
-  const FavoritesScreen({super.key});
+  final bool showBottomNavigation;
+
+  const FavoritesScreen({super.key, this.showBottomNavigation = true});
 
   @override
   State<FavoritesScreen> createState() => _FavoritesScreenState();
@@ -198,53 +197,12 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   // ĐIỀU HƯỚNG
   // ============================================================
 
-  void _openScreen(Widget screen) {
-    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => screen));
-  }
-
-  void _goBack() {
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-      );
-    }
-  }
-
-  Widget _buildBottomNavItem({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool selected = false,
-  }) {
-    final color = selected ? AppColors.primaryGreen : AppColors.textSecondary;
-
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox.expand(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 22, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10.5,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
+  void _navigateToTab(int index) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => HomeScreen(initialTabIndex: index),
       ),
+      (route) => false,
     );
   }
 
@@ -381,6 +339,9 @@ class _FavoritesScreenState extends State<FavoritesScreen>
             ),
         ],
       ),
+      bottomNavigationBar: widget.showBottomNavigation
+          ? TenantBottomNav(selectedIndex: 4, onItemTapped: _navigateToTab)
+          : null,
     );
   }
 

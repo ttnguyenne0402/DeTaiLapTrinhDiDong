@@ -12,7 +12,8 @@ import '../../core/constants/app_colors.dart';
 import 'utility_history.dart';
 import 'utility_readings.dart';
 import '../../services/owner/property_service.dart';
-import 'owner_profile_screen.dart';
+import 'services_manage.dart';
+import 'amenities_manage.dart';
 import '../../services/auth_storage.dart';
 
 
@@ -418,6 +419,72 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                           ),
                           label: const Text(
                             'Xem tiêu thụ',
+                            style: TextStyle(fontSize: 12, color: Colors.black87),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ServicesManageScreen(
+                                  initialPropertyId: item.id,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.room_service_outlined,
+                            size: 16,
+                            color: Colors.deepOrange,
+                          ),
+                          label: const Text(
+                            'Dịch vụ',
+                            style: TextStyle(fontSize: 12, color: Colors.black87),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AmenitiesManageScreen(
+                                  initialPropertyId: item.id,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: Icon(
+                            Icons.checklist_outlined,
+                            size: 16,
+                            color: primaryColor,
+                          ),
+                          label: const Text(
+                            'Tiện ích',
                             style: TextStyle(fontSize: 12, color: Colors.black87),
                           ),
                           style: OutlinedButton.styleFrom(
