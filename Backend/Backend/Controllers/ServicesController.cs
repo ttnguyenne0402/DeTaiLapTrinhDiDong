@@ -17,9 +17,9 @@ namespace Backend.Controllers
             _context = context;
         }
 
-        // 1. GET: api/owner/services/{ownerId}
+        // 1. GET: api/owner/services/{ownerId}?propertyId=...
         [HttpGet("{ownerId}")]
-        public async Task<IActionResult> GetServices(string ownerId)
+        public async Task<IActionResult> GetServices(string ownerId, [FromQuery] string? propertyId)
         {
             try
             {
@@ -40,12 +40,21 @@ namespace Backend.Controllers
 
                 var result = services.Select(s =>
                 {
-                    // Lấy giá từ bảng services hoặc PropertyService gần nhất
-                    var propService = s.PropertyServices
-                        .FirstOrDefault(ps => ownerPropertyIds.Contains(ps.PropertyId))
-                        ?? s.PropertyServices.FirstOrDefault();
+                    PropertyService? propService = null;
+                    if (!string.IsNullOrEmpty(propertyId))
+                    {
+                        propService = s.PropertyServices.FirstOrDefault(ps => ps.PropertyId == propertyId);
+                    }
+                    else
+                    {
+                        propService = s.PropertyServices
+                            .FirstOrDefault(ps => ownerPropertyIds.Contains(ps.PropertyId))
+                            ?? s.PropertyServices.FirstOrDefault();
+                    }
 
-                    decimal price = s.Price > 0 ? s.Price : (propService?.Price ?? 0);
+                    decimal price = propService != null ? propService.Price : s.Price;
+                    bool isAssigned = !string.IsNullOrEmpty(propertyId) ? (propService != null && propService.Status == "active") : true;
+                    bool status = !string.IsNullOrEmpty(propertyId) ? (propService != null && propService.Status == "active") : (s.Status == "active");
 
                     // Lấy icon đã lưu hoặc tự suy đoán icon dựa theo tên dịch vụ
                     string iconName = !string.IsNullOrEmpty(s.Icon) ? s.Icon : DetermineIcon(s.Name);
@@ -62,10 +71,12 @@ namespace Backend.Controllers
                         PriceFormatted = $"{price:N0}".Replace(",", "."),
                         Unit = s.Unit,
                         IsMandatory = isMandatory,
-                        Status = s.Status == "active",
-                        StatusCode = s.Status,
+                        Status = status,
+                        StatusCode = status ? "active" : "inactive",
                         Description = s.Description ?? "Dịch vụ tính theo nhu cầu sử dụng thực tế.",
-                        Icon = iconName
+                        Icon = iconName,
+                        PropertyId = propertyId,
+                        IsAssigned = isAssigned
                     };
                 }).ToList();
 
@@ -173,11 +184,38 @@ namespace Backend.Controllers
                 service.UpdatedAt = DateTime.UtcNow;
 
                 // Cập nhật giá trên các PropertyServices liên quan
-                foreach (var ps in service.PropertyServices)
+                if (!string.IsNullOrWhiteSpace(dto.PropertyId))
                 {
-                    ps.Price = dto.Price;
-                    ps.Status = service.Status;
-                    ps.UpdatedAt = DateTime.UtcNow;
+                    var targetPs = service.PropertyServices.FirstOrDefault(ps => ps.PropertyId == dto.PropertyId);
+                    if (targetPs == null)
+                    {
+                        targetPs = new PropertyService
+                        {
+                            Id = "PSRV_" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
+                            PropertyId = dto.PropertyId,
+                            ServiceId = service.Id,
+                            Price = dto.Price,
+                            Status = dto.Status ? "active" : "inactive",
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        _context.PropertyServices.Add(targetPs);
+                    }
+                    else
+                    {
+                        targetPs.Price = dto.Price;
+                        targetPs.Status = dto.Status ? "active" : "inactive";
+                        targetPs.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+                else
+                {
+                    foreach (var ps in service.PropertyServices)
+                    {
+                        ps.Price = dto.Price;
+                        ps.Status = service.Status;
+                        ps.UpdatedAt = DateTime.UtcNow;
+                    }
                 }
 
                 await _context.SaveChangesAsync();
@@ -220,6 +258,48 @@ namespace Backend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi chuyển trạng thái dịch vụ", error = ex.Message });
+            }
+        }
+
+        // 4b. PUT: api/owner/services/{id}/property/{propertyId}/toggle
+        [HttpPut("{id}/property/{propertyId}/toggle")]
+        public async Task<IActionResult> TogglePropertyService(string id, string propertyId)
+        {
+            try
+            {
+                var service = await _context.Services.FindAsync(id);
+                if (service == null) return NotFound(new { message = "Không tìm thấy dịch vụ." });
+
+                var ps = await _context.PropertyServices
+                    .FirstOrDefaultAsync(p => p.ServiceId == id && p.PropertyId == propertyId);
+
+                if (ps == null)
+                {
+                    ps = new PropertyService
+                    {
+                        Id = "PSRV_" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
+                        PropertyId = propertyId,
+                        ServiceId = id,
+                        Price = service.Price,
+                        Status = "active",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    _context.PropertyServices.Add(ps);
+                    await _context.SaveChangesAsync();
+                    return Ok(new { message = "Đã kích hoạt dịch vụ cho khu trọ này", status = "active", isAssigned = true });
+                }
+                else
+                {
+                    ps.Status = ps.Status == "active" ? "inactive" : "active";
+                    ps.UpdatedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                    return Ok(new { message = "Đã cập nhật trạng thái dịch vụ", status = ps.Status, isAssigned = ps.Status == "active" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi đổi trạng thái dịch vụ", error = ex.Message });
             }
         }
 

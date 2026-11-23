@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/service_service.dart';
+import '../../services/owner/property_service.dart';
 import '../../services/auth_storage.dart';
 
 class ServiceFormScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
+  final String? initialPropertyId;
 
-  const ServiceFormScreen({super.key, this.initialData});
+  const ServiceFormScreen({super.key, this.initialData, this.initialPropertyId});
 
   @override
   State<ServiceFormScreen> createState() => _ServiceFormScreenState();
@@ -23,6 +25,8 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
   String _selectedUnit = 'kWh';
   bool _isMandatory = false;
   IconData _selectedIcon = Icons.bolt;
+  String? _selectedPropertyId;
+  List<PropertyModel> _properties = [];
 
   final List<String> _units = [
     'kWh',
@@ -80,6 +84,26 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
         _selectedIcon = data['icon'];
       }
     }
+
+    _selectedPropertyId = widget.initialPropertyId ?? data?['propertyId'];
+    _loadProperties();
+  }
+
+  Future<void> _loadProperties() async {
+    try {
+      final ownerId = await AuthStorage.getUserId();
+      if (ownerId != null && ownerId.isNotEmpty) {
+        final props = await PropertyService.fetchProperties(ownerId, 'All');
+        if (mounted) {
+          setState(() {
+            _properties = props;
+            if ((_selectedPropertyId == null || !_properties.any((p) => p.id == _selectedPropertyId)) && _properties.isNotEmpty) {
+              _selectedPropertyId = _properties.first.id;
+            }
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   IconData _getIconDataByName(String icon) {
@@ -166,6 +190,61 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildSectionTitle('Khu trọ áp dụng'),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: _properties.isEmpty
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.home_work_outlined, color: AppColors.primaryGreen, size: 20),
+                                    const SizedBox(width: 10),
+                                    const Text('Đang tải danh sách khu trọ...', style: TextStyle(fontSize: 13.5, color: Colors.grey)),
+                                  ],
+                                ),
+                              )
+                            : DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _properties.any((p) => p.id == _selectedPropertyId)
+                                      ? _selectedPropertyId!
+                                      : _properties.first.id,
+                                  icon: Icon(Icons.keyboard_arrow_down, color: AppColors.primaryGreen),
+                                  items: _properties.map((p) => DropdownMenuItem<String>(
+                                    value: p.id,
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.home_work_outlined, color: AppColors.primaryGreen, size: 20),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            p.name,
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )).toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _selectedPropertyId = val;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 20),
+
                       _buildSectionTitle('Biểu tượng đại diện'),
                       const SizedBox(height: 8),
                       Container(
@@ -365,6 +444,7 @@ class _ServiceFormScreenState extends State<ServiceFormScreen> {
                                   final ownerId = await AuthStorage.getUserId();
                                   final payload = {
                                     'ownerId': ownerId.toString().trim(),
+                                    'propertyId': _selectedPropertyId,
                                     'name': _nameController.text.trim(),
                                     'price': priceVal,
                                     'unit': _selectedUnit,

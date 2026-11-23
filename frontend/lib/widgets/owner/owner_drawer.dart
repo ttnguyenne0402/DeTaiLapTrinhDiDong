@@ -8,12 +8,11 @@ import '../../screens/owner/maintenance_manage.dart';
 import '../../screens/owner/posts_manage.dart';
 import '../../screens/owner/properties_manage.dart';
 import '../../screens/owner/appointments_manage.dart';
-import '../../screens/owner/services_manage.dart';
 import '../../screens/owner/owner_notifications_screen.dart';
 
 class OwnerDrawer extends StatelessWidget {
   /// Mã định danh màn hình hiện tại để làm nổi bật :
-  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'services'
+  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'notifications'
   final String? currentRoute;
 
   const OwnerDrawer({super.key, this.currentRoute});
@@ -157,27 +156,7 @@ class OwnerDrawer extends StatelessWidget {
                   },
                 ),
 
-                // 7. Quản lý Dịch vụ & Bảng giá
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.room_service_outlined,
-                  title: 'Dịch vụ & Bảng giá',
-                  subtitle: 'Cấu hình đơn giá điện, nước, wifi...',
-                  isActive: currentRoute == 'services',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentRoute != 'services') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ServicesManageScreen(),
-                        ),
-                      );
-                    }
-                  },
-                ),
-
-                // 8. Thông báo của Chủ trọ
+                // 7. Thông báo của Chủ trọ
                 _buildDrawerItem(
                   context: context,
                   icon: Icons.notifications_active_outlined,

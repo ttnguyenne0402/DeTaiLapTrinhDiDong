@@ -43,6 +43,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
     public virtual DbSet<PropertyService> PropertyServices { get; set; }
 
+    public virtual DbSet<PropertyAmenity> PropertyAmenities { get; set; }
+
     public virtual DbSet<RentalPost> RentalPosts { get; set; }
 
     public virtual DbSet<RentalPostImage> RentalPostImages { get; set; }
@@ -92,9 +94,19 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
             entity.Property(e => e.Status)
                 .HasMaxLength(50)
                 .HasColumnName("status");
+            entity.Property(e => e.Icon)
+                .HasMaxLength(50)
+                .HasColumnName("icon");
+            entity.Property(e => e.OwnerId)
+                .HasMaxLength(50)
+                .HasColumnName("owner_id");
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.Owner).WithMany()
+                .HasForeignKey(d => d.OwnerId)
+                .HasConstraintName("FK_amenities_users");
         });
 
         modelBuilder.Entity<BankAccount>(entity =>
@@ -700,6 +712,28 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
                 .HasForeignKey(d => d.ServiceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_property_services_services");
+        });
+
+        modelBuilder.Entity<PropertyAmenity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.ToTable("property_amenities");
+            entity.Property(e => e.Id).HasMaxLength(50).HasColumnName("id");
+            entity.Property(e => e.PropertyId).HasMaxLength(50).HasColumnName("property_id");
+            entity.Property(e => e.AmenityId).HasMaxLength(50).HasColumnName("amenity_id");
+            entity.Property(e => e.Status).HasMaxLength(50).HasColumnName("status");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getdate())").HasColumnName("updated_at");
+
+            entity.HasOne(d => d.Property).WithMany(p => p.PropertyAmenities)
+                .HasForeignKey(d => d.PropertyId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_property_amenities_properties");
+
+            entity.HasOne(d => d.Amenity).WithMany(p => p.PropertyAmenities)
+                .HasForeignKey(d => d.AmenityId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_property_amenities_amenities");
         });
 
         modelBuilder.Entity<RentalPost>(entity =>
