@@ -13,6 +13,8 @@ namespace Backend.DT0s
         public string StatusCode { get; set; } = "active";
         public string Description { get; set; } = string.Empty;
         public string Icon { get; set; } = "bolt"; // bolt, water_drop, wifi, cleaning_services, elevator, two_wheeler, security, local_laundry_service
+        public string? PropertyId { get; set; }
+        public bool IsAssigned { get; set; } = true;
     }
 
     public class CreateServiceDto
@@ -30,6 +32,7 @@ namespace Backend.DT0s
 
     public class UpdateServiceDto
     {
+        public string? PropertyId { get; set; }
         public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public string Unit { get; set; } = "kWh";

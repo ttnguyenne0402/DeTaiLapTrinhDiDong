@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../widgets/owner/owner_drawer.dart';
 import '../../services/owner/service_service.dart';
+import '../../services/owner/property_service.dart';
 import 'service_form.dart';
 import '../../services/auth_storage.dart';
 
 class ServicesManageScreen extends StatefulWidget {
-  const ServicesManageScreen({super.key});
+  final String? initialPropertyId;
+
+  const ServicesManageScreen({super.key, this.initialPropertyId});
 
   @override
   State<ServicesManageScreen> createState() => _ServicesManageScreenState();
@@ -17,13 +19,39 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
   String? _errorMessage;
   List<Map<String, dynamic>> _services = [];
 
+  List<PropertyModel> _properties = [];
+  String? _selectedPropertyId; // null = Tất cả khu trọ
+
   @override
   void initState() {
     super.initState();
-    _loadServices();
+    _selectedPropertyId = widget.initialPropertyId;
+    _initData();
   }
 
-  // Tải danh sách dịch vụ trực tiếp từ SQL Server qua Backend Web API
+  Future<void> _initData() async {
+    await _loadProperties();
+    await _loadServices();
+  }
+
+  Future<void> _loadProperties() async {
+    try {
+      final ownerId = await AuthStorage.getUserId() ?? '';
+      final props = await PropertyService.fetchProperties(ownerId, 'All');
+      if (mounted) {
+        setState(() {
+          _properties = props;
+          if ((_selectedPropertyId == null || !_properties.any((p) => p.id == _selectedPropertyId)) && _properties.isNotEmpty) {
+            _selectedPropertyId = _properties.first.id;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải danh sách bất động sản: $e');
+    }
+  }
+
+  // Tải danh sách dịch vụ trực tiếp từ SQL Server qua Backend Web API (hỗ trợ lọc theo khu trọ)
   Future<void> _loadServices() async {
     setState(() {
       _isLoading = true;
@@ -31,7 +59,10 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
     });
     try {
       final ownerId = await AuthStorage.getUserId() ?? '';
-      final list = await ServiceManagementService.fetchServices(ownerId);
+      final list = await ServiceManagementService.fetchServices(
+        ownerId,
+        propertyId: _selectedPropertyId,
+      );
       if (mounted) {
         setState(() {
           _services = list.map((s) => {
@@ -44,6 +75,8 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             'iconName': s.icon,
             'isMandatory': s.isMandatory,
             'status': s.status,
+            'isAssigned': s.isAssigned,
+            'propertyId': _selectedPropertyId,
             'description': s.description,
           }).toList();
           _isLoading = false;
@@ -87,16 +120,13 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryGreen,
-      drawer: const OwnerDrawer(currentRoute: 'services'),
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Quản lý Dịch vụ & Bảng giá',
@@ -125,111 +155,129 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             topRight: Radius.circular(24),
           ),
         ),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadServices,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: RefreshIndicator(
+          onRefresh: _loadServices,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Bộ chọn Khu trọ / Tòa nhà áp dụng
+                _buildPropertySelector(),
+                const SizedBox(height: 14),
+
+                // 2. Banner Thông tin hướng dẫn
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGreen.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primaryGreen.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGreen.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.primaryGreen.withValues(alpha: 0.2),
+                      Icon(
+                        Icons.info_outline,
+                        color: AppColors.primaryGreen,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Đang xem và cấu hình dịch vụ cho: ${_getSelectedPropertyName()}',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.primaryGreen,
+                            height: 1.3,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: AppColors.primaryGreen,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Bảng giá dịch vụ lấy trực tiếp từ SQL Server và được áp dụng khi lập hóa đơn hàng tháng.',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: AppColors.primaryGreen,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Danh sách dịch vụ áp dụng',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '${_services.length} dịch vụ',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _services.isEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 40),
-                              child: Center(
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      _errorMessage ?? 'Chưa có dịch vụ nào trong cơ sở dữ liệu.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: _errorMessage != null ? Colors.red[400] : Colors.grey,
-                                      ),
-                                    ),
-                                    if (_errorMessage != null) ...[
-                                      const SizedBox(height: 12),
-                                      OutlinedButton.icon(
-                                        onPressed: _loadServices,
-                                        icon: const Icon(Icons.refresh),
-                                        label: const Text('Thử lại'),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _services.length,
-                              itemBuilder: (context, index) {
-                                final service = _services[index];
-                                return _buildServiceCard(service);
-                              },
-                            ),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(height: 18),
+
+                // 3. Tiêu đề danh sách
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Dịch vụ của khu trọ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${_services.length} dịch vụ',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // 4. Danh sách dịch vụ
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_services.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            _errorMessage ?? 'Chưa có dịch vụ nào trong cơ sở dữ liệu.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _errorMessage != null ? Colors.red[400] : Colors.grey,
+                            ),
+                          ),
+                          if (_errorMessage != null) ...[
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: _loadServices,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Thử lại'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _services.length,
+                    itemBuilder: (context, index) {
+                      final service = _services[index];
+                      return _buildServiceCard(service);
+                    },
+                  ),
+                const SizedBox(height: 60),
+              ],
+            ),
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const ServiceFormScreen()),
+            MaterialPageRoute(
+              builder: (context) => ServiceFormScreen(
+                initialPropertyId: _selectedPropertyId,
+              ),
+            ),
           );
           if (result == true) {
             _loadServices();
@@ -245,8 +293,89 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
     );
   }
 
+  String _getSelectedPropertyName() {
+    if (_properties.isEmpty) return 'Đang tải...';
+    final match = _properties.where((p) => p.id == _selectedPropertyId);
+    return match.isNotEmpty ? match.first.name : _properties.first.name;
+  }
+
+  Widget _buildPropertySelector() {
+    if (_properties.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.apartment, size: 20, color: AppColors.primaryGreen),
+            const SizedBox(width: 10),
+            const Text(
+              'Đang tải danh sách khu trọ...',
+              style: TextStyle(fontSize: 13.5, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final selectedValue = _properties.any((p) => p.id == _selectedPropertyId)
+        ? _selectedPropertyId!
+        : _properties.first.id;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: selectedValue,
+          icon: Icon(Icons.keyboard_arrow_down, color: AppColors.primaryGreen),
+          items: _properties.map((p) => DropdownMenuItem<String>(
+            value: p.id,
+            child: Row(
+              children: [
+                Icon(Icons.apartment, size: 20, color: AppColors.primaryGreen),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    p.name,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          )).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _selectedPropertyId = val;
+              });
+              _loadServices();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildServiceCard(Map<String, dynamic> service) {
     final bool isActive = service['status'] ?? true;
+    final bool isAssigned = service['isAssigned'] ?? true;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -259,12 +388,16 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primaryGreen.withValues(alpha: 0.12),
+                color: (isActive && isAssigned)
+                    ? AppColors.primaryGreen.withValues(alpha: 0.12)
+                    : Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 service['icon'] as IconData? ?? Icons.miscellaneous_services,
-                color: AppColors.primaryGreen,
+                color: (isActive && isAssigned)
+                    ? AppColors.primaryGreen
+                    : Colors.grey.shade500,
                 size: 26,
               ),
             ),
@@ -275,11 +408,15 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        service['name'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Text(
+                          service['name'] ?? '',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: (isActive && isAssigned) ? Colors.black87 : Colors.grey[600],
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (service['isMandatory'] == true) ...[
@@ -312,7 +449,7 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.primaryGreen,
+                        color: (isActive && isAssigned) ? AppColors.primaryGreen : Colors.grey,
                       ),
                       children: [
                         TextSpan(
@@ -326,7 +463,24 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                       ],
                     ),
                   ),
-                  if (service['description'] != null) ...[
+                  if (_selectedPropertyId != null) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isAssigned ? Colors.green[50] : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isAssigned ? 'Áp dụng cho khu này' : 'Chưa áp dụng cho khu này',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: isAssigned ? Colors.green[800] : Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ] else if (service['description'] != null && (service['description'] as String).isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       service['description'] ?? '',
@@ -341,16 +495,29 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
             Column(
               children: [
                 Switch(
-                  value: isActive,
+                  value: _selectedPropertyId != null ? isAssigned : isActive,
                   activeThumbColor: AppColors.primaryGreen,
                   onChanged: (val) async {
                     setState(() {
-                      service['status'] = val;
+                      if (_selectedPropertyId != null) {
+                        service['isAssigned'] = val;
+                        service['status'] = val;
+                      } else {
+                        service['status'] = val;
+                      }
                     });
                     try {
-                      await ServiceManagementService.toggleServiceStatus(service['id']);
+                      if (_selectedPropertyId != null) {
+                        await ServiceManagementService.togglePropertyService(
+                          service['id'],
+                          _selectedPropertyId!,
+                        );
+                      } else {
+                        await ServiceManagementService.toggleServiceStatus(service['id']);
+                      }
                     } catch (e) {
                       debugPrint('Lỗi chuyển trạng thái dịch vụ: $e');
+                      _loadServices();
                     }
                   },
                 ),
@@ -359,8 +526,10 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                     final res = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) =>
-                            ServiceFormScreen(initialData: service),
+                        builder: (context) => ServiceFormScreen(
+                          initialData: service,
+                          initialPropertyId: _selectedPropertyId,
+                        ),
                       ),
                     );
                     if (res == true) {
@@ -374,7 +543,7 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      'Sửa',
+                      'Sửa giá',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.blue[700],
