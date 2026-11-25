@@ -1,5 +1,6 @@
 import 'dart:io'; // 1. Thư viện xử lý HTTP Overrides để bypass SSL trên máy ảo
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'route/app_router.dart';
 import 'screens/auth/login_screen.dart';
 import 'services/local_notification_service.dart'; // <--- THÊM DÒNG NÀY
@@ -18,6 +19,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   HttpOverrides.global = MyHttpOverrides();
 //KHỞI TẠO THÔNG BÁO
   await LocalNotificationService.instance.init(navigatorKey);
@@ -39,6 +41,6 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: LoginScreen(),
-    );
+    ); 
   }
 }

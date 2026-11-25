@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "53430291551",
+    "project_id": "trooiapp",
+    "storage_bucket": "trooiapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:53430291551:android:2278b8c97ee08225931fea",
+        "android_client_info": {
+          "package_name": "com.example.doanlaptrinhdidong"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "53430291551-s2rtk8huntktftrckorjk5ckb31knkn9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7LsOddWLpAd_-t6_1quKfKofqP1myurc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "53430291551-s2rtk8huntktftrckorjk5ckb31knkn9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

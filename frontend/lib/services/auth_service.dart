@@ -148,6 +148,27 @@ class AuthService {
     return _parseResponse(response, 'Không đặt lại được mật khẩu.');
   }
 
+  // ĐẶT LẠI MẬT KHẨU QUA SỐ ĐIỆN THOẠI (Xác thực Firebase OTP)
+  static Future<Map<String, dynamic>> resetPasswordByPhone({
+    required String phone,
+    required String newPassword,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/reset-password-phone'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: jsonEncode({
+            'phone': phone,
+            'newPassword': newPassword,
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+    return _parseResponse(response, 'Không đặt lại được mật khẩu qua số điện thoại.');
+  }
+
   // ĐĂNG NHẬP GOOGLE
   static Future<Map<String, dynamic>> googleSignIn({
     required String idToken,

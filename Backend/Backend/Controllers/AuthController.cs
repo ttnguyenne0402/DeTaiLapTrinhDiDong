@@ -1,4 +1,4 @@
-﻿using Backend.DT0s;
+using Backend.DT0s;
 using Backend.DTOs;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -270,6 +270,47 @@ namespace Backend.Controllers
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Ok(new { message = "Đặt lại mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới." });
+        }
+
+        // ĐẶT LẠI MẬT KHẨU QUA SỐ ĐIỆN THOẠI (ĐÃ ĐƯỢC XÁC MINH BẰNG FIREBASE OTP)
+        // POST /api/Auth/reset-password-phone
+        [HttpPost("reset-password-phone")]
+        public async Task<IActionResult> ResetPasswordByPhone(
+            [FromBody] ResetPasswordByPhoneDTO model,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(model.Phone) || string.IsNullOrWhiteSpace(model.NewPassword))
+                {
+                    return BadRequest(new { message = "Số điện thoại và mật khẩu mới không được để trống." });
+                }
+
+                if (!IsStrongPassword(model.NewPassword))
+                {
+                    return BadRequest(new { message = "Mật khẩu cần ít nhất 8 ký tự." });
+                }
+
+                string normalizedPhone = NormalizePhone(model.Phone);
+                var users = await _context.Users.ToListAsync(cancellationToken);
+                var user = users.FirstOrDefault(u => NormalizePhone(u.Phone) == normalizedPhone);
+
+                if (user == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy tài khoản liên kết với số điện thoại này trong hệ thống." });
+                }
+
+                user.Password = model.NewPassword;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync(cancellationToken);
+
+                return Ok(new { message = "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng số điện thoại và mật khẩu mới." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi đặt lại mật khẩu qua số điện thoại: {Message}", ex.Message);
+                return StatusCode(500, new { message = $"Lỗi máy chủ: {ex.Message}" });
+            }
         }
 
         // 3. ĐĂNG NHẬP BẰNG GOOGLE
