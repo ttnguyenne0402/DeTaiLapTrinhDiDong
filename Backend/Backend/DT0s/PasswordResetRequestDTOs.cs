@@ -20,3 +20,13 @@ public sealed class ResetPasswordRequestDTO
     public string NewPassword { get; set; } = null!;
 }
 
+public sealed class ResetPasswordByPhoneDTO
+{
+    [Required, Phone, MaxLength(20)]
+    public string Phone { get; set; } = null!;
+
+    [Required, MinLength(8), MaxLength(128)]
+    public string NewPassword { get; set; } = null!;
+}
+
+
