@@ -345,6 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     await AuthStorage.clearLogin();
 
     if (!mounted) return;

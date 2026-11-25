@@ -52,7 +52,7 @@ namespace Backend.Controllers
                     UpdatedAt = DateTime.Now
                 };
 
-                // Lấy Id của lịch hẹn vừa tạo gán vào ReferenceId (Dùng Reflection để tránh lỗi nếu cấu trúc DTO thay đổi)
+                // Lấy Id của lịch hẹn vừa tạo gán vào ReferenceId
                 var idProp = result?.GetType().GetProperty("Id");
                 if (idProp != null)
                 {
@@ -60,6 +60,26 @@ namespace Backend.Controllers
                 }
 
                 _context.Notifications.Add(tenantNotif);
+
+                // 🔴 TỰ ĐỘNG TẠO THÔNG BÁO CHO CHỦ TRỌ KHI CÓ KHÁCH ĐẶT LỊCH
+                string? ownerId = room?.Property?.OwnerId;
+                if (!string.IsNullOrEmpty(ownerId))
+                {
+                    var ownerNotif = new Notification
+                    {
+                        Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
+                        UserId = ownerId, // Gửi cho CHỦ TRỌ sở hữu phòng này
+                        Title = "Lịch hẹn xem phòng mới 📅",
+                        Message = $"Khách hàng vừa đặt lịch hẹn xem {roomName} vào lúc {request.AppointmentTime} ngày {request.AppointmentDate}. SĐT: {request.Phone}.",
+                        Type = "appointment_new",
+                        ReferenceId = tenantNotif.ReferenceId,
+                        ReferenceType = "viewing_appointment",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    _context.Notifications.Add(ownerNotif);
+                }
+
                 await _context.SaveChangesAsync();
             }
             catch (Exception ex)

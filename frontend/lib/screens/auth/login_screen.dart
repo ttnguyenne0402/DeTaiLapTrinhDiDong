@@ -128,7 +128,9 @@ class _LoginScreenState extends State<LoginScreen>
   void _showNotice(String message, {bool isError = false}) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Colors.redAccent : AppColors.primaryGreen,
@@ -209,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (!mounted) return;
 
-      _showNotice(result['message'] ?? 'Đăng nhập thành công!');
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
       // Điều hướng theo vai trò
       if (role == 'admin') {
@@ -217,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen>
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
         );
-      } else if (role == 'owner') {
+      } else if (role == 'owner' || role == 'landlord') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const OwnerDashboard()),
@@ -311,10 +313,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (!mounted) return;
 
-      // Bước 9: Thông báo đăng nhập thành công
-      _showNotice(
-        result['message']?.toString() ?? 'Đăng nhập Google thành công!',
-      );
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
       // Bước 10: Điều hướng theo vai trò tài khoản
       if (role == 'admin') {

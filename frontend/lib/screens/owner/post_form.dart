@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../services/local/sqlite_helper.dart';
 import '../../services/owner/post_service.dart';
 import '../../services/owner/room_service.dart';
+import '../../services/owner/amenity_service.dart';
 import '../../services/auth_storage.dart';
 
 class PostFormScreen extends StatefulWidget {
@@ -32,13 +33,17 @@ class _PostFormScreenState extends State<PostFormScreen> {
   final List<String> _selectedImages = [];
 
   final List<String> amenities = [
-    'Wifi',
-    'Điều hòa',
-    'Máy giặt',
-    'Chỗ để xe',
-    'Tủ lạnh',
+    'Wifi tốc độ cao',
+    'Máy lạnh / Điều hòa',
+    'Máy giặt chung',
+    'Chỗ để xe máy',
+    'Camera an ninh 24/7',
+    'Bếp / Tủ lạnh riêng',
+    'Thang máy',
     'Giờ giấc tự do',
-    'An ninh 24/7',
+    'Ban công / Cửa sổ',
+    'Khóa vân tay / Thẻ từ',
+    'Hệ thống PCCC',
   ];
   final List<String> selectedAmenities = [];
 
@@ -90,6 +95,22 @@ class _PostFormScreenState extends State<PostFormScreen> {
     _priceController = TextEditingController(text: priceStr);
 
     _loadRooms();
+    _loadAmenitiesFromSql();
+  }
+
+  Future<void> _loadAmenitiesFromSql() async {
+    try {
+      final ownerId = await AuthStorage.getUserId() ?? 'usr_owner1';
+      final list = await AmenityManagementService.fetchAmenities(ownerId);
+      if (mounted && list.isNotEmpty) {
+        setState(() {
+          amenities.clear();
+          amenities.addAll(list.map((a) => a.name).toList());
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi nạp tiện ích từ SQL Server: $e');
+    }
   }
 
   Future<void> _loadRooms() async {

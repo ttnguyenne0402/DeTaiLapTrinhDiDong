@@ -72,10 +72,20 @@ namespace Backend.Controllers
                 var today = DateOnly.FromDateTime(DateTime.Today);
                 var tomorrow = today.AddDays(1);
 
+                // Quét danh sách phòng đã cho thuê hoặc đang có hợp đồng chờ ký
+                var rentedRoomIds = new HashSet<string>(
+                    await _context.Rooms.Where(r => r.Status == "rented").Select(r => r.Id).ToListAsync(),
+                    StringComparer.OrdinalIgnoreCase
+                );
+
+                var pendingContractRoomIds = new HashSet<string>(
+                    await _context.Contracts.Where(c => c.Status == "pending" || c.Status == "draft").Select(c => c.RoomId).ToListAsync(),
+                    StringComparer.OrdinalIgnoreCase
+                );
+
                 var result = rawList.Select(v =>
                 {
                     string dateStr = v.AppointmentDate.ToString("dd/MM/yyyy");
-                    // TimeOnly dùng "HH" để hiển thị giờ dạng 24h, "hh" sẽ bị đổi về 12h (16:00 thành 04:00)
                     string timeFormatted = v.AppointmentTime.ToString("HH:mm");
                     string displayTime = $"{timeFormatted} - {dateStr}";
 
@@ -93,6 +103,10 @@ namespace Backend.Controllers
                     string propName = v.Room?.Property?.Name ?? "";
                     string displayRoomName = roomName.StartsWith("Phòng", StringComparison.OrdinalIgnoreCase) ? roomName : $"Phòng {roomName}";
                     string roomInfo = string.IsNullOrEmpty(propName) ? displayRoomName : $"{displayRoomName} - {propName}";
+
+                    bool isRented = rentedRoomIds.Contains(v.RoomId) || (v.Room != null && v.Room.Status == "rented");
+                    bool hasPendingContract = pendingContractRoomIds.Contains(v.RoomId);
+                    string roomStatus = isRented ? "rented" : (hasPendingContract ? "pending" : (v.Room?.Status ?? "available"));
 
                     return new OwnerAppointmentDto
                     {
@@ -113,6 +127,9 @@ namespace Backend.Controllers
                         RawTime = timeFormatted,
                         Date = dateStr,
                         Status = v.Status,
+                        RoomStatus = roomStatus,
+                        IsRented = isRented,
+                        HasPendingContract = hasPendingContract,
                         Note = v.Message,
                         OwnerNote = v.OwnerNote,
                         Avatar = string.IsNullOrEmpty(v.Tenant?.Avatar) ? "frontend/assets/images/avatarDemo.jpg" : v.Tenant.Avatar

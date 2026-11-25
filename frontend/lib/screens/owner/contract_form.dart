@@ -25,6 +25,7 @@ class Contract_form extends StatefulWidget {
 class HopDongMoi extends State<Contract_form> {
   bool _agreeTerms = false;
   bool _isLoadingData = false;
+  bool _isSubmitting = false;
 
   // Dữ liệu phòng trống & Lịch hẹn
   List<dynamic> _availableRooms = [];
@@ -788,14 +789,46 @@ class HopDongMoi extends State<Contract_form> {
       'services': _appliedServices.where((s) => s['selected'] == true).toList(),
     };
 
-    final success = await ContractService.createContract(body);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu bản nháp vào hệ thống!')),
-      );
-      Navigator.pop(context, true);
-    } else {
-      _showMessage('Lỗi khi lưu bản nháp.');
+    final res = await ContractService.createContract(body);
+    if (mounted) {
+      if (res != null && res['error'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã lưu bản nháp vào hệ thống!'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else {
+        final errorMsg = res != null ? (res['message'] ?? 'Không thể lưu bản nháp.') : 'Lỗi khi lưu bản nháp.';
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 26),
+                SizedBox(width: 8),
+                Text('Thông báo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              errorMsg,
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -999,17 +1032,24 @@ class HopDongMoi extends State<Contract_form> {
       'services': _appliedServices.where((s) => s['selected'] == true).toList(),
     };
 
-    final success = await ContractService.createContract(body);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(initialStatus == 'active' ? 'Đã đính kèm PDF hợp đồng và kích hoạt hợp đồng thành công!' : 'Đã tạo hợp đồng và gửi ký thành công!'),
-          backgroundColor: AppColors.primaryGreen,
-        ),
-      );
-      Navigator.pop(context, true);
-    } else {
-      _showMessage('Lỗi khi tạo hợp đồng.');
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+
+    final res = await ContractService.createContract(body);
+    if (mounted) {
+      if (res != null && res['error'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã tạo hợp đồng và gửi ký thành công!'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else {
+        setState(() => _isSubmitting = false);
+        final errorMsg = res != null ? (res['message'] ?? 'Lỗi khi tạo hợp đồng.') : 'Lỗi khi tạo hợp đồng.';
+        _showMessage(errorMsg);
+      }
     }
   }
 
@@ -1020,8 +1060,8 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
-    if (!_ownerHasSigned || !_tenantHasSigned) {
-      _showMessage('Cả chủ trọ và người thuê đều phải ký.');
+    if (!_ownerHasSigned && !_tenantHasSigned) {
+      _showMessage('Vui lòng vẽ chữ ký trước khi xác nhận.');
       return;
     }
 
@@ -1073,8 +1113,15 @@ class HopDongMoi extends State<Contract_form> {
     );
 
     if (success && mounted) {
+      setState(() {
+        if (ownerBase64.isNotEmpty) _existingOwnerSignature = ownerBase64;
+        if (tenantBase64.isNotEmpty) _existingTenantSignature = tenantBase64;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hợp đồng đã ký thành công và có hiệu lực!')),
+        const SnackBar(
+          content: Text('Hợp đồng đã ký thành công và có hiệu lực!'),
+          backgroundColor: AppColors.primaryGreen,
+        ),
       );
       Navigator.pop(context, true);
     } else {
@@ -1771,14 +1818,21 @@ class HopDongMoi extends State<Contract_form> {
                     hasSavedSig ? 'Đã ký số' : 'Vẽ chữ ký',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: hasSavedSig ? AppColors.primaryGreen : Colors.orange),
                   ),
-                  if (!hasSavedSig) ...[
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: () => controller.clear(),
-                      icon: const Icon(Icons.refresh, size: 12),
-                      label: const Text('Ký lại', style: TextStyle(fontSize: 10)),
-                    ),
-                  ],
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        if (title.contains('Bên A')) {
+                          _existingOwnerSignature = null;
+                        } else {
+                          _existingTenantSignature = null;
+                        }
+                      });
+                      controller.clear();
+                    },
+                    icon: const Icon(Icons.refresh, size: 12),
+                    label: Text(hasSavedSig ? 'Ký lại' : 'Xóa', style: const TextStyle(fontSize: 10)),
+                  ),
                 ],
               ),
             ],
@@ -1844,7 +1898,7 @@ class HopDongMoi extends State<Contract_form> {
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: _saveDraft,
+            onPressed: _isSubmitting ? null : _saveDraft,
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
             child: const Text('Lưu bản nháp', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
           ),
@@ -1852,9 +1906,15 @@ class HopDongMoi extends State<Contract_form> {
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton(
-            onPressed: _completeContract,
+            onPressed: _isSubmitting ? null : _completeContract,
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, padding: const EdgeInsets.symmetric(vertical: 12)),
-            child: const Text('Hoàn tất & Gửi ký', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text('Hoàn tất & Gửi ký', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ),
         ),
       ],

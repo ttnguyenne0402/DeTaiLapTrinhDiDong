@@ -64,16 +64,23 @@ class ContractService {
   }
 
   // 2. Tạo hợp đồng mới hoặc lưu bản nháp
-  static Future<bool> createContract(Map<String, dynamic> data) async {
+  static Future<dynamic> createContract(Map<String, dynamic> data) async {
     try {
       final response = await http.post(
         Uri.parse(baseUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );
-      return response.statusCode == 200;
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return body;
+      }
+      return {
+        'error': true,
+        'message': body['message'] ?? 'Không thể tạo hợp đồng.'
+      };
     } catch (e) {
-      return false;
+      return {'error': true, 'message': 'Lỗi kết nối máy chủ.'};
     }
   }
 
@@ -188,16 +195,23 @@ class ContractService {
   }
 
   // 2. Thêm người ở cùng mới
-  static Future<bool> addContractMember(String contractId, Map<String, dynamic> data) async {
+  static Future<dynamic> addContractMember(String contractId, Map<String, dynamic> data) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/$contractId/members'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(data),
       );
-      return response.statusCode == 200;
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return body;
+      }
+      return {
+        'error': true,
+        'message': body['message'] ?? 'Không thể thêm người ở ghép.'
+      };
     } catch (e) {
-      return false;
+      return {'error': true, 'message': 'Lỗi kết nối máy chủ.'};
     }
   }
 

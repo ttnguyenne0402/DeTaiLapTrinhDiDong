@@ -138,11 +138,19 @@ class OwnerInvoiceService {
 
 
   // Lấy danh sách các phòng ghi điện nước đồng loạt
-  static Future<List<dynamic>?> getRoomsUtilitySummary({String? propertyId}) async {
+  static Future<List<dynamic>?> getRoomsUtilitySummary({String? ownerId, String? propertyId}) async {
     try {
-      var urlStr = '$baseUrl/rooms-utility-summary';
+      List<String> params = [];
+      if (ownerId != null && ownerId.isNotEmpty) {
+        params.add('ownerId=${Uri.encodeComponent(ownerId)}');
+      }
       if (propertyId != null && propertyId.isNotEmpty) {
-        urlStr += '?propertyId=$propertyId';
+        params.add('propertyId=${Uri.encodeComponent(propertyId)}');
+      }
+
+      var urlStr = '$baseUrl/rooms-utility-summary';
+      if (params.isNotEmpty) {
+        urlStr += '?${params.join('&')}';
       }
 
       final res = await http.get(Uri.parse(urlStr), headers: {

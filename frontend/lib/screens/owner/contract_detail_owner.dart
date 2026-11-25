@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../screens/owner/contract_members.dart';
 import '../../services/owner/contract_service.dart';
+import '../../services/auth_storage.dart';
 
 class ContractDetailScreen extends StatefulWidget {
   final Map<String, dynamic>? contract;
@@ -19,6 +20,7 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
   List<dynamic> _members = [];
   List<dynamic> _services = [];
   bool _isLoadingExtra = false;
+  String _loggedInOwnerName = '';
 
   @override
   void initState() {
@@ -27,7 +29,13 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
   }
 
   Future<void> _loadExtraData() async {
-    if (_contractId.isEmpty) return;
+    final currentName = await AuthStorage.getUserName();
+    if (_contractId.isEmpty) {
+      if (mounted && currentName != null && currentName.isNotEmpty) {
+        setState(() => _loggedInOwnerName = currentName);
+      }
+      return;
+    }
     setState(() => _isLoadingExtra = true);
 
     // Tải danh sách người ở cùng thực tế
@@ -47,6 +55,9 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
       setState(() {
         _members = mems;
         _services = srvs;
+        if (currentName != null && currentName.isNotEmpty) {
+          _loggedInOwnerName = currentName;
+        }
         _isLoadingExtra = false;
       });
     }
@@ -353,6 +364,36 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
               ),
             )),
           ],
+          if (_c['amenities'] is List && (_c['amenities'] as List).isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text('Trang thiết bị & Tiện ích bàn giao:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: (_c['amenities'] as List<dynamic>).map((amenity) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle, size: 12, color: AppColors.primaryGreen),
+                      const SizedBox(width: 4),
+                      Text(
+                        amenity.toString(),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
         ],
       ),
     );
@@ -360,8 +401,8 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
 
   // Widget hiển thị chữ ký hai bên đồng bộ giống màn hình thanh lý
   Widget _buildESignatureSection() {
-    final tenantName = _c['tenantName'] ?? 'Khách thuê';
-    final ownerName = _c['ownerName'] ?? 'Trần Thanh Trúc';
+    final tenantName = _c['tenantName'] ?? _c['TenantName'] ?? 'Khách thuê';
+    final ownerName = _c['ownerName'] ?? _c['OwnerName'] ?? (_loggedInOwnerName.isNotEmpty ? _loggedInOwnerName : 'Chủ nhà');
 
     return Container(
       padding: const EdgeInsets.all(14),

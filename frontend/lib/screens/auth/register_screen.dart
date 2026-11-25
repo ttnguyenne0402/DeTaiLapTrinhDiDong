@@ -442,9 +442,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   label: 'Số điện thoại',
                   hint: '0901234567',
                   icon: Icons.phone_outlined,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Vui lòng nhập số điện thoại'
-                      : null,
+                  validator: (value) {
+                    final phone = value?.trim() ?? '';
+                    if (phone.isEmpty) return 'Vui lòng nhập số điện thoại';
+                    if (!RegExp(r'^0[0-9]{9}$').hasMatch(phone)) {
+                      return 'Số điện thoại phải gồm 10 chữ số bắt đầu bằng số 0';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
 

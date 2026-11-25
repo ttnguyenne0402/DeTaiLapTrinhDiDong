@@ -52,7 +52,7 @@ namespace Backend.Controllers
                         Thumbnail = p.RentalPostImages
                             .OrderByDescending(img => img.IsThumbnail)
                             .Select(img => img.ImagePath)
-                            .FirstOrDefault() ?? (p.Room != null ? p.Room.Images : null),
+                            .FirstOrDefault() ?? (p.Room != null && p.Room.Images != null ? p.Room.Images : "assets/images/anhPhongDemo.jpg"),
                         CreatedAt = p.CreatedAt
                     })
                     .ToListAsync();
@@ -110,7 +110,7 @@ namespace Backend.Controllers
                         ? post.RentalPostImages.Select(i => i.ImagePath).ToList()
                         : (!string.IsNullOrWhiteSpace(post.Room?.Images)
                             ? post.Room.Images.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(img => img.Trim()).ToList()
-                            : new List<string>()),
+                            : new List<string> { "assets/images/anhPhongDemo.jpg" }),
                      Amenities = !string.IsNullOrWhiteSpace(post.Amenities)
                     ? post.Amenities.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(a => a.Trim()).ToList()
                     : (post.Room?.RoomAmenities

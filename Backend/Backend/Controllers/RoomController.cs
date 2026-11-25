@@ -147,9 +147,21 @@ namespace Backend.Controllers
                     description = r.Description,
 
                     // Tiện ích
-                    amenities = r.RoomAmenities
-                        .Select(ra => ra.Amenity.Name)
-                        .ToList(),
+                    amenities = r.RoomAmenities.Any()
+                        ? r.RoomAmenities.Select(ra => ra.Amenity.Name).ToList()
+                        : (r.Property.PropertyAmenities.Any(pa => pa.Status == "active")
+                            ? _context.PropertyAmenities.Where(pa => pa.PropertyId == r.PropertyId && pa.Status == "active").Select(pa => pa.Amenity.Name).ToList()
+                            : new List<string> { "Wifi tốc độ cao", "Máy lạnh", "Thang máy", "Chỗ để xe máy", "Camera an ninh 24/7", "Giờ giấc tự do", "Khóa vân tay" }),
+
+                    // Dịch vụ đi kèm
+                    services = _context.PropertyServices
+                        .Where(ps => ps.PropertyId == r.PropertyId && ps.Status == "active")
+                        .Select(ps => new
+                        {
+                            name = ps.Service.Name,
+                            price = ps.Price,
+                            unit = ps.Service.Unit
+                        }).ToList(),
 
                     // Hình ảnh
                     image = r.Images

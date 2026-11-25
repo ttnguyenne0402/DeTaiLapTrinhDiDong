@@ -196,7 +196,15 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const OwnerProfileScreen(), // Điều hướng đúng trang profile chủ trọ
+                    builder: (context) => const ProfileScreen(
+                      user: {
+                        'Name': 'Nguyễn Văn A',
+                        'Email': '',
+                        'Phone': '',
+                        'Avatar': '',
+                        'Role': 'owner',
+                      },
+                    ),
                   ),
                 );
               }),

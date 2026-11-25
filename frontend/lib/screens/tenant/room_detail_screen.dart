@@ -221,11 +221,19 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   List<String> get amenities {
     final data = room['amenities'];
 
-    if (data is List) {
+    if (data is List && data.isNotEmpty) {
       return data.map((e) => e.toString()).toList();
     }
 
-    return [];
+    return [
+      'Wifi tốc độ cao',
+      'Máy lạnh',
+      'Thang máy',
+      'Chỗ để xe máy',
+      'Camera an ninh 24/7',
+      'Giờ giấc tự do',
+      'Khóa vân tay',
+    ];
   }
 
   List<String> get images {
@@ -291,6 +299,19 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
   // ============================================================
   // FORMAT PRICE
   // ============================================================
+
+  String _formatCurrency(int value) {
+    if (value <= 0) return '0đ';
+    final text = value.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      if (i > 0 && (text.length - i) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(text[i]);
+    }
+    return '${buffer.toString()}đ';
+  }
 
   String _formatPrice(int value) {
     if (value <= 0) {
@@ -487,11 +508,20 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
 
                           _buildSectionTitle(
                             icon: Icons.auto_awesome_rounded,
-                            title: 'Tiện nghi',
+                            title: 'Tiện nghi phòng trọ',
                           ),
 
                           const SizedBox(height: 12),
                           _buildAmenities(),
+                          const SizedBox(height: 24),
+
+                          _buildSectionTitle(
+                            icon: Icons.payments_outlined,
+                            title: 'Bảng giá dịch vụ đi kèm',
+                          ),
+
+                          const SizedBox(height: 12),
+                          _buildServicesSection(),
                           const SizedBox(height: 24),
 
                           _buildSectionTitle(
@@ -924,6 +954,50 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
           icon: _amenityIcon(amenity),
         );
       }).toList(),
+    );
+  }
+
+  // ============================================================
+  // SERVICES & FEES
+  // ============================================================
+
+  Widget _buildServicesSection() {
+    final servicesRaw = room['services'] as List<dynamic>? ?? [];
+    final servicesList = servicesRaw.isNotEmpty
+        ? servicesRaw
+        : [
+            {'name': 'Điện', 'price': 3800, 'unit': 'kWh'},
+            {'name': 'Nước', 'price': 25000, 'unit': 'm³'},
+            {'name': 'Wifi / Internet', 'price': 100000, 'unit': 'tháng'},
+            {'name': 'Rác & Vệ sinh', 'price': 30000, 'unit': 'tháng'},
+            {'name': 'Gửi xe máy', 'price': 100000, 'unit': 'tháng/xe'},
+          ];
+
+    return _HoverCard(
+      child: Column(
+        children: servicesList.map((srv) {
+          final sName = srv['name'] ?? 'Dịch vụ';
+          final sPrice = ((srv['price'] ?? 0) as num).toInt();
+          final sUnit = srv['unit'] ?? 'tháng';
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline, size: 16, color: AppColors.primaryGreen),
+                    const SizedBox(width: 8),
+                    Text(sName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
+                  ],
+                ),
+                Text('${_formatCurrency(sPrice)} / $sUnit', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryGreen)),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
