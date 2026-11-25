@@ -58,6 +58,9 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
             'rawTime': a.rawTime,
             'date': a.date,
             'status': a.status,
+            'roomStatus': a.roomStatus,
+            'isRented': a.isRented,
+            'hasPendingContract': a.hasPendingContract,
             'note': a.note ?? 'Khách hẹn xem phòng trực tiếp',
             'ownerNote': a.ownerNote,
             'avatar': a.avatar,
@@ -755,31 +758,50 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                       fontStyle: FontStyle.italic,
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _openCreateContract(item),
-                    icon: const Icon(
-                      Icons.description_outlined,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    label: const Text(
-                      'Lập hợp đồng',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGreen,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final String roomSt = (item['roomStatus'] ?? item['RoomStatus'] ?? '').toString().toLowerCase();
+                      final bool isPendingContract = roomSt == 'pending' || roomSt == 'chờ ký' || item['hasPendingContract'] == true;
+                      final bool isRented = roomSt == 'rented' || roomSt == 'đã cho thuê' || item['isRented'] == true;
+                      final bool isRoomLocked = isPendingContract || isRented || item['hasContract'] == true;
+
+                      String btnLabel = 'Lập hợp đồng';
+                      if (isRented) {
+                        btnLabel = 'Phòng đã được thuê 🛑';
+                      } else if (isPendingContract) {
+                        btnLabel = 'Đang chờ ký 🔒';
+                      } else if (isRoomLocked) {
+                        btnLabel = 'Đã có hợp đồng 🛑';
+                      }
+
+                      return ElevatedButton.icon(
+                        onPressed: isRoomLocked ? null : () => _openCreateContract(item),
+                        icon: Icon(
+                          isRoomLocked ? Icons.lock_outline : Icons.description_outlined,
+                          size: 16,
+                          color: isRoomLocked ? Colors.grey : Colors.white,
+                        ),
+                        label: Text(
+                          btnLabel,
+                          style: TextStyle(
+                            color: isRoomLocked ? Colors.grey : Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isRoomLocked ? Colors.grey.shade300 : AppColors.primaryGreen,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

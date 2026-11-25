@@ -19,6 +19,11 @@ class _TenantManagementScreenState extends State<TenantManagementScreen> {
   List<dynamic> _members = [];
   bool _isLoading = false;
 
+  bool get _isContractLocked {
+    final st = (_c['status'] ?? '').toString().toLowerCase().trim();
+    return st == 'terminated' || st == 'expired' || st == 'đã thanh lý' || st == 'đã hết hạn';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -169,27 +174,79 @@ class _TenantManagementScreenState extends State<TenantManagementScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () async {
-                      if (nameController.text.trim().isEmpty) {
+                      final name = nameController.text.trim();
+                      if (name.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Vui lòng nhập họ và tên thành viên.')),
                         );
                         return;
                       }
 
+                      final phone = phoneController.text.trim();
+                      if (phone.isNotEmpty) {
+                        final phoneRegex = RegExp(r'^0[0-9]{9}$');
+                        if (!phoneRegex.hasMatch(phone)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Số điện thoại không hợp lệ (phải gồm 10 chữ số bắt đầu bằng số 0).')),
+                          );
+                          return;
+                        }
+
+                        final isDupPhone = _members.any((m) => (m['phone'] ?? m['Phone'] ?? '').toString().trim() == phone);
+                        if (isDupPhone) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Số điện thoại $phone đã có trong danh sách ở ghép của phòng này!')),
+                          );
+                          return;
+                        }
+                      }
+
+                      final cccd = cccdController.text.trim();
+                      if (cccd.isNotEmpty) {
+                        if (cccd.length != 12 || int.tryParse(cccd) == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Số CCCD không hợp lệ (phải đủ 12 chữ số).')),
+                          );
+                          return;
+                        }
+
+                        final isDupCccd = _members.any((m) => (m['identityCard'] ?? m['IdentityCard'] ?? m['cccd'] ?? '').toString().trim() == cccd);
+                        if (isDupCccd) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Số CCCD $cccd đã có trong danh sách ở ghép của phòng này!')),
+                          );
+                          return;
+                        }
+                      }
+
                       final body = {
-                        'fullName': nameController.text.trim(),
-                        'phone': phoneController.text.trim(),
-                        'cccd': cccdController.text.trim(),
+                        'fullName': name,
+                        'phone': phone,
+                        'cccd': cccd,
                         'relationship': selectedRelationship,
                       };
 
                       final res = await ContractService.addContractMember(_contractId, body);
-                      if (res != null && mounted) {
-                        Navigator.pop(ctx);
-                        _fetchMembers();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Đã thêm thành viên ở cùng thành công!')),
-                        );
+                      if (mounted) {
+                        if (res != null && res['error'] != true) {
+                          Navigator.pop(ctx);
+                          _fetchMembers();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đã thêm thành viên ở cùng thành công!'),
+                              backgroundColor: AppColors.primaryGreen,
+                            ),
+                          );
+                        } else {
+                          final errorMsg = res != null ? (res['message'] ?? 'Lỗi thêm người ở ghép.') : 'Lỗi kết nối máy chủ.';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(errorMsg),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
                       }
                     },
                     child: const Text(
@@ -464,10 +521,11 @@ class _TenantManagementScreenState extends State<TenantManagementScreen> {
                                   ],
                                 ),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
-                                onPressed: () => _deleteMember(mId, mName),
-                              ),
+                              if (!_isContractLocked)
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                                  onPressed: () => _deleteMember(mId, mName),
+                                ),
                             ],
                           ),
                       );
@@ -475,26 +533,45 @@ class _TenantManagementScreenState extends State<TenantManagementScreen> {
 
                     const SizedBox(height: 12),
 
-                    // Nút thêm nhanh
-                    InkWell(
-                      onTap: _showAddMemberBottomSheet,
-                      child: Container(
+                    // Nút thêm thành viên (Khóa xám khi hợp đồng đã thanh lý / hết hiệu lực)
+                    if (!_isContractLocked)
+                      InkWell(
+                        onTap: _showAddMemberBottomSheet,
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.lightGreen.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.2)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person_add_alt_1, color: AppColors.primaryGreen, size: 20),
+                              SizedBox(width: 8),
+                              Text('+ Thêm thành viên ở ghép mới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryGreen)),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      Container(
                         padding: const EdgeInsets.all(14),
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: AppColors.lightGreen.withOpacity(0.5),
+                          color: Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.primaryGreen.withOpacity(0.2)),
+                          border: Border.all(color: Colors.grey.shade300),
                         ),
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.person_add_alt_1, color: AppColors.primaryGreen, size: 20),
+                            Icon(Icons.lock_outline, size: 18, color: Colors.grey),
                             SizedBox(width: 8),
-                            Text('+ Thêm thành viên ở ghép mới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryGreen)),
+                            Text('+ Thêm thành viên ở ghép mới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
                           ],
                         ),
                       ),
-                    ),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -502,26 +579,6 @@ class _TenantManagementScreenState extends State<TenantManagementScreen> {
             ),
           ),
         ],
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          color: AppColors.cardSurface,
-          border: Border(top: BorderSide(color: AppColors.borderLight)),
-        ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 46,
-          child: ElevatedButton.icon(
-            onPressed: _showAddMemberBottomSheet,
-            icon: const Icon(Icons.person_add, size: 18, color: Colors.white),
-            label: const Text('Thêm người ở ghép', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ),
       ),
     );
   }

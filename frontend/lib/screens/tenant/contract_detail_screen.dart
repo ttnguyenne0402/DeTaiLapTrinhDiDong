@@ -234,6 +234,46 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
               const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
             ],
 
+            // 🟢 TIỆN ÍCH & TRANG THIẾT BỊ BÀN GIAO CỦA PHÒNG
+            if (_contractDetail!['amenities'] is List) ...[
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('TRANG THIẾT BỊ & TIỆN ÍCH BÀN GIAO', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: (_contractDetail!['amenities'] as List<dynamic>).map((amenity) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.check_circle, size: 14, color: AppColors.primaryGreen),
+                              const SizedBox(width: 6),
+                              Text(
+                                amenity.toString(),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryGreen),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, thickness: 4, color: AppColors.lightGreen),
+            ],
+
             // 🔴 HIỂN THỊ TRẠNG THÁI CHỮ KÝ CỦA CẢ 2 BÊN
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -248,15 +288,15 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                         child: _buildSignatureDisplayBox(
                           role: 'Chủ nhà (Bên A)',
                           name: ownerName,
-                          signatureBase64: _contractDetail!['ownerSignature']?.toString(),
+                          signatureBase64: _contractDetail!['ownerSignature']?.toString() ?? _contractDetail!['OwnerSignature']?.toString(),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildSignatureDisplayBox(
                           role: 'Khách thuê (Bên B)',
-                          name: _contractDetail!['tenantName'] ?? 'Khách thuê',
-                          signatureBase64: _contractDetail!['tenantSignature']?.toString(),
+                          name: _contractDetail!['tenantName'] ?? _contractDetail!['TenantName'] ?? 'Khách thuê',
+                          signatureBase64: _contractDetail!['tenantSignature']?.toString() ?? _contractDetail!['TenantSignature']?.toString(),
                         ),
                       ),
                     ],

@@ -144,6 +144,12 @@ class _AmenitiesManageScreenState extends State<AmenitiesManageScreen> {
         return Icons.cleaning_services;
       case 'security':
         return Icons.security;
+      case 'bed':
+        return Icons.bed;
+      case 'wc':
+        return Icons.wc;
+      case 'directions_car':
+        return Icons.directions_car;
       default:
         return Icons.check_circle_outline;
     }
@@ -582,13 +588,18 @@ class _AmenitiesManageScreenState extends State<AmenitiesManageScreen> {
       {'name': 'elevator', 'icon': Icons.elevator, 'label': 'Thang máy'},
       {'name': 'two_wheeler', 'icon': Icons.two_wheeler, 'label': 'Nhà xe'},
       {'name': 'videocam', 'icon': Icons.videocam, 'label': 'Camera'},
-      {'name': 'kitchen', 'icon': Icons.kitchen, 'label': 'Bếp'},
+      {'name': 'kitchen', 'icon': Icons.kitchen, 'label': 'Bếp / Tủ lạnh'},
       {'name': 'local_laundry_service', 'icon': Icons.local_laundry_service, 'label': 'Máy giặt'},
       {'name': 'balcony', 'icon': Icons.balcony, 'label': 'Ban công'},
-      {'name': 'fingerprint', 'icon': Icons.fingerprint, 'label': 'Vân tay'},
+      {'name': 'fingerprint', 'icon': Icons.fingerprint, 'label': 'Khoá vân tay'},
       {'name': 'fire_extinguisher', 'icon': Icons.fire_extinguisher, 'label': 'PCCC'},
-      {'name': 'access_time', 'icon': Icons.access_time, 'label': 'Tự do 24/7'},
-      {'name': 'security', 'icon': Icons.security, 'label': 'Bảo vệ'},
+      {'name': 'access_time', 'icon': Icons.access_time, 'label': 'Giờ giấc tự do'},
+      {'name': 'security', 'icon': Icons.security, 'label': 'Bảo vệ 24/7'},
+      {'name': 'bed', 'icon': Icons.bed, 'label': 'Giường nệm'},
+      {'name': 'wc', 'icon': Icons.wc, 'label': 'WC riêng'},
+      {'name': 'pool', 'icon': Icons.pool, 'label': 'Hồ bơi'},
+      {'name': 'directions_car', 'icon': Icons.directions_car, 'label': 'Đỗ ô tô'},
+      {'name': 'pets', 'icon': Icons.pets, 'label': 'Nuôi thú cưng'},
     ];
 
     showDialog(
@@ -700,6 +711,7 @@ class _AmenitiesManageScreenState extends State<AmenitiesManageScreen> {
                 try {
                   final ok = await AmenityManagementService.createAmenity({
                     'ownerId': _currentOwnerId,
+                    'propertyId': _selectedPropertyId,
                     'name': name,
                     'description': descCtrl.text.trim(),
                     'icon': selectedIcon,
@@ -714,7 +726,7 @@ class _AmenitiesManageScreenState extends State<AmenitiesManageScreen> {
                         ),
                       );
                     }
-                    _loadAmenitiesOnly();
+                    _loadData();
                   } else {
                     if (mounted) {
                       messenger.showSnackBar(

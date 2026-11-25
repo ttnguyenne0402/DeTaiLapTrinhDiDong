@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
@@ -73,10 +74,6 @@ class duyettin extends State<review> {
       appBar: AppBar(
         backgroundColor: AppColors.primaryGreen,
         elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.maybePop(context),
-          icon: const Icon(Icons.arrow_back, size: 26, color: Colors.white),
-        ),
         centerTitle: true,
         title: const Text(
           "Duyệt tin đăng",
@@ -209,25 +206,7 @@ class duyettin extends State<review> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: item.thumbnail != null && item.thumbnail!.isNotEmpty
-                      ? Image.network(
-                    item.thumbnail!,
-                    width: 85,
-                    height: 95,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 85,
-                      height: 95,
-                      color: AppColors.lightGreen,
-                      child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                    ),
-                  )
-                      : Container(
-                    width: 85,
-                    height: 95,
-                    color: AppColors.lightGreen,
-                    child: const Icon(Icons.home, color: AppColors.primaryGreen, size: 32),
-                  ),
+                  child: _buildPostImage(item.thumbnail ?? '', width: 85, height: 95),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -288,6 +267,83 @@ class duyettin extends State<review> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPostImage(String imgPath, {double width = double.infinity, double height = 160, BoxFit fit = BoxFit.cover}) {
+    if (imgPath.isEmpty) {
+      return Image.asset(
+        'assets/images/anhPhongDemo.jpg',
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Container(
+          width: width,
+          height: height,
+          color: AppColors.lightGreen,
+          child: const Center(child: Icon(Icons.home, color: AppColors.primaryGreen, size: 32)),
+        ),
+      );
+    }
+
+    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+      return Image.network(
+        imgPath,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Image.asset(
+          'assets/images/anhPhongDemo.jpg',
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (_, __, ___) => Container(
+            width: width,
+            height: height,
+            color: AppColors.lightGreen,
+            child: const Icon(Icons.home, color: AppColors.primaryGreen, size: 32),
+          ),
+        ),
+      );
+    }
+
+    if (imgPath.contains('assets/')) {
+      final cleanPath = 'assets/' + imgPath.split('assets/').last;
+      return Image.asset(
+        cleanPath,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Container(
+          width: width,
+          height: height,
+          color: AppColors.lightGreen,
+          child: const Icon(Icons.home, color: AppColors.primaryGreen, size: 32),
+        ),
+      );
+    }
+
+    if (File(imgPath).existsSync()) {
+      return Image.file(
+        File(imgPath),
+        width: width,
+        height: height,
+        fit: fit,
+      );
+    }
+
+    final fullUrl = imgPath.startsWith('/') ? 'http://10.0.2.2:5093$imgPath' : 'http://10.0.2.2:5093/$imgPath';
+    return Image.network(
+      fullUrl,
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: (_, __, ___) => Image.asset(
+        'assets/images/anhPhongDemo.jpg',
+        width: width,
+        height: height,
+        fit: fit,
       ),
     );
   }

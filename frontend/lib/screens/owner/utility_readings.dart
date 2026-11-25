@@ -36,7 +36,11 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final res = await OwnerInvoiceService.getRoomsUtilitySummary(propertyId: widget.propertyId);
+      final ownerId = await AuthStorage.getUserId();
+      final res = await OwnerInvoiceService.getRoomsUtilitySummary(
+        ownerId: ownerId,
+        propertyId: widget.propertyId,
+      );
 
       if (mounted && res is List) {
         final List<_RoomInfo> loaded = [];

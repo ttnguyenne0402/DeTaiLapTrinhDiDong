@@ -416,7 +416,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                   final targetFloor =
                                       int.tryParse(_floorController.text.trim()) ?? 1;
 
-                                  // Kiểm tra trùng tên phòng trong cùng bất động sản và cùng tầng (không phân biệt hoa/thường)
+                                  // Kiểm tra trùng tên phòng trong cùng bất động sản (không phân biệt hoa/thường)
                                   final inputNorm = _normalizeRoomCode(roomName);
                                   final duplicate = _existingRooms.any((r) {
                                     if (isEdit &&
@@ -426,18 +426,17 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                     }
                                     final sameProp = r.propertyId.trim().toLowerCase() ==
                                         targetPropId.trim().toLowerCase();
-                                    final sameFloor = (r.floor ?? 1) == targetFloor;
                                     final sameName = r.name.trim().toLowerCase() ==
                                             roomName.toLowerCase() ||
                                         _normalizeRoomCode(r.name) == inputNorm;
-                                    return sameProp && sameFloor && sameName;
+                                    return sameProp && sameName;
                                   });
 
                                   if (duplicate) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Phòng "$roomName" thuộc tầng $targetFloor đã tồn tại trong bất động sản này! Vui lòng đặt tên khác.',
+                                          'Phòng "$roomName" đã tồn tại trong tòa nhà này! Vui lòng đặt tên khác.',
                                         ),
                                         backgroundColor: Colors.red,
                                       ),

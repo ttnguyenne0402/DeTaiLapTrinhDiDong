@@ -16,6 +16,7 @@ class ContractLiquidationScreen extends StatefulWidget {
 class _ContractLiquidationScreenState
     extends State<ContractLiquidationScreen> {
   bool _isLoading = true;
+  bool _isSubmitting = false;
   Map<String, dynamic>? _data;
 
   final List<Map<String, dynamic>> _deductions = [];
@@ -301,6 +302,19 @@ class _ContractLiquidationScreenState
     );
   }
 
+  String _formatCurrency(dynamic amount) {
+    if (amount == null) return '0';
+    final double numVal = (amount is num)
+        ? (amount as num).toDouble()
+        : (double.tryParse(amount.toString().replaceAll('đ', '').replaceAll('.', '').replaceAll(',', '').trim()) ?? 0.0);
+    final int intVal = numVal.toInt();
+    final str = intVal.abs().toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return str;
+  }
+
   // thẻ thông tin hợp đồng và tiền cọc (Đã gắn dữ liệu thật từ API)
   Widget _buildContractCard() {
     final roomName = _data?['roomName'] ?? 'Phòng';
@@ -387,7 +401,7 @@ class _ContractLiquidationScreenState
               children: [
                 const Text('Tiền cọc gốc đang giữ:',
                     style: TextStyle(color: Colors.white, fontSize: 13)),
-                Text('$deposit đ',
+                Text('${_formatCurrency(deposit)} đ',
                     style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -758,13 +772,13 @@ class _ContractLiquidationScreenState
             ],
           ),
           const SizedBox(height: 12),
-          _buildSummaryRow('Tiền đặt cọc ban đầu:', '+$deposit đ',
+          _buildSummaryRow('Tiền đặt cọc ban đầu:', '+${_formatCurrency(deposit)} đ',
               isBold: true, color: AppColors.textPrimary),
           const SizedBox(height: 6),
-          _buildSummaryRow('• Điện nước cuối kỳ:', '-$utilityTotal đ', color: Colors.red),
-          _buildSummaryRow('• Khấu trừ bàn giao / bồi thường:', '-$deductionTotal đ', color: Colors.red),
+          _buildSummaryRow('• Điện nước cuối kỳ:', '-${_formatCurrency(utilityTotal)} đ', color: Colors.red),
+          _buildSummaryRow('• Khấu trừ bàn giao / bồi thường:', '-${_formatCurrency(deductionTotal)} đ', color: Colors.red),
           const SizedBox(height: 8),
-          _buildSummaryRow('Tổng các khoản trừ:', '-$totalDeductions đ',
+          _buildSummaryRow('Tổng các khoản trừ:', '-${_formatCurrency(totalDeductions)} đ',
               isBold: true, color: Colors.red),
           const SizedBox(height: 12),
           Container(
@@ -787,7 +801,7 @@ class _ContractLiquidationScreenState
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$refundAmount VNĐ',
+                  '${_formatCurrency(refundAmount)} VNĐ',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -1022,43 +1036,94 @@ class _ContractLiquidationScreenState
         SizedBox(
           width: double.infinity,
           height: 48,
-          child: ElevatedButton.icon(
-            onPressed: () async {
-              final contractId = _data?['contractId'] ?? widget.contractId;
-              if (contractId == null) return;
+          child: ElevatedButton(
+            onPressed: _isSubmitting
+                ? null
+                : () async {
+                    final contractId = _data?['contractId'] ?? widget.contractId;
+                    if (contractId == null) return;
 
-              final messenger = ScaffoldMessenger.of(context);
-              final navigator = Navigator.of(context);
-              final response = await http.post(
-                Uri.parse('http://10.0.2.2:5093/api/OwnerContracts/$contractId/terminate'),
-                headers: {'Content-Type': 'application/json'},
-              );
+                    final elecOld = (_data?['elecOld'] is num) ? (_data!['elecOld'] as num).toDouble() : 0.0;
+                    final waterOld = (_data?['waterOld'] is num) ? (_data!['waterOld'] as num).toDouble() : 0.0;
 
-              if (response.statusCode == 200 && mounted) {
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Thanh lý hợp đồng thành công! Phòng đã được đưa về trạng thái trống.'),
-                    backgroundColor: AppColors.primaryGreen,
-                  ),
-                );
-                navigator.pop(true);
-              }
-            },
-            icon: const Icon(Icons.check_circle_outline, color: Colors.white),
-            label: const Text(
-              'Xác nhận Hoàn Cọc & Ký Thanh Lý',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+                    final elecNew = double.tryParse(_elecNewController.text.trim()) ?? elecOld;
+                    final waterNew = double.tryParse(_waterNewController.text.trim()) ?? waterOld;
+
+                    if (elecNew < elecOld) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Lỗi: Chỉ số điện mới ($elecNew kWh) không được nhỏ hơn chỉ số chốt cũ ($elecOld kWh)!'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (waterNew < waterOld) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Lỗi: Chỉ số nước mới ($waterNew m³) không được nhỏ hơn chỉ số chốt cũ ($waterOld m³)!'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (_isSubmitting) return;
+                    setState(() => _isSubmitting = true);
+
+                    final messenger = ScaffoldMessenger.of(context);
+                    final navigator = Navigator.of(context);
+
+                    try {
+                      final response = await http.post(
+                        Uri.parse('http://10.0.2.2:5093/api/OwnerContracts/$contractId/terminate'),
+                        headers: {'Content-Type': 'application/json'},
+                      );
+
+                      if (response.statusCode == 200 && mounted) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Thanh lý hợp đồng thành công! Phòng đã được đưa về trạng thái trống.'),
+                            backgroundColor: AppColors.primaryGreen,
+                          ),
+                        );
+                        navigator.pop(true);
+                      } else {
+                        if (mounted) setState(() => _isSubmitting = false);
+                      }
+                    } catch (e) {
+                      if (mounted) setState(() => _isSubmitting = false);
+                    }
+                  },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange.shade700,
+              disabledBackgroundColor: Colors.grey.shade400,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_outline, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        'Xác nhận Hoàn Cọc & Ký Thanh Lý',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
         const SizedBox(height: 10),

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/admin/admin_post_service.dart';
@@ -315,27 +316,9 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
           const SizedBox(height: 10),
           Stack(
             children: [
-              Container(
-                height: 160,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.borderLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: firstImage.isNotEmpty
-                    ? ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    firstImage,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.image_not_supported, color: Colors.grey),
-                    ),
-                  ),
-                )
-                    : const Center(
-                  child: Text('Chưa có ảnh', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
-                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _buildPostImage(firstImage, height: 160),
               ),
               Positioned(
                 top: 8,
@@ -369,18 +352,7 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
                   final imgUrl = images[index + 1];
                   return ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      imgUrl,
-                      width: 70,
-                      height: 60,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 70,
-                        height: 60,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.image, size: 20, color: Colors.grey),
-                      ),
-                    ),
+                    child: _buildPostImage(imgUrl, width: 70, height: 60),
                   );
                 },
               ),
@@ -741,6 +713,83 @@ class _RoomApprovalDetailScreenState extends State<RoomApprovalDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPostImage(String imgPath, {double width = double.infinity, double height = 160, BoxFit fit = BoxFit.cover}) {
+    if (imgPath.isEmpty) {
+      return Image.asset(
+        'assets/images/anhPhongDemo.jpg',
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Container(
+          width: width,
+          height: height,
+          color: Colors.grey.shade200,
+          child: const Center(child: Icon(Icons.home, color: AppColors.primaryGreen, size: 36)),
+        ),
+      );
+    }
+
+    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
+      return Image.network(
+        imgPath,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Image.asset(
+          'assets/images/anhPhongDemo.jpg',
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: (_, __, ___) => Container(
+            width: width,
+            height: height,
+            color: Colors.grey.shade200,
+            child: const Icon(Icons.image, color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
+    if (imgPath.contains('assets/')) {
+      final cleanPath = 'assets/' + imgPath.split('assets/').last;
+      return Image.asset(
+        cleanPath,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => Container(
+          width: width,
+          height: height,
+          color: Colors.grey.shade200,
+          child: const Icon(Icons.image, color: Colors.grey),
+        ),
+      );
+    }
+
+    if (File(imgPath).existsSync()) {
+      return Image.file(
+        File(imgPath),
+        width: width,
+        height: height,
+        fit: fit,
+      );
+    }
+
+    final fullUrl = imgPath.startsWith('/') ? 'http://10.0.2.2:5093$imgPath' : 'http://10.0.2.2:5093/$imgPath';
+    return Image.network(
+      fullUrl,
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: (_, __, ___) => Image.asset(
+        'assets/images/anhPhongDemo.jpg',
+        width: width,
+        height: height,
+        fit: fit,
       ),
     );
   }

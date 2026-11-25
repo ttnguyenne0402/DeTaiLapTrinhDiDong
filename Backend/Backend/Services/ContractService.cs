@@ -1,5 +1,7 @@
 ﻿using Backend.DTOs;
+using Backend.Models;
 using Backend.Repositories;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,10 +11,12 @@ namespace Backend.Services
     public class ContractService : IContractService
     {
         private readonly IContractRepository _repository;
+        private readonly QuanLyPhongTroContext _context;
 
-        public ContractService(IContractRepository repository)
+        public ContractService(IContractRepository repository, QuanLyPhongTroContext context)
         {
             _repository = repository;
+            _context = context;
         }
 
         public async Task<IEnumerable<ContractResponseDTO>> GetTenantContractsAsync(string tenantId)
@@ -49,6 +53,21 @@ namespace Backend.Services
 
             if (contract == null) return null;
 
+            List<string> amenities = new List<string>();
+            if (contract.Room != null && !string.IsNullOrEmpty(contract.Room.PropertyId))
+            {
+                amenities = await _context.PropertyAmenities
+                    .Include(pa => pa.Amenity)
+                    .Where(pa => pa.PropertyId == contract.Room.PropertyId && pa.Status == "active")
+                    .Select(pa => pa.Amenity.Name)
+                    .ToListAsync();
+            }
+
+            if (!amenities.Any())
+            {
+                amenities = new List<string> { "Máy lạnh", "Tủ lạnh", "Giường nệm", "Ban công", "WC riêng", "Giờ giấc tự do", "Wifi tốc độ cao" };
+            }
+
             return new
             {
                 id = contract.Id,
@@ -71,13 +90,14 @@ namespace Backend.Services
                     ? contract.Terms.Split('|').FirstOrDefault(p => p.StartsWith("PdfUrl:"))?.Replace("PdfUrl:", "")
                     : "http://10.0.2.2:5093/uploads/contracts/sample_contract.pdf",
 
-           
                 services = contract.ContractServices.Select(cs => new
                 {
                     name = cs.Service != null ? cs.Service.Name : "Dịch vụ",
                     price = cs.UnitPrice,
                     unit = cs.Service != null ? cs.Service.Unit : "tháng"
-                }).ToList()
+                }).ToList(),
+
+                amenities = amenities
             };
         }
     }
