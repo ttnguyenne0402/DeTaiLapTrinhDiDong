@@ -11,10 +11,12 @@ namespace Backend.Controllers
     public class AdminUsersController : ControllerBase
     {
         private readonly QuanLyPhongTroContext _context;
+        private readonly IConfiguration _config;
 
-        public AdminUsersController(QuanLyPhongTroContext context)
+        public AdminUsersController(QuanLyPhongTroContext context, IConfiguration config)
         {
             _context = context;
+            _config = config;
         }
 
         // 1. GET: /api/AdminUsers?role=tenant&search=viet
@@ -94,7 +96,7 @@ namespace Backend.Controllers
 
                 if (newStatus == "blocked")
                 {
-                    string subject = "[Quản Lý Phòng Trọ] Thông báo tạm khóa tài khoản 🔒";
+                    string subject = "[Quản Lý Phòng Trọ] Thông báo tạm khóa tài khoản";
                     string htmlContent = $@"
                         <h3>Chào {user.Name},</h3>
                         <p>Tài khoản <b>{user.Email}</b> của bạn đã bị <b>Quản trị viên tạm khóa</b> do vi phạm chính sách sử dụng.</p>
@@ -105,7 +107,7 @@ namespace Backend.Controllers
                         </ul>
                         <p>Trân trọng,<br>Ban Quản Trị Hệ Thống</p>";
 
-                    _ = SendResendEmailAsync(user.Email, user.Name, subject, htmlContent);
+                     await SendEmailAsync(user.Email, user.Name, subject, htmlContent);
                 }
                 else if (newStatus == "active")
                 {
@@ -116,7 +118,7 @@ namespace Backend.Controllers
                         <p>Hiện tại bạn đã có thể mở ứng dụng và đăng nhập lại bình thường.</p>
                         <p>Chúc bạn có trải nghiệm tuyệt vời!</p>";
 
-                    _ = SendResendEmailAsync(user.Email, user.Name, subject, htmlContent);
+                    await SendEmailAsync(user.Email, user.Name, subject, htmlContent);
                 }
 
                 return Ok(new { message = "Cập nhật trạng thái thành công!", status = user.Status });
@@ -127,39 +129,44 @@ namespace Backend.Controllers
             }
         }
 
-        private static readonly System.Net.Http.HttpClient _resendClient = new System.Net.Http.HttpClient();
 
-        //THAY MÃ RESEND API KEY CỦA BẠN VÀO DÒNG DƯỚI ĐÂY (VD: "re_123456789...")
-        private const string RESEND_API_KEY = "re_YOUR_RESEND_API_KEY_HERE";
-
-        private async Task SendResendEmailAsync(string toEmail, string name, string subject, string htmlContent)
+        private async Task SendEmailAsync(string toEmail, string name, string subject, string htmlContent)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(toEmail) || !toEmail.Contains("@") || toEmail.EndsWith(".local")) return;
 
-                var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://api.resend.com/emails");
-                request.Headers.Add("Authorization", $"Bearer {RESEND_API_KEY}");
+                var senderEmail = _config["EmailSettings:SenderEmail"];
+                var senderName = _config["EmailSettings:SenderName"] ?? "Quản Lý Phòng Trọ";
+                var appPassword = _config["EmailSettings:AppPassword"];
 
-                var payload = new
+                if (string.IsNullOrWhiteSpace(senderEmail) || string.IsNullOrWhiteSpace(appPassword))
                 {
-                    from = "Quản Lý Phòng Trọ <onboarding@resend.dev>",
-                    to = new[] { toEmail },
-                    subject = subject,
-                    html = htmlContent
+                    Console.WriteLine("[GMAIL SMTP ERROR]: Chưa cấu hình EmailSettings trong appsettings.json");
+                    return;
+                }
+
+                using var message = new System.Net.Mail.MailMessage();
+                message.From = new System.Net.Mail.MailAddress(senderEmail, senderName);
+                message.To.Add(new System.Net.Mail.MailAddress(toEmail, name));
+                message.Subject = subject;
+                message.Body = htmlContent;
+                message.IsBodyHtml = true;
+
+                using var smtp = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                {
+                    DeliveryMethod = System.Net.Mail.SmtpDeliveryMethod.Network,
+                    UseDefaultCredentials = false,
+                    Credentials = new System.Net.NetworkCredential(senderEmail, appPassword),
+                    EnableSsl = true
                 };
 
-                request.Content = new System.Net.Http.StringContent(
-                    System.Text.Json.JsonSerializer.Serialize(payload),
-                    System.Text.Encoding.UTF8,
-                    "application/json"
-                );
-
-                await _resendClient.SendAsync(request);
+                await smtp.SendMailAsync(message);
+                Console.WriteLine($"[GMAIL SMTP SUCCESS]: Đã gửi email tới {toEmail}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RESEND EMAIL ERROR]: {ex.Message}");
+                Console.WriteLine($"[GMAIL SMTP ERROR]: {ex}");
             }
         }
     }

@@ -93,16 +93,45 @@ BEGIN
 END
 GO
 
--- 4. Bảng amenities: Danh mục tiện nghi
+-- 4. Bảng amenities: Danh mục tiện nghi (bổ sung icon và owner_id cho chủ trọ tự tạo)
 IF OBJECT_ID('dbo.amenities', 'U') IS NULL
 BEGIN
     CREATE TABLE amenities (
         id NVARCHAR(50) PRIMARY KEY,
+        owner_id NVARCHAR(50) NULL,
         name NVARCHAR(100) NOT NULL UNIQUE,
         description NVARCHAR(MAX) NULL,
+        icon NVARCHAR(50) NULL DEFAULT 'check_circle',
         status NVARCHAR(50) NOT NULL CHECK (status IN ('active', 'inactive')),
         created_at DATETIME2 DEFAULT GETDATE(),
-        updated_at DATETIME2 DEFAULT GETDATE()
+        updated_at DATETIME2 DEFAULT GETDATE(),
+        CONSTRAINT FK_amenities_users FOREIGN KEY (owner_id) REFERENCES users(id)
+    );
+END
+ELSE
+BEGIN
+    IF COL_LENGTH('dbo.amenities', 'icon') IS NULL
+        ALTER TABLE dbo.amenities ADD icon NVARCHAR(50) NULL DEFAULT 'check_circle';
+    IF COL_LENGTH('dbo.amenities', 'owner_id') IS NULL
+    BEGIN
+        ALTER TABLE dbo.amenities ADD owner_id NVARCHAR(50) NULL;
+        ALTER TABLE dbo.amenities ADD CONSTRAINT FK_amenities_users FOREIGN KEY (owner_id) REFERENCES users(id);
+    END
+END
+GO
+
+-- 4b. Bảng property_amenities: Tiện ích gắn theo từng khu trọ cụ thể
+IF OBJECT_ID('dbo.property_amenities', 'U') IS NULL
+BEGIN
+    CREATE TABLE property_amenities (
+        id NVARCHAR(50) PRIMARY KEY,
+        property_id NVARCHAR(50) NOT NULL,
+        amenity_id NVARCHAR(50) NOT NULL,
+        status NVARCHAR(50) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+        created_at DATETIME2 DEFAULT GETDATE(),
+        updated_at DATETIME2 DEFAULT GETDATE(),
+        CONSTRAINT FK_property_amenities_properties FOREIGN KEY (property_id) REFERENCES properties(id),
+        CONSTRAINT FK_property_amenities_amenities FOREIGN KEY (amenity_id) REFERENCES amenities(id)
     );
 END
 GO
@@ -559,15 +588,22 @@ BEGIN
 END
 GO
 
--- 5. Amenities & Room Amenities
+-- 5. Amenities & Room Amenities & Property Amenities
 IF NOT EXISTS (SELECT 1 FROM amenities WHERE id = 'amn_wifi')
 BEGIN
-    INSERT INTO amenities (id, name, description, status, created_at, updated_at) VALUES
-    ('amn_wifi', N'Wifi tốc độ cao', N'Đường truyền cáp quang riêng từng tầng', 'active', GETDATE(), GETDATE()),
-    ('amn_ac', N'Máy lạnh', N'Inverter tiết kiệm điện', 'active', GETDATE(), GETDATE()),
-    ('amn_wm', N'Máy giặt chung', N'Khu giặt phơi sân thượng', 'active', GETDATE(), GETDATE()),
-    ('amn_park', N'Chỗ để xe máy', N'Hầm giữ xe có thẻ từ và bảo vệ', 'active', GETDATE(), GETDATE()),
-    ('amn_cam', N'Camera an ninh', N'Giám sát hành lang 24/7', 'active', GETDATE(), GETDATE());
+    INSERT INTO amenities (id, name, description, icon, status, created_at, updated_at) VALUES
+    ('amn_wifi', N'Wifi tốc độ cao', N'Đường truyền cáp quang riêng từng tầng', 'wifi', 'active', GETDATE(), GETDATE()),
+    ('amn_ac', N'Máy lạnh', N'Inverter tiết kiệm điện', 'ac_unit', 'active', GETDATE(), GETDATE()),
+    ('amn_wm', N'Máy giặt chung', N'Khu giặt phơi sân thượng', 'local_laundry_service', 'active', GETDATE(), GETDATE()),
+    ('amn_park', N'Chỗ để xe máy', N'Hầm giữ xe có thẻ từ và bảo vệ', 'two_wheeler', 'active', GETDATE(), GETDATE()),
+    ('amn_cam', N'Camera an ninh', N'Giám sát hành lang 24/7', 'videocam', 'active', GETDATE(), GETDATE()),
+    ('amn_fridge', N'Tủ lạnh riêng', N'Tủ lạnh ngăn đá riêng trong phòng', 'kitchen', 'active', GETDATE(), GETDATE()),
+    ('amn_elev', N'Thang máy', N'Thang máy tải trọng lớn, bảo trì định kỳ', 'elevator', 'active', GETDATE(), GETDATE()),
+    ('amn_time', N'Giờ giấc tự do', N'Ra vào tự do 24/24, không chung chủ', 'access_time', 'active', GETDATE(), GETDATE()),
+    ('amn_loft', N'Gác lửng cao', N'Gác lửng đúc kiên cố, không đụng đầu', 'stairs', 'active', GETDATE(), GETDATE()),
+    ('amn_balc', N'Ban công / Cửa sổ', N'Ban công riêng thoáng mát đón ánh sáng tự nhiên', 'balcony', 'active', GETDATE(), GETDATE()),
+    ('amn_finger', N'Khóa vân tay / Thẻ từ', N'Cổng ra vào kiểm soát bằng vân tay/thẻ từ an ninh', 'fingerprint', 'active', GETDATE(), GETDATE()),
+    ('amn_fire', N'Hệ thống PCCC', N'Trang bị bình chữa cháy và báo khói hành lang', 'fire_extinguisher', 'active', GETDATE(), GETDATE());
 
     INSERT INTO room_amenities (id, room_id, amenity_id, created_at, updated_at) VALUES
     ('ra_01', 'room_101', 'amn_wifi', GETDATE(), GETDATE()),
@@ -575,6 +611,25 @@ BEGIN
     ('ra_03', 'room_a1',  'amn_wifi', GETDATE(), GETDATE()),
     ('ra_04', 'room_a1',  'amn_ac', GETDATE(), GETDATE()),
     ('ra_05', 'room_a1',  'amn_wm', GETDATE(), GETDATE());
+
+    INSERT INTO property_amenities (id, property_id, amenity_id, status) VALUES
+    ('pa_01_01', 'prop_01', 'amn_wifi', 'active'),
+    ('pa_01_02', 'prop_01', 'amn_park', 'active'),
+    ('pa_01_03', 'prop_01', 'amn_cam', 'active'),
+    ('pa_01_04', 'prop_01', 'amn_time', 'active'),
+    ('pa_01_05', 'prop_01', 'amn_finger', 'active'),
+    ('pa_01_06', 'prop_01', 'amn_fire', 'active'),
+    ('pa_02_01', 'prop_02', 'amn_wifi', 'active'),
+    ('pa_02_02', 'prop_02', 'amn_ac', 'active'),
+    ('pa_02_03', 'prop_02', 'amn_fridge', 'active'),
+    ('pa_02_04', 'prop_02', 'amn_elev', 'active'),
+    ('pa_02_05', 'prop_02', 'amn_wm', 'active'),
+    ('pa_02_06', 'prop_02', 'amn_cam', 'active'),
+    ('pa_02_07', 'prop_02', 'amn_finger', 'active'),
+    ('pa_03_01', 'prop_03', 'amn_wifi', 'active'),
+    ('pa_03_02', 'prop_03', 'amn_elev', 'active'),
+    ('pa_03_03', 'prop_03', 'amn_park', 'active'),
+    ('pa_03_04', 'prop_03', 'amn_fire', 'active');
 END
 GO
 

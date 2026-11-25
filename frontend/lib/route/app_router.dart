@@ -12,28 +12,24 @@ import '../screens/admin/content_moderation.dart';
 import '../screens/owner/owner_dashboard.dart';
 import '../screens/owner/contracts_manage.dart';
 import '../screens/owner/contract_form.dart';
-import '../screens/owner/contract_detail_owner.dart';
 import '../screens/owner/contract_members.dart';
 import '../screens/owner/termination_screen.dart';
 import '../screens/owner/invoices_manage..dart';
-import '../screens/owner/invoice_form.dart';
 import '../screens/owner/invoice_detail_owner.dart';
 import '../screens/owner/utility_readings.dart';
 import '../screens/owner/utility_history.dart';
 import '../screens/owner/maintenance_manage.dart';
-import '../screens/owner/maintenance_detail.dart';
+import '../screens/owner/services_manage.dart';
+import '../screens/owner/amenities_manage.dart';
 
-import '../screens/tenant/booking_screen.dart' as tenant_booking;
 import '../screens/tenant/booking_history_screen.dart' as tenant_booking_history;
 import '../screens/tenant/my_contracts_screen.dart' as tenant_contracts;
 import '../screens/tenant/contract_detail_screen.dart' as tenant_contract_detail;
 import '../screens/tenant/my_invoices_screen.dart' as tenant_invoices;
 import '../screens/tenant/invoice_detail_screen.dart' as tenant_invoice_detail;
-import '../screens/tenant/payment_screen.dart' as tenant_payment;
 import '../screens/tenant/notifications_screen.dart' as tenant_notifications;
 import '../screens/tenant/home_screen.dart' as tv1_home;
 import '../screens/tenant/room_detail_screen.dart' as tv1_room_detail;
-import '../screens/tenant/tenant_maintenance_request_screen.dart';
 import '../screens/tenant/utility_history_ten.dart';
 import '../screens/tenant/tenant_maintenance_history_screen.dart';
 class AppRouter {
@@ -60,6 +56,10 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => Contract_form()); // địa chỉ
       case AppRoutes.invoicesManage:
         return MaterialPageRoute(builder: (_) => const Invoice_mana());
+      case AppRoutes.servicesManage:
+        return MaterialPageRoute(builder: (_) => const ServicesManageScreen());
+      case AppRoutes.amenitiesManage:
+        return MaterialPageRoute(builder: (_) => const AmenitiesManageScreen());
       // case AppRoutes.invoiceForm:
       //   return MaterialPageRoute(builder: (_) => Invoice_form()); //địa chỉ
 

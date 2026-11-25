@@ -806,22 +806,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             )
           : ListView(
               padding: const EdgeInsets.all(16),
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 24),
-                _sectionTitle('Thông tin cá nhân', Icons.person_outline),
-                const SizedBox(height: 12),
-                _buildPersonalInfo(),
-                const SizedBox(height: 24),
-                _buildMaintenanceHistoryButton(),
-                const SizedBox(height: 24),
-                _buildBankInfo(),
-                const SizedBox(height: 24),
-                _buildPrivacyNote(),
-                const SizedBox(height: 24),
-                _buildLogoutButton(),
-                const SizedBox(height: 24),
-              ],
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 24),
+          _sectionTitle('Thông tin cá nhân', Icons.person_outline),
+          const SizedBox(height: 12),
+          _buildPersonalInfo(),
+          const SizedBox(height: 24),
+          if (_userRole == 'tenant') ...[
+            _buildMaintenanceHistoryButton(),
+            const SizedBox(height: 24),
+          ],
+          _buildBankInfo(),
+          const SizedBox(height: 24),
+          _buildPrivacyNote(),
+          const SizedBox(height: 24),
+          _buildLogoutButton(),
+          const SizedBox(height: 24),
+        ],
             ),
     );
   }
