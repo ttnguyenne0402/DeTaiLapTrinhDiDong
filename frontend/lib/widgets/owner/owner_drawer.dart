@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
+import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/owner/owner_dashboard.dart';
 import '../../screens/owner/contracts_manage.dart';
@@ -8,7 +11,6 @@ import '../../screens/owner/maintenance_manage.dart';
 import '../../screens/owner/posts_manage.dart';
 import '../../screens/owner/properties_manage.dart';
 import '../../screens/owner/appointments_manage.dart';
-import '../../screens/owner/owner_notifications_screen.dart';
 
 class OwnerDrawer extends StatelessWidget {
   /// Mã định danh màn hình hiện tại để làm nổi bật :
@@ -166,12 +168,7 @@ class OwnerDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     if (currentRoute != 'notifications') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const OwnerNotificationsScreen(),
-                        ),
-                      );
+                      Navigator.pushNamed(context, AppRoutes.ownerNotifications);
                     }
                   },
                 ),
@@ -513,10 +510,13 @@ class OwnerDrawer extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            onPressed: () {
+            onPressed: () async {
+              final navigator = Navigator.of(context);
               Navigator.pop(dialogCtx);
-              Navigator.pushAndRemoveUntil(
-                context,
+              await LocalNotificationService.instance.endPushSession();
+              await AuthStorage.clearLogin();
+              if (!navigator.mounted) return;
+              navigator.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
                 (route) => false,
               );

@@ -536,7 +536,7 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 
             entity.HasKey(e => e.Id).HasName("PK__notifica__3213E83FA29A72A9");
 
-            entity.ToTable("notifications");
+            entity.ToTable("notifications", table => table.UseSqlOutputClause(false));
 
             entity.Property(e => e.Id)
                 .HasMaxLength(50)

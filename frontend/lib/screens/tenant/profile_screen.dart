@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
 import '../../services/profile_service.dart';
 import '../auth/login_screen.dart';
 
@@ -346,6 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (confirmed != true || !mounted) return;
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    await LocalNotificationService.instance.endPushSession();
     await AuthStorage.clearLogin();
 
     if (!mounted) return;

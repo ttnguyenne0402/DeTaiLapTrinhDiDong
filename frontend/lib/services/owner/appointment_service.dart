@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../auth_storage.dart';
 
 class OwnerAppointmentModel {
   final String id;
@@ -109,9 +110,15 @@ class AppointmentService {
     String? newDate,
     String? newTime,
   }) async {
+    final token = await AuthStorage.getAccessToken();
+    if (token == null || token.isEmpty) return false;
+
     final response = await http.put(
       Uri.parse('$baseUrl/api/owner/appointments/$id/status'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
       body: jsonEncode({
         'status': status,
         'ownerNote': ownerNote,

@@ -10,6 +10,7 @@ import '../screens/admin/content_moderation.dart';
 
 
 import '../screens/owner/owner_dashboard.dart';
+import '../screens/owner/owner_notifications_screen.dart';
 import '../screens/owner/contracts_manage.dart';
 import '../screens/owner/contract_form.dart';
 import '../screens/owner/contract_members.dart';
@@ -49,6 +50,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_)=> const review());
       case AppRoutes.OwnerDashboard:
         return MaterialPageRoute(builder: (_)=> const OwnerDashboard() );
+      case AppRoutes.ownerNotifications:
+        return MaterialPageRoute(builder: (_) => const OwnerNotificationsScreen());
 
       case AppRoutes.contractsManage:
         return MaterialPageRoute(builder: (_) => const Contracts_manager());
