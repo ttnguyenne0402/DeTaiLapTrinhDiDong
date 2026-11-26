@@ -59,21 +59,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _ReviewPeriod.week => (DateTime(now.year, now.month, now.day - 6), now),
       _ReviewPeriod.month => (month, now),
       _ReviewPeriod.previousMonth => (
-        DateTime(now.year, now.month - 1),
-        month.subtract(const Duration(milliseconds: 1)),
+      DateTime(now.year, now.month - 1),
+      month.subtract(const Duration(milliseconds: 1)),
       ),
       _ReviewPeriod.quarter => (
-        DateTime(now.year, ((now.month - 1) ~/ 3) * 3 + 1),
-        now,
+      DateTime(now.year, ((now.month - 1) ~/ 3) * 3 + 1),
+      now,
       ),
       _ReviewPeriod.year => (DateTime(now.year), now),
       _ReviewPeriod.custom => (
-        _customRange!.start,
-        DateTime(
-          _customRange!.end.year,
-          _customRange!.end.month,
-          _customRange!.end.day + 1,
-        ).subtract(const Duration(milliseconds: 1)),
+      _customRange!.start,
+      DateTime(
+        _customRange!.end.year,
+        _customRange!.end.month,
+        _customRange!.end.day + 1,
+      ).subtract(const Duration(milliseconds: 1)),
       ),
     };
   }
@@ -258,91 +258,91 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: filteredList.isEmpty
                         ? const Center(child: Text('Không có thông báo nào', style: TextStyle(color: Colors.grey)))
                         : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                            itemCount: filteredList.length,
-                            itemBuilder: (context, index) {
-                              final item = filteredList[index];
-                              final bool isRead = item['isRead'] == true;
-                              final String title = item['title'] ?? '';
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      itemCount: filteredList.length,
+                      itemBuilder: (context, index) {
+                        final item = filteredList[index];
+                        final bool isRead = item['isRead'] == true;
+                        final String title = item['title'] ?? '';
 
-                              IconData iconData = Icons.notifications_active;
-                              Color iconColor = AppColors.primaryGreen;
-                              Color iconBg = Colors.green.shade50;
+                        IconData iconData = Icons.notifications_active;
+                        Color iconColor = AppColors.primaryGreen;
+                        Color iconBg = Colors.green.shade50;
 
+                        if (title.contains('Tin') || title.contains('bài')) {
+                          iconData = Icons.article_outlined;
+                          iconColor = Colors.blue;
+                          iconBg = Colors.blue.shade50;
+                        } else if (title.contains('Tài khoản') || title.contains('người')) {
+                          iconData = Icons.person_outline;
+                          iconColor = Colors.teal;
+                          iconBg = Colors.teal.shade50;
+                        }
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: isRead ? Colors.white : Colors.green.shade50.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: isRead ? Colors.grey.shade200 : AppColors.primaryGreen.withValues(alpha: 0.3)),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            leading: CircleAvatar(
+                              backgroundColor: iconBg,
+                              child: Icon(iconData, color: iconColor, size: 22),
+                            ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: TextStyle(
+                                      fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                      fontSize: 14,
+                                      color: isRead ? Colors.black87 : Colors.black,
+                                    ),
+                                  ),
+                                ),
+                                if (!isRead)
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primaryGreen,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 3),
+                                Text(
+                                  item['subtitle'] ?? '',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  item['time'] ?? '',
+                                  style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              setState(() => item['isRead'] = true);
+                              Navigator.pop(context);
                               if (title.contains('Tin') || title.contains('bài')) {
-                                iconData = Icons.article_outlined;
-                                iconColor = Colors.blue;
-                                iconBg = Colors.blue.shade50;
-                              } else if (title.contains('Tài khoản') || title.contains('người')) {
-                                iconData = Icons.person_outline;
-                                iconColor = Colors.teal;
-                                iconBg = Colors.teal.shade50;
+                                Navigator.pushNamed(context, AppRoutes.rewview);
+                              } else {
+                                Navigator.pushNamed(context, AppRoutes.usersManage);
                               }
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                decoration: BoxDecoration(
-                                  color: isRead ? Colors.white : Colors.green.shade50.withValues(alpha: 0.4),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: isRead ? Colors.grey.shade200 : AppColors.primaryGreen.withValues(alpha: 0.3)),
-                                ),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                  leading: CircleAvatar(
-                                    backgroundColor: iconBg,
-                                    child: Icon(iconData, color: iconColor, size: 22),
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          title,
-                                          style: TextStyle(
-                                            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                                            fontSize: 14,
-                                            color: isRead ? Colors.black87 : Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                      if (!isRead)
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.primaryGreen,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        item['subtitle'] ?? '',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        item['time'] ?? '',
-                                        style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () {
-                                    setState(() => item['isRead'] = true);
-                                    Navigator.pop(context);
-                                    if (title.contains('Tin') || title.contains('bài')) {
-                                      Navigator.pushNamed(context, AppRoutes.rewview);
-                                    } else {
-                                      Navigator.pushNamed(context, AppRoutes.usersManage);
-                                    }
-                                  },
-                                ),
-                              );
                             },
                           ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -364,7 +364,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (_isLoading || value == null) return '—';
     return value.toString().replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (_) => '.',
+          (_) => '.',
     );
   }
 
@@ -389,6 +389,45 @@ class _AdminDashboardState extends State<AdminDashboard> {
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Trợ lý AI Quản trị',
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                AppRoutes.aiChat,
+                arguments: {'role': 'admin'},
+              );
+            },
+            icon: const Icon(Icons.auto_awesome_rounded, color: _published),
+          ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                tooltip: 'Thông báo',
+                onPressed: _showNotificationsSheet,
+                icon: const Icon(Icons.notifications_outlined),
+              ),
+              if (_unreadCount > 0)
+                Positioned(
+                  right: 5,
+                  top: 5,
+                  child: IgnorePointer(
+                    child: CircleAvatar(
+                      radius: 9,
+                      backgroundColor: Colors.redAccent,
+                      child: Text(
+                        '$_unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: IconButton.filledTonal(
@@ -415,7 +454,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 constraints.maxWidth >= 600 ? 32 : 20,
                 12,
                 constraints.maxWidth >= 600 ? 32 : 20,
-                28,
+                100,
               ),
               child: Center(
                 child: ConstrainedBox(
@@ -437,54 +476,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             ),
                           );
                         },
-                      ),
-
-                      IconButton(
-                        tooltip: 'Trợ lý AI Quản trị',
-                        onPressed: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRoutes.aiChat,
-                            arguments: {'role': 'admin'},
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.auto_awesome,
-                          color: Colors.amberAccent,
-                        ),
-                      ),
-
-                      Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          IconButton(
-                            onPressed: _showNotificationsSheet,
-                            icon: const Icon(
-                              Icons.notifications,
-                              color: Colors.white,
-                            ),
-                          ),
-                          if (_unreadCount > 0)
-                            Positioned(
-                              right: 8,
-                              top: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  '$_unreadCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
                       ),
 
                       const SizedBox(height: 16),
@@ -549,7 +540,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Navigator.pushNamed(context, AppRoutes.aiChat, arguments: {'role': 'admin'});
         },
       ),
-        bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: NavigationBar(
         selectedIndex: 0,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
@@ -819,3 +810,4 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 }
+
