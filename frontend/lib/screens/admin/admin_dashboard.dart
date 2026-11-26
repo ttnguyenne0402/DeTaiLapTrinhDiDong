@@ -206,7 +206,82 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             name.isEmpty
                                 ? 'Xin chào, quản trị viên'
                                 : 'Xin chào, $name',
-                            style: const TextStyle(fontSize: 16, color: _muted),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: _muted,
+                            ),
+                          );
+                        },
+                      ),
+
+                      IconButton(
+                        tooltip: 'Trợ lý AI Quản trị',
+                        onPressed: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.aiChat,
+                            arguments: {'role': 'admin'},
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.amberAccent,
+                        ),
+                      ),
+
+                      Stack(
+                        alignment: Alignment.topRight,
+                        children: [
+                          IconButton(
+                            onPressed: _showNotificationsSheet,
+                            icon: const Icon(
+                              Icons.notifications,
+                              color: Colors.white,
+                            ),
+                          ),
+                          if (_unreadCount > 0)
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '$_unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ProfileScreen(
+                                user: {
+                                  'Name': 'Quản trị viên',
+                                  'Email': 'admin@phongtro.vn',
+                                  'Phone': '0901234567',
+                                  'Avatar': '',
+                                  'Role': 'admin',
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                           );
                         },
                       ),
@@ -257,7 +332,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ),
       ),
-      bottomNavigationBar: NavigationBar(
+
+      // --- BOTTOM NAVIGATION BAR ---
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.primaryGreen,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 20),
+        label: const Text(
+          'AI Quản trị',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        onPressed: () {
+          Navigator.pushNamed(context, AppRoutes.aiChat, arguments: {'role': 'admin'});
+        },
+      ),
+        bottomNavigationBar: NavigationBar(
         selectedIndex: 0,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,

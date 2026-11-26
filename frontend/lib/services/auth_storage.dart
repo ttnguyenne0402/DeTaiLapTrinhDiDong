@@ -69,6 +69,12 @@ class AuthStorage {
     await prefs.remove(_tokenKey);
     await prefs.remove(_nameKey);
     await prefs.remove(_phoneKey);
+
+    // Xóa sạch toàn bộ lịch sử trò chuyện AI khi người dùng đăng xuất
+    final aiKeys = prefs.getKeys().where((k) => k.startsWith('ai_chat_history_')).toList();
+    for (final k in aiKeys) {
+      await prefs.remove(k);
+    }
   }
 
   static Future<Map<String, String>?> getRememberedCredentials() async {
