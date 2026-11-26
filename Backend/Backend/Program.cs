@@ -58,6 +58,8 @@ builder.Services.AddScoped<Backend.Services.IMaintenanceService,
 
 // 8. Đăng ký HttpClient
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<Backend.Services.FirebasePushService>();
+builder.Services.AddHostedService<Backend.Services.FirebasePushWorker>();
 
 // 9. Cấu hình JWT
 var jwtKey = builder.Configuration["Jwt:Key"];

@@ -13,6 +13,7 @@ import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -230,6 +231,11 @@ class _LoginScreenState extends State<LoginScreen>
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
+      LocalNotificationService.instance.startPushSession(
+        userId: userId,
+        role: role,
+        accessToken: accessToken,
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -334,6 +340,11 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         throw Exception('Vai trò tài khoản không hợp lệ: $role');
       }
+      LocalNotificationService.instance.startPushSession(
+        userId: userId,
+        role: role,
+        accessToken: appToken,
+      );
     } catch (e, stackTrace) {
       debugPrint('[GOOGLE LOGIN] Lỗi: $e');
       debugPrintStack(stackTrace: stackTrace);
@@ -470,6 +481,11 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         throw Exception('Vai trò tài khoản không hợp lệ: $role');
       }
+      LocalNotificationService.instance.startPushSession(
+        userId: userId,
+        role: role,
+        accessToken: appToken,
+      );
     } catch (e, stackTrace) {
       debugPrint('[ZALO LOGIN] Lỗi: $e');
       debugPrintStack(stackTrace: stackTrace);
