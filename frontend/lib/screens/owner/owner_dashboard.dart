@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../route/app_routes.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'properties_manage.dart';
 import 'appointments_manage.dart';
@@ -90,6 +91,13 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text('Trang chủ', style: TextStyle(color: Colors.white)),
         actions: [
+          IconButton(
+            tooltip: 'Trợ lý Chủ trọ',
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.aiChat, arguments: {'role': 'owner'});
+            },
+            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white),
+          ),
           Stack(
             alignment: Alignment.center,
             children: [
@@ -152,7 +160,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
             final data = snapshot.data!;
 
-            return RefreshIndicator(
+            return Stack(
+              children: [
+                RefreshIndicator(
               onRefresh: () async => _refreshDashboard(),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -349,7 +359,14 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                   ],
                 ),
               ),
-            );
+            ),
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: _buildFloatingChatBubble(),
+            ),
+          ],
+        );
           },
         ),
       ),
@@ -539,6 +556,60 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingChatBubble() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.pushNamed(
+            context,
+            AppRoutes.aiChat,
+            arguments: {'role': 'owner'},
+          );
+        },
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: primaryColor,
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withValues(alpha: 0.4),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(
+                Icons.chat_bubble_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+              Positioned(
+                top: 11,
+                right: 11,
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: Colors.lightGreenAccent.shade400,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

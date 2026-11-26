@@ -40,6 +40,10 @@ namespace Backend.Controllers
 
                 var query = _context.Rooms
                     .Include(r => r.Property)
+                    .Include(r => r.RoomAmenities)
+                        .ThenInclude(ra => ra.Amenity)
+                    .Include(r => r.RoomServices)
+                        .ThenInclude(rs => rs.Service)
                     .Where(r => propertyIds.Contains(r.PropertyId));
 
                 // Bỏ qua nếu propertyId là placeholder Swagger ("propertyId" hoặc "all")
@@ -90,7 +94,11 @@ namespace Backend.Controllers
                     Detail = $"{r.Area} m²" + (r.Floor.HasValue ? $" - Tầng {r.Floor}" : ""),
                     PriceFormatted = $"{r.Price:N0}đ",
                     Images = string.IsNullOrEmpty(r.Images) ? "frontend/assets/images/anhPhongDemo.jpg" : r.Images,
-                    Description = r.Description
+                    Description = r.Description,
+                    AmenityIds = r.RoomAmenities.Where(ra => ra.Amenity != null).Select(ra => ra.AmenityId).ToList(),
+                    Amenities = r.RoomAmenities.Where(ra => ra.Amenity != null).Select(ra => ra.Amenity.Name).ToList(),
+                    ServiceIds = r.RoomServices.Where(rs => rs.Service != null).Select(rs => rs.ServiceId).ToList(),
+                    Services = r.RoomServices.Where(rs => rs.Service != null).Select(rs => rs.Service.Name).ToList()
                 }).ToList();
 
                 return Ok(result);
@@ -110,6 +118,10 @@ namespace Backend.Controllers
             {
                 var r = await _context.Rooms
                     .Include(x => x.Property)
+                    .Include(x => x.RoomAmenities)
+                        .ThenInclude(ra => ra.Amenity)
+                    .Include(x => x.RoomServices)
+                        .ThenInclude(rs => rs.Service)
                     .FirstOrDefaultAsync(x => x.Id == id);
 
                 if (r == null)
@@ -134,7 +146,11 @@ namespace Backend.Controllers
                     Detail = $"{r.Area} m²" + (r.Floor.HasValue ? $" - Tầng {r.Floor}" : ""),
                     PriceFormatted = $"{r.Price:N0}đ",
                     Images = string.IsNullOrEmpty(r.Images) ? "frontend/assets/images/anhPhongDemo.jpg" : r.Images,
-                    Description = r.Description
+                    Description = r.Description,
+                    AmenityIds = r.RoomAmenities.Where(ra => ra.Amenity != null).Select(ra => ra.AmenityId).ToList(),
+                    Amenities = r.RoomAmenities.Where(ra => ra.Amenity != null).Select(ra => ra.Amenity.Name).ToList(),
+                    ServiceIds = r.RoomServices.Where(rs => rs.Service != null).Select(rs => rs.ServiceId).ToList(),
+                    Services = r.RoomServices.Where(rs => rs.Service != null).Select(rs => rs.Service.Name).ToList()
                 };
 
                 return Ok(dto);
@@ -234,6 +250,43 @@ namespace Backend.Controllers
                 };
 
                 _context.Rooms.Add(room);
+
+                if (dto.AmenityIds != null && dto.AmenityIds.Any())
+                {
+                    foreach (var amenityId in dto.AmenityIds.Distinct())
+                    {
+                        if (!string.IsNullOrWhiteSpace(amenityId))
+                        {
+                            _context.RoomAmenities.Add(new RoomAmenity
+                            {
+                                Id = "RA_" + Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper(),
+                                RoomId = room.Id,
+                                AmenityId = amenityId,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            });
+                        }
+                    }
+                }
+
+                if (dto.ServiceIds != null && dto.ServiceIds.Any())
+                {
+                    foreach (var serviceId in dto.ServiceIds.Distinct())
+                    {
+                        if (!string.IsNullOrWhiteSpace(serviceId))
+                        {
+                            _context.RoomServices.Add(new RoomServiceItem
+                            {
+                                Id = "RS_" + Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper(),
+                                RoomId = room.Id,
+                                ServiceId = serviceId,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            });
+                        }
+                    }
+                }
+
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Thêm phòng thành công", roomId = room.Id });
@@ -316,6 +369,52 @@ namespace Backend.Controllers
                     else if (s.Contains("thuê") || s == "rented") room.Status = "rented";
                     else if (s.Contains("trì") || s == "maintenance") room.Status = "maintenance";
                     else room.Status = dto.Status;
+                }
+
+                if (dto.AmenityIds != null)
+                {
+                    var existingAmenities = await _context.RoomAmenities
+                        .Where(ra => ra.RoomId == room.Id)
+                        .ToListAsync();
+                    _context.RoomAmenities.RemoveRange(existingAmenities);
+
+                    foreach (var amenityId in dto.AmenityIds.Distinct())
+                    {
+                        if (!string.IsNullOrWhiteSpace(amenityId))
+                        {
+                            _context.RoomAmenities.Add(new RoomAmenity
+                            {
+                                Id = "RA_" + Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper(),
+                                RoomId = room.Id,
+                                AmenityId = amenityId,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            });
+                        }
+                    }
+                }
+
+                if (dto.ServiceIds != null)
+                {
+                    var existingServices = await _context.RoomServices
+                        .Where(rs => rs.RoomId == room.Id)
+                        .ToListAsync();
+                    _context.RoomServices.RemoveRange(existingServices);
+
+                    foreach (var serviceId in dto.ServiceIds.Distinct())
+                    {
+                        if (!string.IsNullOrWhiteSpace(serviceId))
+                        {
+                            _context.RoomServices.Add(new RoomServiceItem
+                            {
+                                Id = "RS_" + Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper(),
+                                RoomId = room.Id,
+                                ServiceId = serviceId,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            });
+                        }
+                    }
                 }
 
                 room.UpdatedAt = DateTime.UtcNow;

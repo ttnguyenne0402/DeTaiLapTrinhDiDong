@@ -151,6 +151,21 @@ BEGIN
 END
 GO
 
+-- 5.1 Bảng room_services: Liên kết Phòng - Dịch vụ theo nhu cầu riêng
+IF OBJECT_ID('dbo.room_services', 'U') IS NULL
+BEGIN
+    CREATE TABLE room_services (
+        id NVARCHAR(50) PRIMARY KEY,
+        room_id NVARCHAR(50) NOT NULL,
+        service_id NVARCHAR(50) NOT NULL,
+        created_at DATETIME2 DEFAULT GETDATE(),
+        updated_at DATETIME2 DEFAULT GETDATE(),
+        CONSTRAINT FK_room_services_rooms FOREIGN KEY (room_id) REFERENCES rooms(id),
+        CONSTRAINT FK_room_services_services FOREIGN KEY (service_id) REFERENCES services(id)
+    );
+END
+GO
+
 -- 6. Bảng rental_posts: Tin đăng cho thuê (tổng hợp đầy đủ các cột mới và expired_at)
 IF OBJECT_ID('dbo.rental_posts', 'U') IS NULL
 BEGIN

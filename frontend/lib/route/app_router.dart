@@ -30,6 +30,7 @@ import '../screens/tenant/invoice_detail_screen.dart' as tenant_invoice_detail;
 import '../screens/tenant/notifications_screen.dart' as tenant_notifications;
 import '../screens/tenant/home_screen.dart' as tv1_home;
 import '../screens/tenant/room_detail_screen.dart' as tv1_room_detail;
+import '../screens/tenant/ai_chatbot_screen.dart';
 import '../screens/tenant/utility_history_ten.dart';
 import '../screens/tenant/tenant_maintenance_history_screen.dart';
 class AppRouter {
@@ -102,6 +103,10 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const tenant_notifications.NotificationsScreen());// --- ROUTE CỦA TV1 ---
       case AppRoutes.home:
         return MaterialPageRoute(builder: (_) => const tv1_home.HomeScreen());
+      case AppRoutes.aiChat:
+        final chatArgs = (args as Map<String, dynamic>?) ?? {};
+        final role = chatArgs['role']?.toString() ?? 'tenant';
+        return MaterialPageRoute(builder: (_) => AiChatbotScreen(initialRole: role));
       // case AppRoutes.tenantMaintenanceRequest:
       //   return MaterialPageRoute(builder: (_) => const TenantMaintenanceRequestScreen(roomId: '', roomName: ''));
       case AppRoutes.tenantMaintenanceHistory:

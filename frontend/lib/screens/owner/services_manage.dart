@@ -186,13 +186,27 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          'Đang xem và cấu hình dịch vụ cho: ${_getSelectedPropertyName()}',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.primaryGreen,
-                            height: 1.3,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Đang cấu hình dịch vụ cho: ${_getSelectedPropertyName()}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '• Bắt buộc: Dịch vụ chung cả dãy trọ đều đóng (Điện, Nước, Rác...)\n• Theo nhu cầu: Dịch vụ riêng (Gửi xe, Wifi, Máy lạnh...), chỉ phòng nào đăng ký dùng mới tính tiền.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: AppColors.primaryGreen.withValues(alpha: 0.9),
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -435,6 +449,26 @@ class _ServicesManageScreenState extends State<ServicesManageScreen> {
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.red[700],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Theo nhu cầu',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue[700],
                               fontWeight: FontWeight.bold,
                             ),
                           ),
