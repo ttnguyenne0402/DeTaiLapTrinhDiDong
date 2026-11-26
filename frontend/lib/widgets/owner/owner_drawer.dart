@@ -542,9 +542,6 @@ class OwnerDrawer extends StatelessWidget {
                 ),
                 (route) => false,
               );
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
             },
             child: const Text(
               'Đăng xuất',
