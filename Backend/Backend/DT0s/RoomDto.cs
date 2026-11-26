@@ -18,6 +18,10 @@ namespace Backend.DT0s
         public string PriceFormatted { get; set; } = string.Empty; // "4.000.000đ"
         public string Images { get; set; } = "frontend/assets/images/anhPhongDemo.jpg";
         public string? Description { get; set; }
+        public List<string> AmenityIds { get; set; } = new();
+        public List<string> Amenities { get; set; } = new();
+        public List<string> ServiceIds { get; set; } = new();
+        public List<string> Services { get; set; } = new();
     }
 
     public class CreateRoomDto
@@ -32,6 +36,8 @@ namespace Backend.DT0s
         public string Status { get; set; } = "available"; // available, rented, maintenance
         public string? Description { get; set; }
         public string? Images { get; set; } = "frontend/assets/images/anhPhongDemo.jpg";
+        public List<string>? AmenityIds { get; set; }
+        public List<string>? ServiceIds { get; set; }
     }
 
     public class UpdateRoomDto
@@ -46,6 +52,8 @@ namespace Backend.DT0s
         public string Status { get; set; } = "available";
         public string? Description { get; set; }
         public string? Images { get; set; }
+        public List<string>? AmenityIds { get; set; }
+        public List<string>? ServiceIds { get; set; }
     }
 }
 

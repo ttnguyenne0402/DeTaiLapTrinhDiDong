@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Backend.Models;
@@ -44,6 +44,8 @@ public partial class Room
     public virtual ICollection<Review> Reviews { get; set; } = new List<Review>();
 
     public virtual ICollection<RoomAmenity> RoomAmenities { get; set; } = new List<RoomAmenity>();
+
+    public virtual ICollection<RoomServiceItem> RoomServices { get; set; } = new List<RoomServiceItem>();
 
     public virtual ICollection<UtilityReading> UtilityReadings { get; set; } = new List<UtilityReading>();
 

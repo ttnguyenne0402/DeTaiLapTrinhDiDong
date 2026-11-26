@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/owner/room_service.dart';
 import '../../services/owner/property_service.dart';
+import '../../services/owner/amenity_service.dart';
+import '../../services/owner/service_service.dart';
 import '../../services/auth_storage.dart';
 import '../../widgets/tenant/open_street_map_widget.dart';
 
@@ -37,9 +39,15 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
 
   List<PropertyModel> _properties = [];
   List<RoomModel> _existingRooms = [];
+  List<AmenityModel> _availableAmenities = [];
+  final List<String> _selectedAmenityIds = [];
+  List<ServiceModel> _availableServices = [];
+  final List<String> _selectedServiceIds = [];
   String? _selectedPropertyId;
   bool _isLoading = false;
   bool _loadingProperties = true;
+  bool _loadingAmenities = true;
+  bool _loadingServices = true;
 
   final List<String> _selectedImages = [];
 
@@ -71,6 +79,12 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
       if (item.images.isNotEmpty) {
         _selectedImages.add(item.images);
       }
+      if (item.amenityIds.isNotEmpty) {
+        _selectedAmenityIds.addAll(item.amenityIds);
+      }
+      if (item.serviceIds.isNotEmpty) {
+        _selectedServiceIds.addAll(item.serviceIds);
+      }
     } else if (widget.initialPropertyId != null &&
         widget.initialPropertyId!.isNotEmpty) {
       _selectedPropertyId = widget.initialPropertyId;
@@ -82,16 +96,55 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
   Future<void> _loadInitialData() async {
     try {
       final ownerId = await AuthStorage.getUserId() ?? 'USER_OWNER_01';
+      final targetPropId = _selectedPropertyId ?? widget.initialPropertyId ?? widget.initialData?.propertyId;
       final results = await Future.wait([
         PropertyService.fetchProperties(ownerId, 'all'),
         RoomService.fetchRooms(ownerId, status: 'all'),
+        AmenityManagementService.fetchAmenities(ownerId),
+        ServiceManagementService.fetchServices(ownerId, propertyId: targetPropId),
       ]);
       if (mounted) {
         final props = results[0] as List<PropertyModel>;
         final rooms = results[1] as List<RoomModel>;
+        final amenities = results[2] as List<AmenityModel>;
+        final servicesList = results[3] as List<ServiceModel>;
         setState(() {
           _properties = props;
           _existingRooms = rooms;
+          _availableAmenities = amenities;
+          _availableServices = servicesList;
+
+          // Loại bỏ các ID dịch vụ bắt buộc (nếu lỡ được gán vào _selectedServiceIds)
+          final mandatoryIds = servicesList.where((s) => s.isMandatory).map((s) => s.id).toSet();
+          _selectedServiceIds.removeWhere((id) => mandatoryIds.contains(id));
+
+          // Nếu đang sửa phòng và danh sách tiện ích của phòng trước đó có tên tiện ích
+          if (widget.initialData != null && _selectedAmenityIds.isEmpty && widget.initialData!.amenities.isNotEmpty) {
+            for (final aName in widget.initialData!.amenities) {
+              final matchedList = amenities.where(
+                (am) => am.name.trim().toLowerCase() == aName.trim().toLowerCase(),
+              );
+              if (matchedList.isNotEmpty) {
+                final matched = matchedList.first;
+                if (!_selectedAmenityIds.contains(matched.id)) {
+                  _selectedAmenityIds.add(matched.id);
+                }
+              }
+            }
+          }
+
+          // Khôi phục các dịch vụ theo nhu cầu đã lưu nếu có (chỉ nhận dịch vụ tùy chọn / không bắt buộc)
+          if (widget.initialData != null && _selectedServiceIds.isEmpty && widget.initialData!.services.isNotEmpty) {
+            for (final sName in widget.initialData!.services) {
+              final matched = servicesList.where(
+                (s) => !s.isMandatory && s.name.trim().toLowerCase() == sName.trim().toLowerCase(),
+              );
+              if (matched.isNotEmpty && !_selectedServiceIds.contains(matched.first.id)) {
+                _selectedServiceIds.add(matched.first.id);
+              }
+            }
+          }
+
           if (_selectedPropertyId != null) {
             final match = _properties.where(
               (p) => p.id.toLowerCase() == _selectedPropertyId!.toLowerCase(),
@@ -105,13 +158,40 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
             _selectedPropertyId = _properties.first.id;
           }
           _loadingProperties = false;
+          _loadingAmenities = false;
+          _loadingServices = false;
         });
       }
     } catch (e) {
-      debugPrint('Lỗi tải danh sách tòa nhà & phòng: $e');
+      debugPrint('Lỗi tải danh sách tòa nhà, phòng, tiện ích & dịch vụ: $e');
       if (mounted) {
-        setState(() => _loadingProperties = false);
+        setState(() {
+          _loadingProperties = false;
+          _loadingAmenities = false;
+          _loadingServices = false;
+        });
       }
+    }
+  }
+
+  // Tải lại bảng dịch vụ theo nhu cầu khi chủ trọ đổi khu trọ khác
+  Future<void> _loadServicesForProperty(String? propId) async {
+    setState(() => _loadingServices = true);
+    try {
+      final ownerId = await AuthStorage.getUserId() ?? 'USER_OWNER_01';
+      final servicesList = await ServiceManagementService.fetchServices(ownerId, propertyId: propId);
+      if (mounted) {
+        setState(() {
+          _availableServices = servicesList;
+          _loadingServices = false;
+          // Loại bỏ ID dịch vụ bắt buộc (nếu có)
+          final mandatoryIds = servicesList.where((s) => s.isMandatory).map((s) => s.id).toSet();
+          _selectedServiceIds.removeWhere((id) => mandatoryIds.contains(id));
+        });
+      }
+    } catch (e) {
+      debugPrint('Lỗi tải dịch vụ cho khu trọ $propId: $e');
+      if (mounted) setState(() => _loadingServices = false);
     }
   }
 
@@ -354,6 +434,28 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                         _buildStatusSelector(),
                         const SizedBox(height: 20),
 
+                        // Tiện ích riêng của phòng (Máy lạnh, Tủ lạnh, Gác lửng...)
+                        _buildSectionTitle('Tiện ích riêng của phòng này'),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Tích chọn tiện ích thực tế có sẵn trong phòng này (phòng có máy lạnh thì chọn máy lạnh, phòng không có thì bỏ trống).',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildRoomAmenitiesSection(),
+                        const SizedBox(height: 20),
+
+                        // Dịch vụ theo nhu cầu của phòng (Xe máy, Wifi, Dọn dẹp...)
+                        _buildSectionTitle('Dịch vụ theo nhu cầu của phòng này'),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Tích chọn dịch vụ tùy chọn mà phòng này có nhu cầu đăng ký sử dụng (phòng không dùng thì bỏ trống để không bị tính tiền). Các dịch vụ bắt buộc chung của khu trọ (như điện, nước, rác...) sẽ tự động được áp dụng khi lập hợp đồng.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildRoomServicesSection(),
+                        const SizedBox(height: 20),
+
                         // Mô tả nội thất & Ghi chú
                         _buildSectionTitle('Mô tả thêm'),
                         const SizedBox(height: 8),
@@ -470,6 +572,8 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                     'images': _selectedImages.isNotEmpty
                                         ? _selectedImages.first
                                         : 'frontend/assets/images/anhPhongDemo.jpg',
+                                    'amenityIds': _selectedAmenityIds,
+                                    'serviceIds': _selectedServiceIds,
                                   };
 
                                   String? errMessage;
@@ -671,6 +775,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
           onChanged: (val) {
             if (val != null) {
               setState(() => _selectedPropertyId = val);
+              _loadServicesForProperty(val);
             }
           },
         ),
@@ -934,5 +1039,283 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
         }).toList(),
       ),
     );
+  }
+
+  Widget _buildRoomAmenitiesSection() {
+    if (_loadingAmenities) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    if (_availableAmenities.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: const Text(
+          'Chưa có danh mục tiện ích trong hệ thống.',
+          style: TextStyle(fontSize: 12.5, color: Colors.grey, fontStyle: FontStyle.italic),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle_outline, size: 18, color: AppColors.primaryGreen),
+              const SizedBox(width: 8),
+              Text(
+                'Đã chọn ${_selectedAmenityIds.length} tiện ích',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _availableAmenities.map((amenity) {
+              final isSelected = _selectedAmenityIds.contains(amenity.id);
+              return FilterChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getAmenityIcon(amenity.icon),
+                      size: 16,
+                      color: isSelected ? Colors.white : AppColors.primaryGreen,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      amenity.name,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                selected: isSelected,
+                selectedColor: AppColors.primaryGreen,
+                backgroundColor: Colors.grey.shade100,
+                checkmarkColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected ? AppColors.primaryGreen : Colors.grey.shade300,
+                  ),
+                ),
+                onSelected: (bool selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedAmenityIds.add(amenity.id);
+                    } else {
+                      _selectedAmenityIds.remove(amenity.id);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getAmenityIcon(String iconName) {
+    switch (iconName.toLowerCase()) {
+      case 'ac_unit':
+        return Icons.ac_unit;
+      case 'wifi':
+        return Icons.wifi;
+      case 'kitchen':
+        return Icons.kitchen;
+      case 'elevator':
+        return Icons.elevator;
+      case 'two_wheeler':
+        return Icons.two_wheeler;
+      case 'videocam':
+        return Icons.videocam;
+      case 'access_time':
+        return Icons.access_time;
+      case 'stairs':
+        return Icons.stairs;
+      case 'balcony':
+        return Icons.balcony;
+      case 'local_laundry_service':
+        return Icons.local_laundry_service;
+      case 'bed':
+        return Icons.bed;
+      case 'wc':
+        return Icons.wc;
+      default:
+        return Icons.check_circle_outline;
+    }
+  }
+
+  Widget _buildRoomServicesSection() {
+    if (_loadingServices) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+
+    final displayServices = _availableServices.where((s) {
+      // 1. Chỉ hiển thị các dịch vụ KHÔNG bắt buộc (theo nhu cầu của từng phòng)
+      if (s.isMandatory) return false;
+
+      // 2. Không hiển thị các dịch vụ điện/nước cơ bản (vì tính theo đồng hồ chỉ số)
+      final name = s.name.toLowerCase();
+      if (name.contains('điện') || name.contains('nước')) return false;
+
+      // 3. Nếu dịch vụ này đang bị tắt ở khu trọ thì ẩn
+      if (!s.status) return false;
+
+      return true;
+    }).toList();
+
+    if (displayServices.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: const Text(
+          'Khu trọ này hiện chưa có dịch vụ tùy chọn theo nhu cầu nào (các dịch vụ bắt buộc chung như điện, nước, rác... sẽ tự động áp dụng khi lập hợp đồng).',
+          style: TextStyle(fontSize: 12.5, color: Colors.grey, fontStyle: FontStyle.italic),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.room_service_outlined, size: 18, color: AppColors.primaryGreen),
+              const SizedBox(width: 8),
+              Text(
+                'Đã chọn ${_selectedServiceIds.length} dịch vụ sử dụng',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryGreen,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: displayServices.map((service) {
+              final isSelected = _selectedServiceIds.contains(service.id);
+              final priceText = service.priceFormatted.isNotEmpty ? service.priceFormatted : '${service.price.toInt()}đ';
+              return FilterChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getServiceIcon(service.icon),
+                      size: 16,
+                      color: isSelected ? Colors.white : AppColors.primaryGreen,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${service.name} ($priceText/${service.unit})',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+                selected: isSelected,
+                selectedColor: AppColors.primaryGreen,
+                backgroundColor: Colors.grey.shade100,
+                checkmarkColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected ? AppColors.primaryGreen : Colors.grey.shade300,
+                  ),
+                ),
+                onSelected: (bool selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedServiceIds.add(service.id);
+                    } else {
+                      _selectedServiceIds.remove(service.id);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getServiceIcon(String iconName) {
+    switch (iconName.toLowerCase()) {
+      case 'bolt':
+        return Icons.bolt;
+      case 'water_drop':
+        return Icons.water_drop;
+      case 'wifi':
+        return Icons.wifi;
+      case 'cleaning_services':
+        return Icons.cleaning_services;
+      case 'elevator':
+        return Icons.elevator;
+      case 'two_wheeler':
+        return Icons.two_wheeler;
+      case 'security':
+        return Icons.security;
+      case 'local_laundry_service':
+        return Icons.local_laundry_service;
+      case 'ac_unit':
+        return Icons.ac_unit;
+      default:
+        return Icons.miscellaneous_services;
+    }
   }
 }

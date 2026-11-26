@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Backend.DTOs;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -627,7 +627,13 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy phòng trọ." });
                 }
 
-                // 1. Dịch vụ đã cài đặt cho khu trọ này (kèm giá niêm yết từ tin đăng/cơ sở)
+                // 1. Dịch vụ riêng mà phòng này đã đăng ký/có nhu cầu trước đó (nếu có)
+                var roomCustomServiceIds = await _context.RoomServices
+                    .Where(rs => rs.RoomId == roomId)
+                    .Select(rs => rs.ServiceId)
+                    .ToListAsync();
+
+                // 2. Dịch vụ đã cài đặt cho khu trọ này (kèm giá niêm yết từ tin đăng/cơ sở)
                 var propertyServices = await _context.PropertyServices
                     .Include(ps => ps.Service)
                     .Where(ps => ps.PropertyId == room.PropertyId && ps.Status == "active")
@@ -636,8 +642,9 @@ namespace Backend.Controllers
                         serviceId = ps.ServiceId,
                         name = ps.Service.Name,
                         unit = ps.Service.Unit,
-                        price = ps.Price,
-                        isDefault = true // Mặc định tự chọn
+                        price = ps.Price > 0 ? ps.Price : ps.Service.Price,
+                        isMandatory = ps.Service.IsMandatory,
+                        isDefault = ps.Service.IsMandatory || roomCustomServiceIds.Contains(ps.ServiceId) // Bắt buộc HOẶC phòng đã đăng ký nhu cầu trước đó
                     })
                     .ToListAsync();
 

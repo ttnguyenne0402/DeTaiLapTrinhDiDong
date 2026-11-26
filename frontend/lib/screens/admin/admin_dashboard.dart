@@ -358,6 +358,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                   Row(
                     children: [
+                      IconButton(
+                        tooltip: 'Trợ lý AI Quản trị',
+                        onPressed: () {
+                          Navigator.pushNamed(context, AppRoutes.aiChat, arguments: {'role': 'admin'});
+                        },
+                        icon: const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.amberAccent,
+                        ),
+                      ),
                       Stack(
                         alignment: Alignment.topRight,
                         children: [
@@ -736,6 +746,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
 
       // --- BOTTOM NAVIGATION BAR ---
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.primaryGreen,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 20),
+        label: const Text(
+          'AI Quản trị',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        onPressed: () {
+          Navigator.pushNamed(context, AppRoutes.aiChat, arguments: {'role': 'admin'});
+        },
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
         type: BottomNavigationBarType.fixed,

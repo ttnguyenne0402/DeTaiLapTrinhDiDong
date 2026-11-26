@@ -55,6 +55,8 @@ public partial class QuanLyPhongTroContext : DbContext
 
     public virtual DbSet<RoomAmenity> RoomAmenities { get; set; }
 
+    public virtual DbSet<RoomServiceItem> RoomServices { get; set; }
+
     public virtual DbSet<Service> Services { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -930,6 +932,28 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
                 .HasForeignKey(d => d.RoomId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_room_amenities_rooms");
+        });
+
+        modelBuilder.Entity<RoomServiceItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.ToTable("room_services");
+
+            entity.Property(e => e.Id).HasMaxLength(50).HasColumnName("id");
+            entity.Property(e => e.RoomId).HasMaxLength(50).HasColumnName("room_id");
+            entity.Property(e => e.ServiceId).HasMaxLength(50).HasColumnName("service_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+
+            entity.HasOne(d => d.Room).WithMany(p => p.RoomServices)
+                .HasForeignKey(d => d.RoomId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_room_services_rooms");
+
+            entity.HasOne(d => d.Service).WithMany()
+                .HasForeignKey(d => d.ServiceId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_room_services_services");
         });
 
         modelBuilder.Entity<Service>(entity =>

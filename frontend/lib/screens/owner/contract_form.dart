@@ -590,17 +590,23 @@ class HopDongMoi extends State<Contract_form> {
             final m = Map<String, dynamic>.from(item as Map);
             final rawPrice = m['price'] ?? m['Price'];
             final sId = (m['serviceId'] ?? m['ServiceId'] ?? '').toString();
+            final sName = (m['name'] ?? m['Name'] ?? '').toString();
+            final isMandatory = m['isMandatory'] == true ||
+                m['IsMandatory'] == true ||
+                sName.toLowerCase().contains('điện') ||
+                sName.toLowerCase().contains('nước');
 
-            bool isSelected = true;
+            bool isSelected = isMandatory;
             if (savedServices != null) {
               isSelected = savedServiceIds.contains(sId);
             }
 
             return {
               'serviceId': sId,
-              'name': m['name'] ?? m['Name'] ?? '',
+              'name': sName,
               'unit': m['unit'] ?? m['Unit'] ?? '',
               'price': rawPrice != null ? (rawPrice as num).toDouble() : 0.0,
+              'isMandatory': isMandatory,
               'selected': isSelected,
             };
           }).toList();
@@ -1567,9 +1573,54 @@ class HopDongMoi extends State<Contract_form> {
                                 },
                               ),
                               Expanded(
-                                child: Text(
-                                  srv['name'] ?? '',
-                                  style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            srv['name'] ?? '',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: srv['isMandatory'] == true
+                                                ? Colors.red.shade50
+                                                : Colors.blue.shade50,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: srv['isMandatory'] == true
+                                                  ? Colors.red.shade200
+                                                  : Colors.blue.shade200,
+                                              width: 0.8,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            srv['isMandatory'] == true ? 'Bắt buộc' : 'Theo phòng',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: srv['isMandatory'] == true
+                                                  ? Colors.red.shade700
+                                                  : Colors.blue.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (srv['isMandatory'] != true)
+                                      Text(
+                                        'Chỉ tích chọn nếu phòng này đăng ký',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                      ),
+                                  ],
                                 ),
                               ),
                               Text(

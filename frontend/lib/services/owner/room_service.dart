@@ -18,6 +18,10 @@ class RoomModel {
   final String priceFormatted;
   final String images;
   final String? description;
+  final List<String> amenityIds;
+  final List<String> amenities;
+  final List<String> serviceIds;
+  final List<String> services;
 
   RoomModel({
     required this.id,
@@ -36,6 +40,10 @@ class RoomModel {
     required this.priceFormatted,
     required this.images,
     this.description,
+    this.amenityIds = const [],
+    this.amenities = const [],
+    this.serviceIds = const [],
+    this.services = const [],
   });
 
   factory RoomModel.fromJson(Map<String, dynamic> json) {
@@ -56,6 +64,22 @@ class RoomModel {
       priceFormatted: json['priceFormatted'] ?? '',
       images: json['images'] ?? 'frontend/assets/images/anhPhongDemo.jpg',
       description: json['description'],
+      amenityIds: (json['amenityIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      amenities: (json['amenities'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      serviceIds: (json['serviceIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      services: (json['services'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 }
