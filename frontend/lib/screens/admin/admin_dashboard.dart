@@ -128,6 +128,231 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (mounted) await _loadDashboard();
   }
 
+  final List<Map<String, dynamic>> _notifications = [
+    {
+      'title': 'Tin đăng mới chờ duyệt',
+      'subtitle': 'Chủ trọ vừa gửi bài đăng phòng mới cần kiểm duyệt',
+      'time': '5 phút trước',
+      'isRead': false,
+    },
+    {
+      'title': 'Đăng ký tài khoản mới',
+      'subtitle': 'Có 18 tài khoản người dùng vừa đăng ký tham gia hệ thống',
+      'time': '1 giờ trước',
+      'isRead': false,
+    },
+    {
+      'title': 'Cập nhật trạng thái tài khoản',
+      'subtitle': 'Admin vừa cập nhật trạng thái hoạt động của tài khoản hệ thống',
+      'time': '3 giờ trước',
+      'isRead': true,
+    },
+  ];
+
+  int get _unreadCount => _notifications.where((n) => n['isRead'] == false).length;
+
+  void _showNotificationsSheet() {
+    String currentFilter = 'all';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final unreadCount = _notifications.where((n) => n['isRead'] == false).length;
+
+            List<Map<String, dynamic>> filteredList = _notifications;
+            if (currentFilter == 'unread') {
+              filteredList = _notifications.where((n) => n['isRead'] == false).toList();
+            } else if (currentFilter == 'post') {
+              filteredList = _notifications.where((n) => (n['title'] ?? '').toString().toLowerCase().contains('tin') || (n['title'] ?? '').toString().toLowerCase().contains('bài')).toList();
+            } else if (currentFilter == 'user') {
+              filteredList = _notifications.where((n) => (n['title'] ?? '').toString().toLowerCase().contains('người') || (n['title'] ?? '').toString().toLowerCase().contains('tài khoản')).toList();
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.notifications_active_rounded, color: AppColors.primaryGreen, size: 22),
+                            const SizedBox(width: 8),
+                            Text(
+                              unreadCount > 0 ? 'Thông báo ($unreadCount mới)' : 'Thông báo Admin',
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ],
+                        ),
+                        if (unreadCount > 0)
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                for (var n in _notifications) {
+                                  n['isRead'] = true;
+                                }
+                              });
+                              setModalState(() {});
+                            },
+                            icon: const Icon(Icons.done_all, size: 16, color: AppColors.primaryGreen),
+                            label: const Text('Đọc tất cả', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
+                          ),
+                      ],
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        {'key': 'all', 'label': 'Tất cả (${_notifications.length})'},
+                        {'key': 'unread', 'label': 'Chưa đọc ($unreadCount)'},
+                        {'key': 'post', 'label': 'Duyệt tin đăng'},
+                        {'key': 'user', 'label': 'Tài khoản người dùng'},
+                      ].map((chip) {
+                        final isSel = currentFilter == chip['key'];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(chip['label']!),
+                            selected: isSel,
+                            selectedColor: AppColors.primaryGreen,
+                            backgroundColor: Colors.white,
+                            showCheckmark: false,
+                            side: BorderSide(color: isSel ? AppColors.primaryGreen : Colors.grey.shade300),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                              color: isSel ? Colors.white : Colors.black87,
+                            ),
+                            onSelected: (selected) {
+                              if (selected) setModalState(() => currentFilter = chip['key']!);
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const Divider(height: 16),
+                  Expanded(
+                    child: filteredList.isEmpty
+                        ? const Center(child: Text('Không có thông báo nào', style: TextStyle(color: Colors.grey)))
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            itemCount: filteredList.length,
+                            itemBuilder: (context, index) {
+                              final item = filteredList[index];
+                              final bool isRead = item['isRead'] == true;
+                              final String title = item['title'] ?? '';
+
+                              IconData iconData = Icons.notifications_active;
+                              Color iconColor = AppColors.primaryGreen;
+                              Color iconBg = Colors.green.shade50;
+
+                              if (title.contains('Tin') || title.contains('bài')) {
+                                iconData = Icons.article_outlined;
+                                iconColor = Colors.blue;
+                                iconBg = Colors.blue.shade50;
+                              } else if (title.contains('Tài khoản') || title.contains('người')) {
+                                iconData = Icons.person_outline;
+                                iconColor = Colors.teal;
+                                iconBg = Colors.teal.shade50;
+                              }
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                decoration: BoxDecoration(
+                                  color: isRead ? Colors.white : Colors.green.shade50.withValues(alpha: 0.4),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: isRead ? Colors.grey.shade200 : AppColors.primaryGreen.withValues(alpha: 0.3)),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  leading: CircleAvatar(
+                                    backgroundColor: iconBg,
+                                    child: Icon(iconData, color: iconColor, size: 22),
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          style: TextStyle(
+                                            fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                            fontSize: 14,
+                                            color: isRead ? Colors.black87 : Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                      if (!isRead)
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.primaryGreen,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        item['subtitle'] ?? '',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        item['time'] ?? '',
+                                        style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {
+                                    setState(() => item['isRead'] = true);
+                                    Navigator.pop(context);
+                                    if (title.contains('Tin') || title.contains('bài')) {
+                                      Navigator.pushNamed(context, AppRoutes.rewview);
+                                    } else {
+                                      Navigator.pushNamed(context, AppRoutes.usersManage);
+                                    }
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _openProfile() async {
     await Navigator.of(
       context,
@@ -262,29 +487,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ],
                       ),
 
-                      const SizedBox(width: 8),
-
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ProfileScreen(
-                                user: {
-                                  'Name': 'Quản trị viên',
-                                  'Email': 'admin@phongtro.vn',
-                                  'Phone': '0901234567',
-                                  'Avatar': '',
-                                  'Role': 'admin',
-                                },
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                          );
-                        },
-                      ),
                       const SizedBox(height: 16),
                       _buildQueue(),
                       if (_loadFailed) ...[
