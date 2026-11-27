@@ -759,7 +759,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
               ),
             if (status == 'confirmed')
               Row(
-                mainAxisAlignment: MainAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton.icon(
                     onPressed: () => _updateStatus(

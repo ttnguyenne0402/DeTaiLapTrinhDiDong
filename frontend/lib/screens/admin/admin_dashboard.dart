@@ -357,7 +357,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const ProfileScreen()));
-    if (mounted) setState(() => _name = AuthStorage.getUserName());
+    if (!mounted) return;
+    setState(() {
+      _name = AuthStorage.getUserName();
+    });
   }
 
   String _count(int? value) {

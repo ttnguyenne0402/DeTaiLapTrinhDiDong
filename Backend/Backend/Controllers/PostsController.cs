@@ -46,6 +46,14 @@ namespace Backend.Controllers
                 var query = _context.RentalPosts
                     .Include(p => p.Room)
                         .ThenInclude(r => r.Property)
+                            .ThenInclude(prop => prop.Owner)
+                    .Include(p => p.Room)
+                        .ThenInclude(r => r.RoomAmenities)
+                            .ThenInclude(ra => ra.Amenity)
+                    .Include(p => p.Room)
+                        .ThenInclude(r => r.Property)
+                            .ThenInclude(prop => prop.PropertyAmenities)
+                                .ThenInclude(pa => pa.Amenity)
                     .Include(p => p.RentalPostImages)
                     .Where(p => ownerRoomIds.Contains(p.RoomId));
 
@@ -94,55 +102,10 @@ namespace Backend.Controllers
 
                 var result = rawPosts.Select(p =>
                 {
-                    var firstImg = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
-                                       .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).FirstOrDefault()?.ImagePath
-                                   ?? p.Room?.Images
-                                   ?? "frontend/assets/images/anhPhongDemo.jpg";
-
                     int likes = (p.RoomId != null && favoritesCountByRoom.ContainsKey(p.RoomId))
                                 ? favoritesCountByRoom[p.RoomId] : 0;
 
-                    // Chuẩn hóa status sang active nếu database dùng 'published'
-                    string normalizedStatus = p.Status == "published" ? "active" : p.Status;
-
-                    decimal postPrice = (p.Price.HasValue && p.Price.Value > 0)
-                        ? p.Price.Value
-                        : (p.Room?.Price ?? 0);
-
-                    var amenitiesList = !string.IsNullOrWhiteSpace(p.Amenities)
-                        ? p.Amenities.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(a => a.Trim()).ToList()
-                        : new List<string>();
-
-                    return new PostDto
-                    {
-                        Id = p.Id,
-                        RoomId = p.RoomId ?? "",
-                        RoomName = p.Room?.Name ?? "",
-                        PropertyId = p.Room?.PropertyId ?? "",
-                        PropertyName = p.Room?.Property?.Name ?? "",
-                        PropertyAddress = p.Room?.Property?.Address ?? "",
-                        Room = $"Phòng {p.Room?.Name} - {p.Room?.Property?.Name}",
-                        RoomArea = p.Room?.Area ?? 0,
-                        RoomDeposit = p.Room?.Deposit ?? 0,
-                        RoomMaxPeople = p.Room?.MaxPeople ?? 0,
-                        RoomFloor = p.Room?.Floor,
-                        RoomStatus = p.Room?.Status ?? "available",
-                        RoomDescription = p.Room?.Description ?? "",
-                        Title = p.Title,
-                        Description = p.Description,
-                        Price = postPrice,
-                        PriceFormatted = $"{postPrice:N0}".Replace(",", ".") + "đ/tháng",
-                        Amenities = amenitiesList,
-                        Views = p.Views,
-                        Likes = likes,
-                        Date = (p.CreatedAt ?? DateTime.Now).ToString("dd/MM/yyyy"),
-                        Status = normalizedStatus,
-                        SubmitNote = !string.IsNullOrEmpty(p.SubmitNote) ? p.SubmitNote : (normalizedStatus == "pending" ? "Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC" : null),
-                        RejectReason = p.RejectionReason,
-                        Image = firstImg,
-                        Images = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
-                            .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).Select(i => i.ImagePath).ToList() ?? new List<string>()
-                    };
+                    return MapPostToDto(p, likes);
                 }).ToList();
 
                 return Ok(result);
@@ -163,6 +126,14 @@ namespace Backend.Controllers
                 var p = await _context.RentalPosts
                     .Include(x => x.Room)
                         .ThenInclude(r => r.Property)
+                            .ThenInclude(prop => prop.Owner)
+                    .Include(x => x.Room)
+                        .ThenInclude(r => r.RoomAmenities)
+                            .ThenInclude(ra => ra.Amenity)
+                    .Include(x => x.Room)
+                        .ThenInclude(r => r.Property)
+                            .ThenInclude(prop => prop.PropertyAmenities)
+                                .ThenInclude(pa => pa.Amenity)
                     .Include(x => x.RentalPostImages)
                     .FirstOrDefaultAsync(x => x.Id == id);
 
@@ -195,58 +166,155 @@ namespace Backend.Controllers
                     likesCount = await _context.Favorites.CountAsync(f => f.RoomId == p.RoomId);
                 }
 
-                var firstImg = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
-                               .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).FirstOrDefault()?.ImagePath
-                               ?? p.Room?.Images
-                               ?? "frontend/assets/images/anhPhongDemo.jpg";
-
-                string normalizedStatus = p.Status == "published" ? "active" : p.Status;
-
-                decimal postPrice = (p.Price.HasValue && p.Price.Value > 0)
-                    ? p.Price.Value
-                    : (p.Room?.Price ?? 0);
-
-                var amenitiesList = !string.IsNullOrWhiteSpace(p.Amenities)
-                    ? p.Amenities.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(a => a.Trim()).ToList()
-                    : new List<string>();
-
-                var dto = new PostDto
+                var services = new List<PostServiceItemDto>();
+                if (!string.IsNullOrEmpty(p.Room?.PropertyId))
                 {
-                    Id = p.Id,
-                    RoomId = p.RoomId ?? "",
-                    RoomName = p.Room?.Name ?? "",
-                    PropertyId = p.Room?.PropertyId ?? "",
-                    PropertyName = p.Room?.Property?.Name ?? "",
-                    PropertyAddress = p.Room?.Property?.Address ?? "",
-                    Room = $"Phòng {p.Room?.Name} - {p.Room?.Property?.Name}",
-                    RoomArea = p.Room?.Area ?? 0,
-                    RoomDeposit = p.Room?.Deposit ?? 0,
-                    RoomMaxPeople = p.Room?.MaxPeople ?? 0,
-                    RoomFloor = p.Room?.Floor,
-                    RoomStatus = p.Room?.Status ?? "available",
-                    RoomDescription = p.Room?.Description ?? "",
-                    Title = p.Title,
-                    Description = p.Description,
-                    Price = postPrice,
-                    PriceFormatted = $"{postPrice:N0}".Replace(",", ".") + "đ/tháng",
-                    Amenities = amenitiesList,
-                    Views = p.Views,
-                    Likes = likesCount,
-                    Date = (p.CreatedAt ?? DateTime.Now).ToString("dd/MM/yyyy"),
-                    Status = normalizedStatus,
-                    SubmitNote = !string.IsNullOrEmpty(p.SubmitNote) ? p.SubmitNote : (normalizedStatus == "pending" ? "Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC" : null),
-                    RejectReason = p.RejectionReason,
-                    Image = firstImg,
-                    Images = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
-                        .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).Select(i => i.ImagePath).ToList() ?? new List<string>()
-                };
+                    services = await _context.PropertyServices
+                        .AsNoTracking()
+                        .Include(ps => ps.Service)
+                        .Where(ps => ps.PropertyId == p.Room.PropertyId && ps.Status == "active" && ps.Service != null)
+                        .Select(ps => new PostServiceItemDto
+                        {
+                            Name = ps.Service.Name,
+                            Price = ps.Price,
+                            Unit = ps.Service.Unit
+                        })
+                        .ToListAsync();
+                }
 
+                var dto = MapPostToDto(p, likesCount, services);
                 return Ok(dto);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi lấy chi tiết bài đăng", error = ex.Message });
             }
+        }
+
+        private static PostDto MapPostToDto(RentalPost p, int likesCount, List<PostServiceItemDto>? services = null)
+        {
+            var property = p.Room?.Property;
+            var images = BuildPostImages(p);
+            var firstImg = images.FirstOrDefault() ?? "frontend/assets/images/anhPhongDemo.jpg";
+            var normalizedStatus = p.Status == "published" ? "active" : p.Status;
+            decimal postPrice = (p.Price.HasValue && p.Price.Value > 0)
+                ? p.Price.Value
+                : (p.Room?.Price ?? 0);
+
+            return new PostDto
+            {
+                Id = p.Id,
+                RoomId = p.RoomId ?? "",
+                RoomName = p.Room?.Name ?? "",
+                PropertyId = p.Room?.PropertyId ?? "",
+                PropertyName = property?.Name ?? "",
+                PropertyAddress = BuildFullAddress(property),
+                PropertyWard = property?.Ward ?? "",
+                PropertyDistrict = property?.District ?? "",
+                Latitude = property?.Latitude,
+                Longitude = property?.Longitude,
+                OwnerName = property?.Owner?.Name ?? "",
+                OwnerPhone = property?.Owner?.Phone,
+                Room = BuildRoomLabel(p.Room),
+                RoomArea = p.Room?.Area ?? 0,
+                RoomDeposit = p.Room?.Deposit ?? 0,
+                RoomMaxPeople = p.Room?.MaxPeople ?? 0,
+                RoomFloor = p.Room?.Floor,
+                RoomStatus = p.Room?.Status ?? "available",
+                RoomDescription = p.Room?.Description ?? "",
+                Title = p.Title,
+                Description = p.Description,
+                Price = postPrice,
+                PriceFormatted = $"{postPrice:N0}".Replace(",", ".") + "đ/tháng",
+                Amenities = BuildPostAmenities(p),
+                Services = services ?? new List<PostServiceItemDto>(),
+                Views = p.Views,
+                Likes = likesCount,
+                Date = (p.CreatedAt ?? DateTime.Now).ToString("dd/MM/yyyy"),
+                Status = normalizedStatus,
+                SubmitNote = !string.IsNullOrEmpty(p.SubmitNote)
+                    ? p.SubmitNote
+                    : (normalizedStatus == "pending" ? "Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC" : null),
+                RejectReason = p.RejectionReason,
+                Image = firstImg,
+                Images = images
+            };
+        }
+
+        private static string BuildFullAddress(Property? prop)
+        {
+            if (prop == null) return string.Empty;
+            var parts = new[] { prop.Address, prop.Ward, prop.District }
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => s!.Trim());
+            return string.Join(", ", parts);
+        }
+
+        private static string BuildRoomLabel(Room? room)
+        {
+            if (room == null) return string.Empty;
+            var roomName = (room.Name ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(roomName))
+            {
+                return room.Property?.Name ?? string.Empty;
+            }
+            var prefix = roomName.StartsWith("Phòng", StringComparison.OrdinalIgnoreCase)
+                ? roomName
+                : $"Phòng {roomName}";
+            var propName = (room.Property?.Name ?? string.Empty).Trim();
+            return string.IsNullOrEmpty(propName) ? prefix : $"{prefix} - {propName}";
+        }
+
+        private static List<string> BuildPostImages(RentalPost p)
+        {
+            if (p.RentalPostImages != null && p.RentalPostImages.Any())
+            {
+                return p.RentalPostImages
+                    .OrderByDescending(i => i.IsThumbnail)
+                    .ThenBy(i => i.SortOrder)
+                    .ThenBy(i => i.Id)
+                    .Select(i => i.ImagePath)
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(p.Room?.Images))
+            {
+                return p.Room.Images
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(img => img.Trim())
+                    .Where(img => !string.IsNullOrEmpty(img))
+                    .ToList();
+            }
+
+            return new List<string>();
+        }
+
+        private static List<string> BuildPostAmenities(RentalPost p)
+        {
+            if (!string.IsNullOrWhiteSpace(p.Amenities))
+            {
+                return p.Amenities
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(a => a.Trim())
+                    .Where(a => !string.IsNullOrEmpty(a))
+                    .ToList();
+            }
+
+            var roomAmenities = p.Room?.RoomAmenities?
+                .Where(ra => ra.Amenity != null && !string.IsNullOrWhiteSpace(ra.Amenity.Name))
+                .Select(ra => ra.Amenity!.Name.Trim())
+                .ToList();
+            if (roomAmenities != null && roomAmenities.Count > 0)
+            {
+                return roomAmenities;
+            }
+
+            var propertyAmenities = p.Room?.Property?.PropertyAmenities?
+                .Where(pa => pa.Status == "active" && pa.Amenity != null && !string.IsNullOrWhiteSpace(pa.Amenity.Name))
+                .Select(pa => pa.Amenity!.Name.Trim())
+                .ToList();
+            return propertyAmenities ?? new List<string>();
         }
 
         // 3. POST: api/owner/posts

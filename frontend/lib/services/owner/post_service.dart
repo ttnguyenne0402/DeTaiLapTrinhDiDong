@@ -13,6 +13,12 @@ class PostModel {
   final String propertyId;
   final String propertyName;
   final String propertyAddress;
+  final String propertyWard;
+  final String propertyDistrict;
+  final double? latitude;
+  final double? longitude;
+  final String ownerName;
+  final String? ownerPhone;
   final String room;
   final double roomArea;
   final double roomDeposit;
@@ -25,6 +31,7 @@ class PostModel {
   final double price;
   final String priceFormatted;
   final List<String> amenities;
+  final List<Map<String, dynamic>> services;
   final int views;
   final int likes;
   final String date;
@@ -41,6 +48,12 @@ class PostModel {
     required this.propertyId,
     required this.propertyName,
     required this.propertyAddress,
+    this.propertyWard = '',
+    this.propertyDistrict = '',
+    this.latitude,
+    this.longitude,
+    this.ownerName = '',
+    this.ownerPhone,
     required this.room,
     required this.roomArea,
     required this.roomDeposit,
@@ -53,6 +66,7 @@ class PostModel {
     required this.price,
     required this.priceFormatted,
     required this.amenities,
+    this.services = const [],
     required this.views,
     required this.likes,
     required this.date,
@@ -72,6 +86,11 @@ class PostModel {
     var amnList = json['amenities'] as List? ?? [];
     List<String> amenities = amnList.map((e) => e.toString()).toList();
 
+    final servicesList = (json['services'] as List? ?? [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+
     return PostModel(
       id: json['id'] ?? '',
       roomId: json['roomId'] ?? '',
@@ -79,6 +98,16 @@ class PostModel {
       propertyId: json['propertyId'] ?? '',
       propertyName: json['propertyName'] ?? '',
       propertyAddress: json['propertyAddress'] ?? '',
+      propertyWard: json['propertyWard']?.toString() ?? '',
+      propertyDistrict: json['propertyDistrict']?.toString() ?? '',
+      latitude: (json['latitude'] is num)
+          ? (json['latitude'] as num).toDouble()
+          : double.tryParse(json['latitude']?.toString() ?? ''),
+      longitude: (json['longitude'] is num)
+          ? (json['longitude'] as num).toDouble()
+          : double.tryParse(json['longitude']?.toString() ?? ''),
+      ownerName: json['ownerName']?.toString() ?? '',
+      ownerPhone: json['ownerPhone']?.toString(),
       room: json['room'] ?? '',
       roomArea: (json['roomArea'] is num)
           ? (json['roomArea'] as num).toDouble()
@@ -99,6 +128,7 @@ class PostModel {
       price: (json['price'] is num) ? (json['price'] as num).toDouble() : 0.0,
       priceFormatted: json['priceFormatted'] ?? '',
       amenities: amenities,
+      services: servicesList,
       views: json['views'] ?? 0,
       likes: json['likes'] ?? 0,
       date: json['date'] ?? '',

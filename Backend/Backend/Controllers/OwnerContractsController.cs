@@ -373,8 +373,8 @@ namespace Backend.Controllers
                          Type = "contract_pending",
                          ReferenceId = contract.Id,
                          ReferenceType = "contract",
-                         CreatedAt = DateTime.UtcNow,
-                         UpdatedAt = DateTime.UtcNow
+                         CreatedAt = DateTime.Now,
+                         UpdatedAt = DateTime.Now
                     };
                     _context.Notifications.Add(contractNotif);
                  }
@@ -564,8 +564,8 @@ namespace Backend.Controllers
                 Type = tenantRejects ? "contract_signing_rejected" : "contract_signing_withdrawn",
                 ReferenceId = contract.Id,
                 ReferenceType = "contract",
-                CreatedAt = now,
-                UpdatedAt = now
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             });
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -1131,8 +1131,8 @@ namespace Backend.Controllers
                                     Type = "contract_terminated",
                                     ReferenceId = contract.Id,
                                     ReferenceType = "contract",
-                                    CreatedAt = DateTime.UtcNow,
-                                    UpdatedAt = DateTime.UtcNow
+                                    CreatedAt = DateTime.Now,
+                                    UpdatedAt = DateTime.Now
                                 };
                                 _context.Notifications.Add(terminationNotif);
                      }

@@ -8,6 +8,12 @@ namespace Backend.DT0s
         public string PropertyId { get; set; } = string.Empty;
         public string PropertyName { get; set; } = string.Empty;
         public string PropertyAddress { get; set; } = string.Empty;
+        public string PropertyWard { get; set; } = string.Empty;
+        public string PropertyDistrict { get; set; } = string.Empty;
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
+        public string OwnerName { get; set; } = string.Empty;
+        public string? OwnerPhone { get; set; }
         public string Room { get; set; } = string.Empty; // "Phòng 201 - Chung cư Mini Q7"
         public decimal RoomArea { get; set; }
         public decimal RoomDeposit { get; set; }
@@ -20,6 +26,7 @@ namespace Backend.DT0s
         public decimal Price { get; set; }
         public string PriceFormatted { get; set; } = string.Empty; // "4.000.000đ/tháng"
         public List<string> Amenities { get; set; } = new();
+        public List<PostServiceItemDto> Services { get; set; } = new();
         public int Views { get; set; }
         public int Likes { get; set; }
         public string Date { get; set; } = string.Empty; // "24/09/2026"
@@ -28,6 +35,13 @@ namespace Backend.DT0s
         public string? RejectReason { get; set; }
         public string Image { get; set; } = "frontend/assets/images/anhPhongDemo.jpg";
         public List<string> Images { get; set; } = new();
+    }
+
+    public class PostServiceItemDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public string Unit { get; set; } = string.Empty;
     }
 
     public interface IPostImageRequest
