@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
 import 'dart:convert';
-import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
-import '../../utils/database_helper.dart';
 import 'invoice_detail_screen.dart';
 import '../../route/app_routes.dart';
 class MyInvoicesScreen extends StatefulWidget {
@@ -17,58 +14,47 @@ class MyInvoicesScreen extends StatefulWidget {
 
 class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
   List _invoices = [];
-  bool _isLoading = true;
-
-// URL API Backend
-  late String _apiUrl;
+  bool _isLoading = false;
+  String? _loadError;
 
   @override
   void initState() {
     super.initState();
-    _initData();
-  }
-  Future<void> _initData() async {
-    final userId = await AuthStorage.getUserId();
-    _apiUrl = 'http://10.0.2.2:5093/api/invoices/tenant/${userId ?? ""}';
-    await _loadData();
-  }
-
-  // Hàm tạo Client tùy chỉnh bỏ qua lỗi SSL
-  IOClient _getCustomClient() {
-    final httpClient = HttpClient()
-      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-    return IOClient(httpClient);
+    _loadData();
   }
 
   Future<void> _loadData() async {
-    // Always load invoices for the currently signed-in tenant from the backend.
-    // The local invoice cache is not user-scoped and could show another account's data.
-    final client = _getCustomClient();
-    try {
-      final response = await client.get(Uri.parse(_apiUrl));
+    if (!mounted || _isLoading) return;
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
 
-      if (response.statusCode == 200) {
-        final List<dynamic> apiData = json.decode(response.body);
-        await DatabaseHelper.instance.insertInvoices(apiData);
+    try {
+      final userId = await AuthStorage.getUserId();
+      if (userId == null || userId.trim().isEmpty) {
         if (mounted) {
           setState(() {
-            _invoices = List.from(apiData);
-            _isLoading = false;
+            _invoices = [];
+            _loadError = 'Vui lòng đăng nhập lại để xem hóa đơn.';
           });
         }
-      } else {
-        print("Lỗi hóa đơn từ server: ${response.statusCode} - ${response.body}");
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+        return;
       }
+      final url = Uri.parse('http://10.0.2.2:5093/api/invoices/tenant/${Uri.encodeComponent(userId.trim())}');
+      final response = await http.get(url).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+      final invoices = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+      if (mounted) setState(() => _invoices = invoices);
     } catch (e) {
-      print("Lỗi khi lấy hóa đơn từ server: $e");
+      debugPrint('Lỗi tải hóa đơn người thuê: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => _loadError = 'Không tải được hóa đơn. Hãy thử lại.');
       }
     } finally {
-      client.close();
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -90,6 +76,11 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Tải lại hóa đơn',
+            onPressed: _isLoading ? null : _loadData,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+          ),
           IconButton(
             tooltip: 'Theo d?i ?i?n n??c',
             onPressed: () => Navigator.pushNamed(context, AppRoutes.tenantUtilityHistory),
@@ -170,6 +161,8 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
                     Expanded(
                       child: _isLoading
                           ? const Center(child: CircularProgressIndicator())
+                          : _loadError != null
+                          ? Center(child: Text(_loadError!, textAlign: TextAlign.center))
                           : _invoices.isEmpty
                           ? const Center(
                         child: Text('Không có hóa đơn nào.', style: TextStyle(color: AppColors.textSecondary)),
@@ -217,9 +210,6 @@ class _MyInvoicesScreenState extends State<MyInvoicesScreen> {
               settings: RouteSettings(arguments: invoice['id']),
             ),
           );
-        setState(() {
-          _isLoading = true;
-        });
         await _loadData();
         },
         child: Padding(

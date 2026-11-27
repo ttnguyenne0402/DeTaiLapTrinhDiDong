@@ -11,6 +11,8 @@ class InvoiceWidgetHelpers {
     required String totalAmount,
     required TextEditingController oldController,
     required TextEditingController newController,
+    required bool canEditOldReading,
+    required bool canEditNewReading,
     required String unitLabel,
     required String consumption,
     required String actionText,
@@ -66,7 +68,8 @@ class InvoiceWidgetHelpers {
                           Expanded(
                             child: TextField(
                               controller: oldController,
-                              keyboardType: TextInputType.number,
+                              readOnly: !canEditOldReading,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
                               decoration: const InputDecoration(
                                 isDense: true,
@@ -89,9 +92,9 @@ class InvoiceWidgetHelpers {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: canEditNewReading ? Colors.white : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primaryGreen, width: 1.2),
+                    border: Border.all(color: canEditNewReading ? AppColors.primaryGreen : Colors.grey.shade200),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,7 +105,8 @@ class InvoiceWidgetHelpers {
                           Expanded(
                             child: TextField(
                               controller: newController,
-                              keyboardType: TextInputType.number,
+                              readOnly: !canEditNewReading,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
                               decoration: const InputDecoration(
                                 isDense: true,

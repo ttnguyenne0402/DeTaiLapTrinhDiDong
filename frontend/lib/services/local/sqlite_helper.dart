@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
+import '../../utils/post_image_path.dart';
 
 class SqliteHelper {
   static final SqliteHelper instance = SqliteHelper._init();
@@ -19,7 +24,7 @@ class SqliteHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -33,6 +38,9 @@ class SqliteHelper {
       try {
         await db.execute('ALTER TABLE draft_posts ADD COLUMN amenities TEXT;');
       } catch (_) {}
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE draft_posts ADD COLUMN images TEXT');
     }
   }
 
@@ -49,6 +57,7 @@ class SqliteHelper {
         price TEXT,
         amenities TEXT,
         image TEXT,
+        images TEXT,
         created_at TEXT
       )
     ''');
@@ -68,6 +77,37 @@ class SqliteHelper {
   }
 
   // --- CÁC HÀM CRUD CHO BẢN NHÁP TIN ĐĂNG (DRAFT POSTS) ---
+
+  Future<Map<String, String>> saveDraftImages(List<String> images) async {
+    final directory = Directory(
+      join(await getDatabasesPath(), 'draft_post_images'),
+    );
+    final saved = <String>[];
+    for (final path in images) {
+      if (isSharedPostImage(path) || isWithin(directory.path, path)) {
+        saved.add(path);
+      } else {
+        await directory.create(recursive: true);
+        final folder = await directory.createTemp('image-');
+        final copy = await File(path).copy(join(folder.path, basename(path)));
+        saved.add(copy.path);
+      }
+    }
+    return {
+      'image': saved.isEmpty ? postImageFallback : saved.first,
+      'images': jsonEncode(saved),
+    };
+  }
+
+  List<String> readDraftImages(Map<String, dynamic> draft) {
+    final encoded = draft['images'];
+    if (encoded is String && encoded.isNotEmpty) {
+      final images = jsonDecode(encoded);
+      if (images is List) return images.whereType<String>().toList();
+    }
+    final legacy = draft['image']?.toString();
+    return legacy == null || legacy.isEmpty ? [] : [legacy];
+  }
 
   // Thêm tin nháp vào SQLite
   Future<int> insertDraftPost(Map<String, dynamic> data) async {
@@ -95,11 +135,7 @@ class SqliteHelper {
   // Xóa tin nháp sau khi đã gửi duyệt lên SQL Server
   Future<int> deleteDraftPost(int id) async {
     final db = await instance.database;
-    return await db.delete(
-      'draft_posts',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    return await db.delete('draft_posts', where: 'id = ?', whereArgs: [id]);
   }
 
   // Đóng database

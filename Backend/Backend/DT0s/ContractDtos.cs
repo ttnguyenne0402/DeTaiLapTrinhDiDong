@@ -21,6 +21,8 @@
         public string? Cccd { get; set; }
         public string? OwnerSignature { get; set; }
         public string? TenantSignature { get; set; }
+        public DateTime? SigningClosedAt { get; set; }
+        public string? SigningCloseReason { get; set; }
 
         public List<ContractServiceItemDto>? Services { get; set; } = new();
         public DateTime StartDate { get; set; }
@@ -70,6 +72,12 @@
     {
         public string OwnerSignature { get; set; } = null!;
         public string TenantSignature { get; set; } = null!;
+    }
+
+    public class CloseContractSigningRequest
+    {
+        [System.ComponentModel.DataAnnotations.StringLength(500)]
+        public string? Reason { get; set; }
     }
 
     public class AvailableRoomDto

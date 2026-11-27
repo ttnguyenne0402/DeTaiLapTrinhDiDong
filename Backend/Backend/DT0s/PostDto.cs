@@ -30,7 +30,18 @@ namespace Backend.DT0s
         public List<string> Images { get; set; } = new();
     }
 
-    public class CreatePostDto
+    public interface IPostImageRequest
+    {
+        List<string>? Images { get; set; }
+    }
+
+    public class PostUploadForm
+    {
+        public string Post { get; set; } = string.Empty;
+        public List<IFormFile> Files { get; set; } = new();
+    }
+
+    public class CreatePostDto : IPostImageRequest
     {
         public string RoomId { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
@@ -42,7 +53,7 @@ namespace Backend.DT0s
         public List<string>? Images { get; set; }
     }
 
-    public class UpdatePostDto
+    public class UpdatePostDto : IPostImageRequest
     {
         public string? RoomId { get; set; }
         public string Title { get; set; } = string.Empty;

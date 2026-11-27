@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../common/shared_post_image.dart';
 
 class RoomCard extends StatelessWidget {
   final Map<String, dynamic> room;
@@ -79,15 +80,10 @@ class RoomCard extends StatelessWidget {
                     child: SizedBox(
                       height: 180,
                       width: double.infinity,
-                      child: image.isNotEmpty
-                          ? Image.network(
-                              image,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) {
-                                return _imagePlaceholder();
-                              },
-                            )
-                          : _imagePlaceholder(),
+                      child: SharedPostImage(
+                        path: image,
+                        fallback: _imagePlaceholder(),
+                      ),
                     ),
                   ),
 

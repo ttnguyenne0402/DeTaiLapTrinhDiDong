@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -33,13 +35,13 @@ class RoomUtilityCard extends StatefulWidget {
   final RoomUtilityStatus status;
   final String? totalAmount;
 
-  final int? elecOld;
-  final int? elecNew;
+  final num? elecOld;
+  final num? elecNew;
   final String? elecDiff;
   final String? elecCost;
 
-  final int? waterOld;
-  final int? waterNew;
+  final num? waterOld;
+  final num? waterNew;
   final String? waterDiff;
   final String? waterCost;
 
@@ -50,7 +52,7 @@ class RoomUtilityCard extends StatefulWidget {
 
   // Callback để màn hình cha cập nhật trạng thái phòng.
   final VoidCallback? onEnterInput;
-  final void Function(String elec, String water)? onSave;
+  final Future<void> Function(String elec, String water)? onSave;
 
   const RoomUtilityCard({
     super.key,
@@ -80,6 +82,10 @@ class RoomUtilityCard extends StatefulWidget {
 }
 
 class _RoomUtilityCardState extends State<RoomUtilityCard> {
+  static const _meterOcr = MethodChannel('tro_oi/meter_ocr');
+  static final _readingFormat = RegExp(r'^\d{1,8}(?:[.,]\d{1,2})?$');
+  static final _readingInImage = RegExp(r'(?<![\d.,-])\d{1,8}(?:[.,]\d{1,2})?(?![\d.,])');
+
   final ImagePicker _picker = ImagePicker();
 
   final TextEditingController _elecController = TextEditingController();
@@ -89,6 +95,10 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
   File? _waterImage;
 
   bool _saving = false;
+  bool _reading = false;
+  bool? _scanningElectricity;
+  final Map<bool, List<String>> _scanResults = {};
+  bool get _supportsMeterScan => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   @override
   void initState() {
@@ -113,10 +123,11 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
   // Mở camera hoặc thư viện ảnh.
   Future<void> _showImageSourcePicker({
     required bool isElectricity,
+    bool scan = false,
   }) async {
-    if (!mounted) return;
+    if (!mounted || _saving || _reading) return;
 
-    await showModalBottomSheet<void>(
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -132,8 +143,8 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
               children: [
                 Text(
                   isElectricity
-                      ? 'Ảnh công tơ điện - ${widget.roomName}'
-                      : 'Ảnh công tơ nước - ${widget.roomName}',
+                      ? '${scan ? 'Quét' : 'Ảnh'} công tơ điện - ${widget.roomName}'
+                      : '${scan ? 'Quét' : 'Ảnh'} công tơ nước - ${widget.roomName}',
                   style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
@@ -147,13 +158,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
                     size: 30,
                   ),
                   title: const Text('Chụp ảnh bằng camera'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _pickImage(
-                      ImageSource.camera,
-                      isElectricity: isElectricity,
-                    );
-                  },
+                  onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
                 ),
                 ListTile(
                   leading: const Icon(
@@ -162,13 +167,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
                     size: 30,
                   ),
                   title: const Text('Chọn ảnh từ thư viện'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _pickImage(
-                      ImageSource.gallery,
-                      isElectricity: isElectricity,
-                    );
-                  },
+                  onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
                 ),
               ],
             ),
@@ -176,13 +175,18 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
         );
       },
     );
+    if (!mounted || source == null) return;
+    await _pickImage(source, isElectricity: isElectricity, scan: scan);
   }
 
   // Chụp ảnh hoặc lấy ảnh từ thư viện bằng image_picker.
   Future<void> _pickImage(
       ImageSource source, {
         required bool isElectricity,
+        required bool scan,
       }) async {
+    if (_reading || _saving) return;
+    setState(() => _reading = true);
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
@@ -201,6 +205,15 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
         }
       });
 
+      if (scan) {
+        setState(() {
+          _scanningElectricity = isElectricity;
+          _scanResults.remove(isElectricity);
+        });
+        await _scanMeter(pickedFile.path, isElectricity: isElectricity);
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -216,23 +229,68 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Không thể lấy ảnh: $e'),
+          content: Text(scan
+              ? 'Không thể quét ảnh. Hãy chụp rõ dãy số hoặc nhập tay.'
+              : 'Không thể mở ảnh. Vui lòng thử lại.'),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _reading = false;
+          _scanningElectricity = null;
+        });
+      }
     }
+  }
+
+  Future<void> _scanMeter(String path, {required bool isElectricity}) async {
+    final text = await _meterOcr.invokeMethod<String>(
+      'readText',
+      {'path': path},
+    ).timeout(const Duration(seconds: 12));
+    if (!mounted || widget.isPaid) return;
+
+    final oldReading = (isElectricity ? widget.elecOld : widget.waterOld) ?? 0;
+    final candidates = _readingInImage.allMatches(text ?? '')
+        .map((match) => match.group(0)!)
+        .where((value) => (_parseReading(value) ?? -1) >= oldReading)
+        .toSet()
+        .take(12)
+        .toList();
+    if (candidates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Chưa đọc được chỉ số hợp lệ. Hãy chụp sát dãy số hoặc nhập tay.'),
+      ));
+      return;
+    }
+
+    setState(() {
+      _scanResults[isElectricity] = candidates;
+    });
+  }
+
+  num? _parseReading(String raw) {
+    final value = raw.trim();
+    return _readingFormat.hasMatch(value)
+        ? num.tryParse(value.replaceAll(',', '.'))
+        : null;
   }
 
   void _increaseReading({
     required TextEditingController controller,
     required int amount,
   }) {
-    final currentValue = int.tryParse(controller.text) ?? 0;
-    controller.text = (currentValue + amount).toString();
+    final currentValue = _parseReading(controller.text) ?? 0;
+    controller.text = (currentValue + amount).toStringAsFixed(2);
   }
 
-  void _saveReading() {
-    final electricity = int.tryParse(_elecController.text);
-    final water = int.tryParse(_waterController.text);
+  Future<void> _saveReading() async {
+    final save = widget.onSave;
+    if (_saving || _reading || widget.isPaid || save == null) return;
+
+    final electricity = _parseReading(_elecController.text);
+    final water = _parseReading(_waterController.text);
 
     if (electricity == null ||
         water == null ||
@@ -250,21 +308,11 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
 
     setState(() => _saving = true);
 
-    widget.onSave?.call(
-      electricity.toString(),
-      water.toString(),
-    );
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Đã lưu số điện ${electricity} và nước ${water} '
-              'cho phòng ${widget.roomName}.',
-        ),
-      ),
-    );
-
-    setState(() => _saving = false);
+    try {
+      await save(electricity.toString(), water.toString());
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -550,7 +598,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _saving ? null : _saveReading,
+            onPressed: _saving || _reading ? null : _saveReading,
             icon: const Icon(Icons.save_outlined),
             label: const Text('Lưu số'),
             style: ElevatedButton.styleFrom(
@@ -566,12 +614,13 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
 
   Widget _buildInputMeter({
     required String title,
-    required int oldValue,
+    required num oldValue,
     required String unit,
     required TextEditingController controller,
     required bool isElectricity,
     required List<int> quickValues,
   }) {
+    final results = _scanResults[isElectricity];
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -604,7 +653,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
               Expanded(
                 child: TextField(
                   controller: controller,
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: 'Chỉ số mới',
                     suffixText: unit,
@@ -627,18 +676,46 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: IconButton(
-                  tooltip: 'Chụp ảnh hoặc chọn ảnh',
-                  onPressed: () => _showImageSourcePicker(  // khi chọn camera
-                    isElectricity: isElectricity,
-                  ),
-                  icon: const Icon(
-                    Icons.camera_alt,
+                  tooltip: _supportsMeterScan ? 'Quét công tơ' : 'Chụp hoặc chọn ảnh',
+                  onPressed: _reading || _saving
+                      ? null
+                      : () => _showImageSourcePicker(
+                            isElectricity: isElectricity,
+                            scan: _supportsMeterScan,
+                          ),
+                  icon: Icon(
+                    _supportsMeterScan ? Icons.document_scanner_outlined : Icons.camera_alt,
                     color: RoomCardColors.accentGreen,
                   ),
                 ),
               ),
             ],
           ),
+          if (_scanningElectricity == isElectricity) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(),
+            const SizedBox(height: 4),
+            const Text('Đang đọc chỉ số...'),
+          ],
+          if (results != null) ...[
+            const SizedBox(height: 10),
+            const Text('Chọn đúng dãy số trên công tơ:'),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final value in results)
+                  ActionChip(
+                    label: Text('$value $unit'),
+                    onPressed: widget.isPaid ? null : () {
+                      controller.text = value;
+                      setState(() {
+                        _scanResults.remove(isElectricity);
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 10),
           const Text(
             'Tăng nhanh:',
@@ -666,7 +743,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
     );
   }
 
-  Widget _buildOldReading(String title, int? value, String unit) {
+  Widget _buildOldReading(String title, num? value, String unit) {
     return Row(
       children: [
         Expanded(
@@ -742,12 +819,7 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
-                    widget.onSave?.call(
-                        _elecController.text,
-                        _waterController.text,
-                    );
-                  },
+                  onPressed: _saving || _reading || widget.isPaid ? null : _saveReading,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryGreen,
                     foregroundColor: Colors.white,
@@ -788,8 +860,8 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
 
   Widget _buildMetricRow({
     required String title,
-    required int? oldValue,
-    required int? newValue,
+    required num? oldValue,
+    required num? newValue,
     required String? diff,
     required String? cost,
     required String unit,

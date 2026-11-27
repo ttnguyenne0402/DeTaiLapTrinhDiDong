@@ -1,10 +1,13 @@
 ﻿using Backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Backend.Controllers
 {
     [ApiController]
+    [Authorize(Roles = "tenant")]
     [Route("api/contracts")]
     public class ContractsController : ControllerBase
     {
@@ -20,7 +23,10 @@ namespace Backend.Controllers
         [HttpGet("tenant/{tenantId}")]
         public async Task<IActionResult> GetTenantContracts(string tenantId)
         {
-            var contracts = await _service.GetTenantContractsAsync(tenantId);
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(actorId)) return Unauthorized();
+            if (!string.Equals(actorId, tenantId, StringComparison.OrdinalIgnoreCase)) return Forbid();
+            var contracts = await _service.GetTenantContractsAsync(actorId);
             return Ok(contracts); 
         }
         // GET: api/contracts/{id}
@@ -28,7 +34,9 @@ namespace Backend.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetContractDetail(string id)
         {
-            var contract = await _service.GetContractDetailAsync(id);
+            var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(actorId)) return Unauthorized();
+            var contract = await _service.GetContractDetailAsync(id, actorId);
 
             if (contract == null)
                 return NotFound(new { message = "Không tìm thấy hợp đồng" });

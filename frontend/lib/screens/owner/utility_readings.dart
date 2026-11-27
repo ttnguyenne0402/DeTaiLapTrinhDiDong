@@ -131,16 +131,17 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     });
   }
 
-  void _saveReading(String room, String elec, String water) async {
-    final targetRoom = _rooms.firstWhere((r) => r.id == room, orElse: () => _rooms.first);
-    final newEl = double.tryParse(elec) ?? double.tryParse(targetRoom.elecOld ?? '0') ?? 0;
-    final newWt = double.tryParse(water) ?? double.tryParse(targetRoom.waterOld ?? '0') ?? 0;
-
-    setState(() {
-      _elecNewValues[room] = elec;
-      _waterNewValues[room] = water;
-      _roomStatuses[room] = RoomUtilityStatus.completed;
-    });
+  Future<void> _saveReading(String room, String elec, String water) async {
+    final index = _rooms.indexWhere((r) => r.id == room);
+    final newEl = double.tryParse(elec);
+    final newWt = double.tryParse(water);
+    if (index < 0 || _roomIsPaid[room] == true || newEl == null || newWt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể lưu chỉ số cho phòng này.')),
+      );
+      return;
+    }
+    final targetRoom = _rooms[index];
 
     final success = await OwnerInvoiceService.saveUtilityReading(
       contractId: targetRoom.contractId,
@@ -149,7 +150,14 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
     );
 
     if (mounted) {
-      showDialog(
+      if (success) {
+        setState(() {
+          _elecNewValues[room] = elec;
+          _waterNewValues[room] = water;
+          _roomStatuses[room] = RoomUtilityStatus.completed;
+        });
+      }
+      await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -162,7 +170,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                success ? 'Đã lưu chỉ số' : 'Thông báo',
+                success ? 'Đã lưu chỉ số' : 'Chưa lưu được chỉ số',
                 style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
               ),
             ],
@@ -170,7 +178,7 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
           content: Text(
             success
                 ? 'Đã lưu chỉ số điện nước cho phòng ${targetRoom.roomName} vào CSDL thành công!'
-                : 'Đã ghi nhận chỉ số phòng ${targetRoom.roomName}.',
+                : 'Máy chủ chưa xác nhận lưu chỉ số phòng ${targetRoom.roomName}. Vui lòng thử lại.',
             style: const TextStyle(fontSize: 13.5, height: 1.4),
           ),
           actions: [
@@ -420,10 +428,10 @@ class _InvoiceCreateScreenState extends State<InvoiceCreateScreen> {
                                 status: _roomStatuses[room.id] ?? room.status,
                                 isPaid: _roomIsPaid[room.id] == true,
                                 totalAmount: room.totalAmount,
-                                elecOld: (double.tryParse(room.elecOld ?? '') ?? 0).toInt(),
-                                elecNew: (double.tryParse(_elecNewValues[room.id] ?? '') ?? 0).toInt(),
-                                waterOld: (double.tryParse(room.waterOld ?? '') ?? 0).toInt(),
-                                waterNew: (double.tryParse(_waterNewValues[room.id] ?? '') ?? 0).toInt(),
+                                elecOld: num.tryParse(room.elecOld ?? ''),
+                                elecNew: num.tryParse(_elecNewValues[room.id] ?? ''),
+                                waterOld: num.tryParse(room.waterOld ?? ''),
+                                waterNew: num.tryParse(_waterNewValues[room.id] ?? ''),
                                 waterCost: room.waterCost,
                                 warningTag: room.warningTag,
                                 warningMessage: room.warningMessage,

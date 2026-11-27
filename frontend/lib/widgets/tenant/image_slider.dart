@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../common/shared_post_image.dart';
 
 class ImageSlider extends StatefulWidget {
   final List<String> images;
@@ -54,14 +55,12 @@ class _ImageSliderState extends State<ImageSlider> {
                       });
                     },
                     itemBuilder: (context, index) {
-                      return Image.network(
-                        widget.images[index],
+                      return SharedPostImage(
+                        path: widget.images[index],
                         width: double.infinity,
                         height: 280,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildPlaceholder();
-                        },
+                        fallback: _buildPlaceholder(),
                       );
                     },
                   )

@@ -99,6 +99,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     final dueDate = _invoiceDetail!['dueDate'] ?? '';
     final status = _invoiceDetail!['status'] ?? '';
     final discount = (_invoiceDetail!['discount'] as num?)?.toDouble() ?? 0;
+    final subtotal = (_invoiceDetail!['subtotal'] as num?)?.toDouble();
     final total = (_invoiceDetail!['total'] as num?)?.toDouble() ?? 0;
     final items = _invoiceDetail!['items'] as List<dynamic>? ?? [];
 
@@ -176,7 +177,17 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                           color: AppColors.cardSurface,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           elevation: 1,
-                          child: ListView.separated(
+                          child: items.isEmpty
+                              ? ListView(
+                                  children: [
+                                    ListTile(
+                                      title: const Text('Cộng tiền trước giảm trừ'),
+                                      subtitle: const Text('Hóa đơn này chưa lưu chi tiết từng khoản thu.'),
+                                      trailing: subtotal == null ? null : Text('${_formatCurrency(subtotal)} đ'),
+                                    ),
+                                  ],
+                                )
+                              : ListView.separated(
                             shrinkWrap: true,
                             itemCount: items.length,
                             separatorBuilder: (context, index) => const Divider(

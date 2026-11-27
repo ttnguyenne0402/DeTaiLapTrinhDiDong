@@ -242,6 +242,8 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
                         "Sắp hết hạn",
                         "Chờ ký",
                         "Bản nháp",
+                        "Đã từ chối",
+                        "Đã thu hồi",
                       ].map((role) {
                         final select = _selectedRole == role;
                         return Padding(
@@ -369,7 +371,7 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       timeColor = Colors.blue;
       primaryBtnText = 'Ký hợp đồng';
       primaryBtnColor = AppColors.primaryGreen;
-    } else if (status == 'Đã thanh lý' || status == 'terminated') {
+    } else if (const ['Đã thanh lý', 'terminated', 'Đã hết hạn', 'Đã từ chối', 'Đã thu hồi'].contains(status)) {
       statusBgColor = Colors.red.shade100;
       statusTextColor = Colors.red.shade800;
       timeColor = Colors.grey;
@@ -442,7 +444,7 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       );
     } else if (status == 'Sắp hết hạn') {
       _showMessage('Mở chức năng gia hạn hợp đồng');
-    } else if (status == 'Đã thanh lý' || status == 'terminated') {
+    } else if (const ['Đã thanh lý', 'terminated', 'Đã hết hạn', 'Đã từ chối', 'Đã thu hồi'].contains(status)) {
       Navigator.push(
         context,
         MaterialPageRoute(

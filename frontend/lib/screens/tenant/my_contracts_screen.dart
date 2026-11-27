@@ -26,7 +26,9 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
     'Chờ ký',
     'Hiệu lực',
     'Đã hết hạn',
-    'Đã thanh lý'
+    'Đã thanh lý',
+    'Đã từ chối',
+    'Đã thu hồi',
   ];
 
   List _contracts = [];
@@ -60,7 +62,7 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
     final localData =
     await DatabaseHelper.instance.getLocalContracts();
 
-    if (localData.isNotEmpty) {
+    if (mounted && localData.isNotEmpty) {
       setState(() {
         _contracts = List.from(localData);
         _isLoading = false;
@@ -70,7 +72,10 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
     final client = _getCustomClient();
 
     try {
-      final response = await client.get(Uri.parse(_apiUrl));
+      final token = await AuthStorage.getAccessToken();
+      final response = await client.get(Uri.parse(_apiUrl), headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
 
       if (response.statusCode == 200) {
         final List<dynamic> apiData =
@@ -121,6 +126,8 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
       if (selectedFilter == 'Đã thanh lý') {
         return st == 'terminated' || st == 'Đã thanh lý';
       }
+      if (selectedFilter == 'Đã từ chối') return st == 'rejected';
+      if (selectedFilter == 'Đã thu hồi') return st == 'withdrawn';
 
       return false;
     }).toList();
@@ -263,7 +270,13 @@ class _MyContractsScreenState extends State<MyContractsScreen> {
                         statusColor =
                             Colors.grey.shade700;
                       } else {
-                        statusText = 'Đã thanh lý';
+                        statusText = switch (st) {
+                          'rejected' => 'Đã từ chối',
+                          'withdrawn' => 'Đã thu hồi',
+                          'draft' => 'Bản nháp',
+                          'terminated' || 'Đã thanh lý' => 'Đã thanh lý',
+                          _ => 'Chưa xác định',
+                        };
                         statusBg =
                             Colors.red.shade100;
                         statusColor =

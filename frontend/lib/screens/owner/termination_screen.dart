@@ -1029,7 +1029,7 @@ class _ContractLiquidationScreenState
     );
   }
 
-  // nút xác nhận và xuất biên bản pdf
+  // Nút xác nhận hoàn cọc và ký thanh lý
   Widget _buildBottomActionButtons() {
     return Column(
       children: [
@@ -1124,29 +1124,6 @@ class _ContractLiquidationScreenState
                       ),
                     ],
                   ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.picture_as_pdf, color: AppColors.primaryGreen),
-            label: const Text(
-              'Xuất biên bản PDF bàn giao',
-              style: TextStyle(
-                color: AppColors.primaryGreen,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primaryGreen, width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
           ),
         ),
       ],

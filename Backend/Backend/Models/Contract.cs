@@ -40,6 +40,10 @@ public partial class Contract
 
     public DateTime? SignedAt { get; set; }
 
+    public DateTime? SigningClosedAt { get; set; }
+
+    public string? SigningCloseReason { get; set; }
+
     public DateTime? TerminatedAt { get; set; }
 
     public decimal InitialElectricityReading { get; set; }
