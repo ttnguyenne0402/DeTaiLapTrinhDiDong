@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' as maplibre;
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
@@ -23,13 +22,15 @@ class OpenStreetMapWidget extends StatefulWidget {
 }
 
 class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
-  final MapController _mapController = MapController();
-  static const LatLng _defaultCenter = LatLng(
+  maplibre.MapLibreMapController? _mapController;
+  bool _mapStyleLoaded = false;
+  maplibre.Circle? _roomMarker;
+  static const maplibre.LatLng _defaultCenter = maplibre.LatLng(
     10.7769,
     106.7009,
   ); // Mặc định TP.HCM
 
-  LatLng? _roomLocation;
+  maplibre.LatLng? _roomLocation;
   bool _loading = true;
   String? _errorMessage;
 
@@ -63,7 +64,7 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
         latitude >= -90 && latitude <= 90 &&
         longitude >= -180 && longitude <= 180) {
       setState(() {
-        _roomLocation = LatLng(latitude, longitude);
+        _roomLocation = maplibre.LatLng(latitude, longitude);
         _loading = false;
       });
       _moveMapTo(_roomLocation!);
@@ -109,7 +110,7 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
       }
 
       final item = results.first;
-      final location = LatLng(
+      final location = maplibre.LatLng(
         double.parse(item['lat'].toString()),
         double.parse(item['lon'].toString()),
       );
@@ -146,15 +147,38 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
     }
   }
 
-  void _moveMapTo(LatLng location) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      try {
-        _mapController.move(location, 16);
-      } catch (_) {
-        // The map controller is not attached yet; initialCenter will use the location.
+  void _moveMapTo(maplibre.LatLng location) {
+    final controller = _mapController;
+    if (controller == null || !_mapStyleLoaded) return;
+    controller.animateCamera(
+      maplibre.CameraUpdate.newCameraPosition(
+        maplibre.CameraPosition(target: location, zoom: 17),
+      ),
+    );
+    _setRoomMarker();
+  }
+
+  Future<void> _setRoomMarker() async {
+    final controller = _mapController;
+    final location = _roomLocation;
+    if (controller == null || !_mapStyleLoaded || location == null) return;
+    try {
+      final previousMarker = _roomMarker;
+      if (previousMarker != null) {
+        await controller.removeCircle(previousMarker);
       }
-    });
+      _roomMarker = await controller.addCircle(
+        maplibre.CircleOptions(
+          geometry: location,
+          circleRadius: 12,
+          circleColor: '#E53935',
+          circleStrokeColor: '#FFFFFF',
+          circleStrokeWidth: 4,
+        ),
+      );
+    } catch (error) {
+      debugPrint('Không thể đặt ghim vị trí phòng: $error');
+    }
   }
 
   Future<void> _openGoogleMaps() async {
@@ -179,7 +203,6 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
 
   @override
   void dispose() {
-    _mapController.dispose();
     super.dispose();
   }
 
@@ -194,36 +217,38 @@ class _OpenStreetMapWidgetState extends State<OpenStreetMapWidget> {
           height: 260,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: center,
-                initialZoom: _roomLocation == null ? 12 : 16,
-              ),
+            child: Stack(
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.doanlaptrinhdidong',
-                ),
-                if (_roomLocation != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: _roomLocation!,
-                        width: 44,
-                        height: 44,
-                        child: const Icon(
-                          Icons.location_pin,
-                          color: Colors.red,
-                          size: 42,
-                        ),
-                      ),
-                    ],
+                maplibre.MapLibreMap(
+                  styleString: 'https://tiles.openfreemap.org/styles/liberty',
+                  initialCameraPosition: maplibre.CameraPosition(
+                    target: center,
+                    zoom: _roomLocation == null ? 12 : 17,
                   ),
-                const RichAttributionWidget(
-                  attributions: [
-                    TextSourceAttribution('OpenStreetMap contributors'),
-                  ],
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                  },
+                  onStyleLoadedCallback: () {
+                    _mapStyleLoaded = true;
+                    if (_roomLocation != null) _moveMapTo(_roomLocation!);
+                  },
+                ),
+                Positioned(
+                  left: 8,
+                  bottom: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.88),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      child: Text(
+                        '© OpenFreeMap · © OpenMapTiles · © OpenStreetMap',
+                        style: TextStyle(fontSize: 10, color: Colors.black87),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
