@@ -1,185 +1,170 @@
 import 'package:flutter/material.dart';
-import '../../route/app_routes.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
-import '../../services/auth_storage.dart';
-import '../../services/local_notification_service.dart';
 import '../../screens/auth/login_screen.dart';
-import '../../screens/owner/owner_dashboard.dart';
+import '../../screens/owner/appointments_manage.dart';
 import '../../screens/owner/contracts_manage.dart';
 import '../../screens/owner/invoices_manage..dart';
 import '../../screens/owner/maintenance_manage.dart';
+import '../../screens/owner/owner_dashboard.dart';
 import '../../screens/owner/posts_manage.dart';
 import '../../screens/owner/properties_manage.dart';
-import '../../screens/owner/appointments_manage.dart';
-import '../../screens/owner/owner_notifications_screen.dart';
 import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
+import '../../services/owner/owner_dashboard_service.dart';
 
-class OwnerDrawer extends StatelessWidget {
-  /// Mã định danh màn hình hiện tại để làm nổi bật :
-  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'notifications'
+class OwnerDrawer extends StatefulWidget {
+  /// Mã định danh màn hình hiện tại để làm nổi bật:
+  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'notifications', 'ai_chat'
   final String? currentRoute;
 
   const OwnerDrawer({super.key, this.currentRoute});
 
   @override
+  State<OwnerDrawer> createState() => _OwnerDrawerState();
+}
+
+class _OwnerDrawerState extends State<OwnerDrawer> {
+  static const Color _primaryColor = Color(0xFF1B5E55);
+  static const String _fallbackAvatar = 'frontend/assets/images/avatarDemo.jpg';
+
+  String _ownerName = 'Chủ trọ';
+  String _ownerAvatar = '';
+  String _ownerPhone = '';
+  String _ownerArea = 'Khu vực quản lý';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOwnerProfile();
+  }
+
+  Future<void> _loadOwnerProfile() async {
+    final results = await Future.wait([
+      AuthStorage.getUserName(),
+      AuthStorage.getUserAvatar(),
+      AuthStorage.getPhone(),
+      AuthStorage.getUserId(),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        final cachedName = results[0]?.trim() ?? '';
+        if (cachedName.isNotEmpty) _ownerName = cachedName;
+        _ownerAvatar = results[1]?.trim() ?? '';
+        _ownerPhone = results[2]?.trim() ?? '';
+      });
+    }
+
+    final userId = results[3]?.trim();
+    if (userId == null || userId.isEmpty) return;
+
+    try {
+      final dashboard = await OwnerDashboardService.fetchDashboardData(userId);
+      if (!mounted) return;
+      setState(() {
+        if (dashboard.ownerName.trim().isNotEmpty) {
+          _ownerName = dashboard.ownerName.trim();
+        }
+        if (dashboard.ownerAvatar.trim().isNotEmpty) {
+          _ownerAvatar = dashboard.ownerAvatar.trim();
+        }
+        if (dashboard.ownerPhone.trim().isNotEmpty) {
+          _ownerPhone = dashboard.ownerPhone.trim();
+        }
+        if (dashboard.ownerArea.trim().isNotEmpty) {
+          _ownerArea = dashboard.ownerArea.trim();
+        }
+      });
+      if (dashboard.ownerAvatar.trim().isNotEmpty) {
+        await AuthStorage.saveUserAvatar(dashboard.ownerAvatar.trim());
+      }
+    } catch (_) {
+      // Giữ thông tin đã lưu cục bộ nếu máy chủ chưa phản hồi
+    }
+  }
+
+  void _navigateToPage(String routeKey, Widget page) {
+    Navigator.pop(context);
+    if (widget.currentRoute != routeKey) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const Color primaryColor = Color(0xFF1B5E55);
+    final currentRoute = widget.currentRoute;
 
     return Drawer(
       backgroundColor: Colors.white,
       child: Column(
         children: [
-          // HEADER THÔNG TIN CHỦ TRỌ
-          _buildDrawerHeader(context, primaryColor),
-
-          // DANH SÁCH CÁC NGHIỆP VỤ QUẢN LÝ (KHÔNG CÓ TRÊN BOTTOM NAV BAR)
+          _buildDrawerHeader(context),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               children: [
-                _buildSectionTitle('NGHIỆP VỤ QUẢN LÝ'),
-
-                // 0. Trợ lý AI Chủ trọ
+                _buildSectionTitle('QUẢN LÝ CHO THUÊ'),
                 _buildDrawerItem(
-                  context: context,
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: 'Trợ lý Chủ trọ',
-                  subtitle: 'Tư vấn quản lý, thống kê & soạn tin',
-                  isActive: currentRoute == 'ai_chat',
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.pushNamed(context, AppRoutes.aiChat, arguments: {'role': 'owner'});
-                  },
-                ),
-
-                // 1. Quản lý Hợp đồng thuê
-                _buildDrawerItem(
-                  context: context,
                   icon: Icons.assignment_outlined,
                   title: 'Quản lý Hợp đồng',
-                  subtitle: 'Theo dõi, gia hạn & tạo hợp đồng',
+                  subtitle: 'Tạo mới, ký & thanh lý hợp đồng',
                   isActive: currentRoute == 'contracts',
-                  onTap: () {
-                    Navigator.pop(context); // Đóng drawer
-                    if (currentRoute != 'contracts') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const Contracts_manager(),
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () =>
+                      _navigateToPage('contracts', const Contracts_manager()),
                 ),
-
-                // 2. Quản lý Hóa đơn & Thu tiền
                 _buildDrawerItem(
-                  context: context,
                   icon: Icons.receipt_long_outlined,
                   title: 'Hóa đơn & Thu tiền',
-                  subtitle: 'Lập phiếu thu, chốt tiền phòng',
+                  subtitle: 'Lập hóa đơn, chốt tiền & VietQR',
                   isActive: currentRoute == 'invoices',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentRoute != 'invoices') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const Invoice_mana(),
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () => _navigateToPage('invoices', const Invoice_mana()),
                 ),
-
-                // 3. Quản lý Chỉ số Điện & Nước
                 _buildDrawerItem(
-                  context: context,
                   icon: Icons.electric_bolt_outlined,
                   title: 'Chỉ số Điện & Nước',
-                  subtitle: 'Ghi số công tơ, tính tiền dịch vụ',
+                  subtitle: 'Ghi công tơ & tính tiền dịch vụ',
                   isActive: currentRoute == 'utilities',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentRoute != 'utilities') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PropertiesManageScreen(),
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () => _navigateToPage(
+                    'utilities',
+                    const PropertiesManageScreen(),
+                  ),
                 ),
-
-                // 4. Quản lý Bảo trì & Sửa chữa
                 _buildDrawerItem(
-                  context: context,
                   icon: Icons.build_circle_outlined,
                   title: 'Yêu cầu Bảo trì',
-                  subtitle: 'Tiếp nhận báo hỏng từ khách thuê',
+                  subtitle: 'Tiếp nhận & xử lý báo hỏng phòng',
                   isActive: currentRoute == 'maintenance',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentRoute != 'maintenance') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const MaintenanceManageScreen(),
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () => _navigateToPage(
+                    'maintenance',
+                    const MaintenanceManageScreen(),
+                  ),
                 ),
 
-                // 5. Quản lý Tin đăng cho thuê
+                _buildDivider(),
+                _buildSectionTitle('TIẾP THỊ & KHÁCH HÀNG'),
                 _buildDrawerItem(
-                  context: context,
                   icon: Icons.campaign_outlined,
                   title: 'Quản lý Tin đăng',
-                  subtitle: 'Đăng phòng trống tìm người thuê',
+                  subtitle: 'Đăng tin phòng trống & theo dõi duyệt',
                   isActive: currentRoute == 'posts',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentRoute != 'posts') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PostsManageScreen(),
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () =>
+                      _navigateToPage('posts', const PostsManageScreen()),
                 ),
-
-                // 6. Quản lý Lịch hẹn xem phòng (MỚI THÊM)
                 _buildDrawerItem(
-                  context: context,
                   icon: Icons.calendar_today_outlined,
                   title: 'Lịch hẹn xem phòng',
-                  subtitle: 'Quản lý, xác nhận lịch xem phòng',
+                  subtitle: 'Xác nhận & quản lý lịch xem phòng',
                   isActive: currentRoute == 'appointments',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentRoute != 'appointments') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AppointmentsManageScreen(),
-                        ),
-                      );
-                    }
-                  },
+                  onTap: () => _navigateToPage(
+                    'appointments',
+                    const AppointmentsManageScreen(),
+                  ),
                 ),
-
-                // 7. Thông báo của Chủ trọ
                 _buildDrawerItem(
-                  context: context,
-                  icon: Icons.notifications_active_outlined,
-                  title: 'Thông báo của bạn',
-                  subtitle: 'Lịch xem phòng, duyệt tin, báo hỏng, thanh toán...',
+                  icon: Icons.notifications_outlined,
+                  title: 'Thông báo',
+                  subtitle: 'Lịch hẹn, duyệt tin, bảo trì, thu tiền',
                   isActive: currentRoute == 'notifications',
                   onTap: () {
                     Navigator.pop(context);
@@ -189,41 +174,28 @@ class OwnerDrawer extends StatelessWidget {
                   },
                 ),
 
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: Color(0xFFEEEEEE),
-                  ),
-                ),
-
-                _buildSectionTitle('HỆ THỐNG'),
-
-                // Cài đặt
+                _buildDivider(),
+                _buildSectionTitle('TIỆN ÍCH & HỖ TRỢ'),
                 _buildDrawerItem(
-                  context: context,
-                  icon: Icons.settings_outlined,
-                  title: 'Cài đặt hệ thống',
-                  subtitle: 'Thông báo, bảo mật & biểu phí chung',
-                  isActive: currentRoute == 'settings',
+                  icon: Icons.auto_awesome_rounded,
+                  title: 'Trợ lý AI Chủ trọ',
+                  subtitle: 'Tư vấn quản lý, thống kê & soạn tin',
+                  isActive: currentRoute == 'ai_chat',
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Tính năng cài đặt đang được hoàn thiện'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
+                    if (currentRoute != 'ai_chat') {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.aiChat,
+                        arguments: {'role': 'owner'},
+                      );
+                    }
                   },
                 ),
-
-                // Trợ giúp & Hỗ trợ
                 _buildDrawerItem(
-                  context: context,
                   icon: Icons.headset_mic_outlined,
                   title: 'Trợ giúp & Hỗ trợ',
-                  subtitle: 'Hotline kỹ thuật và hướng dẫn',
+                  subtitle: 'Hotline 1900 6868 & hướng dẫn',
                   isActive: false,
                   onTap: () {
                     Navigator.pop(context);
@@ -234,54 +206,63 @@ class OwnerDrawer extends StatelessWidget {
             ),
           ),
 
-          // NÚT ĐĂNG XUẤT Ở DƯỚI CÙNG
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+          // NÚT ĐĂNG XUẤT CỐ ĐỊNH Ở DƯỚI CÙNG
+          SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+                ),
               ),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: () => _confirmLogout(context),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _confirmLogout(context),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.logout_rounded,
+                          color: Colors.red,
+                          size: 20,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.logout_rounded,
-                        color: Colors.red,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Đăng xuất',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Đăng xuất',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Thoát tài khoản quản lý',
-                            style: TextStyle(color: Colors.grey, fontSize: 11),
-                          ),
-                        ],
+                            Text(
+                              'Thoát tài khoản quản lý',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -291,8 +272,11 @@ class OwnerDrawer extends StatelessWidget {
     );
   }
 
-  // Header của Drawer
-  Widget _buildDrawerHeader(BuildContext context, Color primaryColor) {
+  Widget _buildDrawerHeader(BuildContext context) {
+    final displayPhone = _ownerPhone.isNotEmpty
+        ? _ownerPhone
+        : 'Chưa cập nhật SĐT';
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(
@@ -301,13 +285,14 @@ class OwnerDrawer extends StatelessWidget {
         left: 16,
         right: 16,
       ),
-      decoration: BoxDecoration(
-        color: primaryColor,
+      decoration: const BoxDecoration(
+        color: _primaryColor,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [primaryColor, AppColors.primaryGreen],
+          colors: [_primaryColor, AppColors.primaryGreen],
         ),
+        borderRadius: BorderRadius.only(bottomRight: Radius.circular(24)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -319,23 +304,18 @@ class OwnerDrawer extends StatelessWidget {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                 ),
-                child: CircleAvatar(
-                  radius: 28,
-                  backgroundColor: const Color(0xFF2C7D73),
-                  backgroundImage: const AssetImage(
-                    'frontend/assets/images/avatarDemo.jpg',
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const OwnerDashboard(),
-                        ),
-                      );
-                    },
-                  ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(28),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerDashboard(),
+                      ),
+                    );
+                  },
+                  child: _buildHeaderAvatar(radius: 28),
                 ),
               ),
               const SizedBox(width: 12),
@@ -343,9 +323,9 @@ class OwnerDrawer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Nguyễn Văn A',
-                      style: TextStyle(
+                    Text(
+                      _ownerName,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -353,23 +333,23 @@ class OwnerDrawer extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
+                            horizontal: 7,
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(4),
+                            color: Colors.orange.withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
                             'Chủ trọ',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 10,
+                              fontSize: 10.5,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -378,7 +358,7 @@ class OwnerDrawer extends StatelessWidget {
                         const Icon(
                           Icons.verified,
                           color: Colors.lightGreenAccent,
-                          size: 14,
+                          size: 15,
                         ),
                       ],
                     ),
@@ -387,25 +367,34 @@ class OwnerDrawer extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.phone, color: Colors.white70, size: 13),
-                SizedBox(width: 6),
+                const Icon(Icons.phone, color: Colors.white70, size: 13),
+                const SizedBox(width: 6),
                 Text(
-                  '0901 234 567',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+                  displayPhone,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                Spacer(),
-                Text(
-                  'Khu vực Q.9',
-                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _ownerArea,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -415,10 +404,53 @@ class OwnerDrawer extends StatelessWidget {
     );
   }
 
-  // Tiêu đề nhóm mục
+  Widget _buildHeaderAvatar({required double radius}) {
+    final resolved = _ownerAvatar.startsWith('/')
+        ? 'http://10.0.2.2:5093$_ownerAvatar'
+        : _ownerAvatar;
+    final isNetwork =
+        resolved.startsWith('http://') || resolved.startsWith('https://');
+    final size = radius * 2;
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0xFF2C7D73),
+      child: ClipOval(
+        child: isNetwork
+            ? Image.network(
+                resolved,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Image.asset(
+                  _fallbackAvatar,
+                  width: size,
+                  height: size,
+                  fit: BoxFit.cover,
+                ),
+              )
+            : Image.asset(
+                resolved.startsWith('frontend/assets/')
+                    ? resolved
+                    : _fallbackAvatar,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+    );
+  }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 6),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 6, bottom: 4),
       child: Text(
         title,
         style: const TextStyle(
@@ -431,22 +463,18 @@ class OwnerDrawer extends StatelessWidget {
     );
   }
 
-  // Item danh mục Drawer
   Widget _buildDrawerItem({
-    required BuildContext context,
     required IconData icon,
     required String title,
     required String subtitle,
     required bool isActive,
     required VoidCallback onTap,
   }) {
-    const Color primaryColor = Color(0xFF1B5E55);
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
         color: isActive
-            ? primaryColor.withValues(alpha: 0.08)
+            ? _primaryColor.withValues(alpha: 0.08)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
       ),
@@ -458,20 +486,20 @@ class OwnerDrawer extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: isActive
-                ? primaryColor
-                : primaryColor.withValues(alpha: 0.08),
+                ? _primaryColor
+                : _primaryColor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             icon,
-            color: isActive ? Colors.white : primaryColor,
+            color: isActive ? Colors.white : _primaryColor,
             size: 20,
           ),
         ),
         title: Text(
           title,
           style: TextStyle(
-            color: isActive ? primaryColor : const Color(0xFF263238),
+            color: isActive ? _primaryColor : const Color(0xFF263238),
             fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
             fontSize: 13.5,
           ),
@@ -480,7 +508,7 @@ class OwnerDrawer extends StatelessWidget {
           subtitle,
           style: TextStyle(
             color: isActive
-                ? primaryColor.withValues(alpha: 0.8)
+                ? _primaryColor.withValues(alpha: 0.8)
                 : const Color(0xFF78909C),
             fontSize: 11,
           ),
@@ -489,7 +517,7 @@ class OwnerDrawer extends StatelessWidget {
         ),
         trailing: Icon(
           Icons.chevron_right_rounded,
-          color: isActive ? primaryColor : const Color(0xFFB0BEC5),
+          color: isActive ? _primaryColor : const Color(0xFFB0BEC5),
           size: 18,
         ),
         onTap: onTap,
@@ -497,7 +525,6 @@ class OwnerDrawer extends StatelessWidget {
     );
   }
 
-  // Hộp thoại xác nhận đăng xuất
   void _confirmLogout(BuildContext context) {
     showDialog(
       context: context,
@@ -527,8 +554,7 @@ class OwnerDrawer extends StatelessWidget {
               ),
             ),
             onPressed: () async {
-            final navigator = Navigator.of(context);
-
+              final navigator = Navigator.of(context);
               Navigator.pop(dialogCtx);
 
               await LocalNotificationService.instance.endPushSession();
@@ -537,9 +563,7 @@ class OwnerDrawer extends StatelessWidget {
               if (!navigator.mounted) return;
 
               navigator.pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const LoginScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );
             },
@@ -553,7 +577,6 @@ class OwnerDrawer extends StatelessWidget {
     );
   }
 
-  // Hộp thoại thông tin hỗ trợ
   void _showSupportDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -561,7 +584,7 @@ class OwnerDrawer extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.headset_mic_outlined, color: Color(0xFF1B5E55)),
+            Icon(Icons.headset_mic_outlined, color: _primaryColor),
             SizedBox(width: 8),
             Text('Hỗ trợ chủ trọ'),
           ],
@@ -588,7 +611,7 @@ class OwnerDrawer extends StatelessWidget {
                 Icon(Icons.email_outlined, color: Colors.blue, size: 18),
                 SizedBox(width: 8),
                 Text(
-                  'hotro@trotot.vn',
+                  'hotro@trooi.vn',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ],
@@ -598,10 +621,7 @@ class OwnerDrawer extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text(
-              'Đóng',
-              style: TextStyle(color: Color(0xFF1B5E55)),
-            ),
+            child: const Text('Đóng', style: TextStyle(color: _primaryColor)),
           ),
         ],
       ),

@@ -50,6 +50,7 @@ namespace Backend.Controllers
                                                  date = v.AppointmentDate,
                                                  timeSpan = v.AppointmentTime,
                                                  name = u.Name,
+                                                 avatar = u.Avatar,
                                                  roomName = r.Name,
                                                  phone = v.Phone,
                                                  status = v.Status == "confirmed" ? "Đã xác nhận" : (v.Status == "rescheduled" ? "Đã đổi giờ" : "Chờ xác nhận")
@@ -61,15 +62,28 @@ namespace Backend.Controllers
                 var upcomingAppointments = rawAppointments.Select(v => new {
                     time = v.date.ToString("dd/MM/yyyy") + ", " + v.timeSpan.ToString("HH:mm"),
                     name = v.name,
+                    avatar = v.avatar ?? "",
                     roomInfo = v.roomName.StartsWith("Phòng", StringComparison.OrdinalIgnoreCase) ? v.roomName : "Phòng " + v.roomName,
                     status = v.status,
                     phone = v.phone
                 }).ToList();
 
-                // 4. Đóng gói kết quả trả về JSON gọn gàng
+                // 4. Lấy khu vực quận quản lý & đóng gói kết quả trả về JSON
+                var ownerDistricts = await _context.Properties
+                    .Where(p => targetOwnerIds.Contains(p.OwnerId) && !string.IsNullOrEmpty(p.District))
+                    .Select(p => p.District)
+                    .Distinct()
+                    .ToListAsync();
+                var ownerArea = ownerDistricts.Count > 0
+                    ? "Khu vực " + string.Join(", ", ownerDistricts.Take(2))
+                    : "Khu vực quản lý";
+
                 var response = new
                 {
                     ownerName = owner.Name,
+                    ownerAvatar = owner.Avatar ?? "",
+                    ownerPhone = owner.Phone ?? "",
+                    ownerArea = ownerArea,
                     ownerRole = "Chủ trọ khu vực quản lý",
                     totalRentedRooms = rentedRooms,
                     scheduledAppointments = scheduledAppointments,
