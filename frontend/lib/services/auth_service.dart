@@ -12,7 +12,7 @@ class AuthService {
     String defaultMessage,
   ) {
     Map<String, dynamic> data = {};
-    final String body = response.body.trim();
+    final String body = utf8.decode(response.bodyBytes).trim();
 
     if (body.isNotEmpty) {
       try {
