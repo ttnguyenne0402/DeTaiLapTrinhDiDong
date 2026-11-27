@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Backend.DTOs;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -41,7 +41,7 @@ namespace Backend.Controllers
                     {
                         Id = p.Id,
                         Title = p.Title,
-                        Price = p.Room != null ? p.Room.Price : 0,
+                        Price = (p.Price.HasValue && p.Price.Value > 0) ? p.Price.Value : (p.Room != null ? p.Room.Price : 0),
                         Address = p.Room != null && p.Room.Property != null
                             ? $"{p.Room.Property.Address}, {p.Room.Property.Ward}, {p.Room.Property.District}"
                             : "Chưa cập nhật",
@@ -103,7 +103,7 @@ namespace Backend.Controllers
                     Address = post.Room?.Property != null
                         ? $"{post.Room.Property.Address}, {post.Room.Property.Ward}, {post.Room.Property.District}"
                         : "Chưa có địa chỉ",
-                    Price = post.Room?.Price ?? 0,
+                    Price = (post.Price.HasValue && post.Price.Value > 0) ? post.Price.Value : (post.Room?.Price ?? 0),
                     Deposit = post.Room?.Deposit ?? 0,
                     Area = post.Room?.Area ?? 0,
                     MaxPeople = post.Room?.MaxPeople ?? 0,
@@ -170,8 +170,8 @@ namespace Backend.Controllers
                             Type = "post_approved",
                             ReferenceId = post.Id,
                             ReferenceType = "rental_post",
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
                         });
                     }
                 }
@@ -194,8 +194,8 @@ namespace Backend.Controllers
                             Type = "post_rejected",
                             ReferenceId = post.Id,
                             ReferenceType = "rental_post",
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
+                            CreatedAt = DateTime.Now,
+                            UpdatedAt = DateTime.Now
                         });
                     }
                 }

@@ -1,4 +1,4 @@
-﻿using Backend.DTOs;
+using Backend.DTOs;
 using Backend.Models;
 using Backend.Helpers;
 using Backend.Services;
@@ -81,7 +81,7 @@ namespace Backend.Controllers
             var roomName = room.Property == null ? room.Name : $"{room.Name} ({room.Property.Name})";
             var time = TimeOnly.FromTimeSpan(request.AppointmentTime).ToString("HH:mm");
             var date = request.AppointmentDate.ToString("dd/MM/yyyy");
-            var now = DateTime.UtcNow;
+            var now = DateTime.Now;
 
             context.Notifications.Add(new Notification
             {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -942,7 +942,8 @@ namespace Backend.Controllers
                 Type = newlyIssued ? "invoice" : "invoice_updated",
                 ReferenceId = invoice.Id,
                 ReferenceType = "invoice",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now,
+                UpdatedAt = DateTime.Now
             });
         }
     }

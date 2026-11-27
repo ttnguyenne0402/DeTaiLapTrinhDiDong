@@ -20,11 +20,17 @@
 --    - owner@quanlyphongtro.vn       | Mật khẩu: 123456 | Tài khoản chủ trọ dự phòng (cùng dữ liệu Chủ trọ 1)
 --    - mai.tran@gmail.com            | Mật khẩu: 123456 | Chủ trọ 2 (Chung Cư Mini Tân Bình)
 --
--- 3. Khách thuê (Tenant):
---    - viet.le@gmail.com             | Mật khẩu: 123456 | Đang thuê Phòng 101 (HĐ HD-2026-001, có 1 hóa đơn chưa thanh toán)
---    - tuan.pham@gmail.com           | Mật khẩu: 123456 | Đang thuê Studio A1 (HĐ HD-2026-002, có 1 hóa đơn quá hạn)
---    - yen.do@gmail.com              | Mật khẩu: 123456 | Có HĐ chờ ký HD-2026-003 (Phòng 202) & lịch hẹn xem phòng
---    - trong.hoang@gmail.com         | Mật khẩu: 123456 | Khách thuê đang tìm phòng (tìm kiếm, yêu thích, đặt lịch)
+-- 3. Khách thuê (Tenant - 10 tài khoản riêng biệt, không trùng tên):
+--    - viet.le@gmail.com             | Mật khẩu: 123456 | Lê Quốc Việt (Đang thuê Phòng 101 - HĐ HD-2026-001, 1 HĐồn chưa trả)
+--    - tuan.pham@gmail.com           | Mật khẩu: 123456 | Phạm Minh Tuấn (Đang thuê Studio A1 - HĐ HD-2026-002, 1 HĐồn quá hạn)
+--    - yen.do@gmail.com              | Mật khẩu: 123456 | Đỗ Hoàng Yến (Có HĐ chờ ký HD-2026-003 Phòng 202)
+--    - trong.hoang@gmail.com         | Mật khẩu: 123456 | Hoàng Đức Trọng (Lịch hẹn đã xác nhận Phòng 102)
+--    - ha.nguyen@gmail.com           | Mật khẩu: 123456 | Nguyễn Thị Thu Hà (Lịch hẹn chờ xác nhận Studio A2)
+--    - huy.tran@gmail.com            | Mật khẩu: 123456 | Trần Quang Huy (Lịch hẹn đã xác nhận Phòng 201)
+--    - lananh.vo@gmail.com           | Mật khẩu: 123456 | Võ Ngọc Lan Anh (Lịch hẹn chờ xác nhận Phòng 102)
+--    - bao.bui@gmail.com             | Mật khẩu: 123456 | Bùi Gia Bảo (Đã xem xong Studio A2 -> sẵn sàng Lập hợp đồng)
+--    - thao.dang@gmail.com           | Mật khẩu: 123456 | Đặng Thanh Thảo (Lịch hẹn đã đổi giờ Phòng 201)
+--    - nghia.phan@gmail.com          | Mật khẩu: 123456 | Phan Hữu Nghĩa (Lịch hẹn đã hủy Studio A2)
 -- ============================================================================
 
 USE master;
@@ -518,16 +524,22 @@ GO
 -- PHẦN 2: DỮ LIỆU MẪU DEMO BÁO CÁO (ĐỒNG BỘ TOÀN HỆ THỐNG)
 -- ============================================================================
 
--- 1. Tài khoản người dùng (Admin, Chủ trọ, Khách thuê)
+-- 1. Tài khoản người dùng (1 Admin, 3 Chủ trọ, 10 Khách thuê phân biệt hoàn toàn)
 INSERT INTO dbo.users (id, name, email, password, phone, avatar, role, status, email_verified_at, created_at, updated_at) VALUES
-('usr_admin',     N'Quản trị viên Hệ thống', 'admin@phongtro.vn',       '123456', '0901234567', 'https://i.pravatar.cc/150?img=1', 'admin',  'active', GETDATE(), DATEADD(day, -60, GETDATE()), GETDATE()),
-('usr_owner1',    N'Nguyễn Văn An',           'an.nguyen@gmail.com',     '123456', '0912345678', 'https://i.pravatar.cc/150?img=2', 'owner',  'active', GETDATE(), DATEADD(day, -45, GETDATE()), GETDATE()),
-('USER_OWNER_01', N'Nguyễn Văn An',           'owner@quanlyphongtro.vn', '123456', '0901234568', 'https://i.pravatar.cc/150?img=2', 'owner',  'active', GETDATE(), DATEADD(day, -45, GETDATE()), GETDATE()),
-('usr_owner2',    N'Trần Thị Mai',            'mai.tran@gmail.com',      '123456', '0987654321', 'https://i.pravatar.cc/150?img=3', 'owner',  'active', GETDATE(), DATEADD(day, -40, GETDATE()), GETDATE()),
-('usr_tenant1',   N'Lê Quốc Việt',            'viet.le@gmail.com',       '123456', '0933112233', 'https://i.pravatar.cc/150?img=4', 'tenant', 'active', GETDATE(), DATEADD(day, -30, GETDATE()), GETDATE()),
-('usr_tenant2',   N'Phạm Minh Tuấn',          'tuan.pham@gmail.com',     '123456', '0944223344', 'https://i.pravatar.cc/150?img=5', 'tenant', 'active', GETDATE(), DATEADD(day, -25, GETDATE()), GETDATE()),
-('usr_tenant3',   N'Đỗ Hoàng Yến',            'yen.do@gmail.com',        '123456', '0966554433', 'https://i.pravatar.cc/150?img=6', 'tenant', 'active', GETDATE(), DATEADD(day, -15, GETDATE()), GETDATE()),
-('usr_tenant4',   N'Hoàng Đức Trọng',         'trong.hoang@gmail.com',   '123456', '0977889900', 'https://i.pravatar.cc/150?img=7', 'tenant', 'active', GETDATE(), DATEADD(day, -10, GETDATE()), GETDATE());
+('usr_admin',     N'Quản trị viên Hệ thống', 'admin@phongtro.vn',       '123456', '0901234567', 'https://i.pravatar.cc/150?img=1',  'admin',  'active', GETDATE(), DATEADD(day, -60, GETDATE()), GETDATE()),
+('usr_owner1',    N'Nguyễn Văn An',           'an.nguyen@gmail.com',     '123456', '0912345678', 'https://i.pravatar.cc/150?img=2',  'owner',  'active', GETDATE(), DATEADD(day, -45, GETDATE()), GETDATE()),
+('USER_OWNER_01', N'Nguyễn Văn An',           'owner@quanlyphongtro.vn', '123456', '0901234568', 'https://i.pravatar.cc/150?img=2',  'owner',  'active', GETDATE(), DATEADD(day, -45, GETDATE()), GETDATE()),
+('usr_owner2',    N'Trần Thị Mai',            'mai.tran@gmail.com',      '123456', '0987654321', 'https://i.pravatar.cc/150?img=3',  'owner',  'active', GETDATE(), DATEADD(day, -40, GETDATE()), GETDATE()),
+('usr_tenant1',   N'Lê Quốc Việt',            'viet.le@gmail.com',       '123456', '0933112233', 'https://i.pravatar.cc/150?img=11', 'tenant', 'active', GETDATE(), DATEADD(day, -35, GETDATE()), GETDATE()),
+('usr_tenant2',   N'Phạm Minh Tuấn',          'tuan.pham@gmail.com',     '123456', '0944223344', 'https://i.pravatar.cc/150?img=12', 'tenant', 'active', GETDATE(), DATEADD(day, -30, GETDATE()), GETDATE()),
+('usr_tenant3',   N'Đỗ Hoàng Yến',            'yen.do@gmail.com',        '123456', '0966554433', 'https://i.pravatar.cc/150?img=5',  'tenant', 'active', GETDATE(), DATEADD(day, -25, GETDATE()), GETDATE()),
+('usr_tenant4',   N'Hoàng Đức Trọng',         'trong.hoang@gmail.com',   '123456', '0977889900', 'https://i.pravatar.cc/150?img=13', 'tenant', 'active', GETDATE(), DATEADD(day, -20, GETDATE()), GETDATE()),
+('usr_tenant5',   N'Nguyễn Thị Thu Hà',       'ha.nguyen@gmail.com',     '123456', '0918223344', 'https://i.pravatar.cc/150?img=9',  'tenant', 'active', GETDATE(), DATEADD(day, -18, GETDATE()), GETDATE()),
+('usr_tenant6',   N'Trần Quang Huy',          'huy.tran@gmail.com',      '123456', '0909334455', 'https://i.pravatar.cc/150?img=14', 'tenant', 'active', GETDATE(), DATEADD(day, -15, GETDATE()), GETDATE()),
+('usr_tenant7',   N'Võ Ngọc Lan Anh',         'lananh.vo@gmail.com',     '123456', '0938445566', 'https://i.pravatar.cc/150?img=16', 'tenant', 'active', GETDATE(), DATEADD(day, -12, GETDATE()), GETDATE()),
+('usr_tenant8',   N'Bùi Gia Bảo',             'bao.bui@gmail.com',       '123456', '0971556677', 'https://i.pravatar.cc/150?img=15', 'tenant', 'active', GETDATE(), DATEADD(day, -10, GETDATE()), GETDATE()),
+('usr_tenant9',   N'Đặng Thanh Thảo',         'thao.dang@gmail.com',     '123456', '0922667788', 'https://i.pravatar.cc/150?img=20', 'tenant', 'active', GETDATE(), DATEADD(day, -7,  GETDATE()), GETDATE()),
+('usr_tenant10',  N'Phan Hữu Nghĩa',          'nghia.phan@gmail.com',    '123456', '0983778899', 'https://i.pravatar.cc/150?img=18', 'tenant', 'active', GETDATE(), DATEADD(day, -5,  GETDATE()), GETDATE());
 GO
 
 -- 2. Tài khoản ngân hàng (VietQR)
@@ -666,20 +678,25 @@ INSERT INTO dbo.rental_post_images (id, rental_post_id, image_path, is_thumbnail
 ('img_07', 'post_07', 'https://images.unsplash.com/photo-1505691938895-1758d7feb511', 1, 0, GETDATE(), GETDATE());
 GO
 
--- 8. Lịch hẹn xem phòng
-INSERT INTO dbo.viewing_appointments (id, room_id, tenant_id, appointment_date, appointment_time, phone, message, status, owner_note, confirmed_at, completed_at, created_at, updated_at) VALUES
-('apt_01', 'room_102', 'usr_tenant4', CAST(GETDATE() AS DATE),                 '15:00:00', '0977889900', N'Tôi muốn xem Phòng 102 lúc 3h chiều nay.',          'confirmed', N'Đã hẹn gặp tại cổng chính', GETDATE(),                    NULL,                       DATEADD(day, -1,  GETDATE()), GETDATE()),
-('apt_02', 'room_a2',  'usr_tenant3', DATEADD(day, 1, CAST(GETDATE() AS DATE)), '09:30:00', '0966554433', N'Cho em xin lịch hẹn xem căn Studio A2 sáng mai.',   'pending',   NULL,                         NULL,                         NULL,                       GETDATE(),                    GETDATE()),
-('apt_03', 'room_201', 'usr_tenant4', DATEADD(day, 2, CAST(GETDATE() AS DATE)), '16:00:00', '0977889900', N'Muốn xem thêm Phòng 201 để so sánh giá.',           'confirmed', N'OK, gặp tại sảnh tầng 1',   GETDATE(),                    NULL,                       DATEADD(day, -2,  GETDATE()), GETDATE()),
-('apt_04', 'room_101', 'usr_tenant1', DATEADD(day, -32, CAST(GETDATE() AS DATE)), '10:00:00', '0933112233', N'Hẹn xem Phòng 101 trước khi ký hợp đồng.',         'completed', N'Khách đã chốt thuê',        DATEADD(day, -32, GETDATE()), DATEADD(day, -31, GETDATE()), DATEADD(day, -33, GETDATE()), GETDATE()),
-('apt_05', 'room_202', 'usr_tenant3', DATEADD(day, -1, CAST(GETDATE() AS DATE)),  '14:00:00', '0966554433', N'Xem Phòng 202, dự kiến dọn vào đầu tháng.',        'completed', N'Đã gửi hợp đồng chờ ký',    DATEADD(day, -2,  GETDATE()), DATEADD(day, -1,  GETDATE()), DATEADD(day, -3,  GETDATE()), GETDATE());
+-- 8. Lịch hẹn xem phòng (10 lịch hẹn - mỗi khách một người riêng, không trùng lặp, đủ 3 tab)
+INSERT INTO dbo.viewing_appointments (id, room_id, tenant_id, appointment_date, appointment_time, phone, message, status, owner_note, confirmed_at, completed_at, cancelled_at, created_at, updated_at) VALUES
+('apt_01', 'room_102', 'usr_tenant4',  CAST(GETDATE() AS DATE),                  '15:00:00', '0977889900', N'Tôi muốn xem Phòng 102 lúc 3h chiều nay.',                     'confirmed',   N'Đã hẹn gặp tại cổng chính',                            GETDATE(),                    NULL,                       NULL,                       DATEADD(day, -1,  GETDATE()), GETDATE()),
+('apt_02', 'room_a2',  'usr_tenant5',  DATEADD(day, 1, CAST(GETDATE() AS DATE)), '09:30:00', '0918223344', N'Cho em xin lịch hẹn xem căn Studio A2 sáng mai.',              'pending',     NULL,                                                    NULL,                         NULL,                       NULL,                       GETDATE(),                    GETDATE()),
+('apt_03', 'room_201', 'usr_tenant6',  DATEADD(day, 1, CAST(GETDATE() AS DATE)), '16:00:00', '0909334455', N'Muốn xem Phòng 201, tìm phòng dưới 3 triệu ạ.',                'confirmed',   N'OK, gặp tại sảnh tầng 1',                               GETDATE(),                    NULL,                       NULL,                       DATEADD(day, -2,  GETDATE()), GETDATE()),
+('apt_04', 'room_102', 'usr_tenant7',  DATEADD(day, 2, CAST(GETDATE() AS DATE)), '10:00:00', '0938445566', N'Em muốn xem Phòng 102 vào sáng cuối tuần này ạ.',              'pending',     NULL,                                                    NULL,                         NULL,                       NULL,                       DATEADD(hour, -4, GETDATE()), GETDATE()),
+('apt_05', 'room_201', 'usr_tenant9',  DATEADD(day, 2, CAST(GETDATE() AS DATE)), '14:30:00', '0922667788', N'Cho em đặt lịch xem Phòng 201 buổi chiều.',                    'rescheduled', N'Khung giờ cũ mình bận, bạn xem giúp giờ mới này nhé!', NULL,                         NULL,                       NULL,                       DATEADD(day, -1,  GETDATE()), GETDATE()),
+('apt_06', 'room_a2',  'usr_tenant8',  DATEADD(day, -1, CAST(GETDATE() AS DATE)), '10:00:00', '0971556677', N'Xem Studio A2 để dọn vào ở ngay tuần tới.',                    'completed',   N'Khách đã xem xong, rất hài lòng',                       DATEADD(day, -2,  GETDATE()), DATEADD(day, -1,  GETDATE()), NULL,                     DATEADD(day, -3,  GETDATE()), GETDATE()),
+('apt_07', 'room_202', 'usr_tenant3',  DATEADD(day, -2, CAST(GETDATE() AS DATE)), '14:00:00', '0966554433', N'Xem Phòng 202, dự kiến ký hợp đồng sớm.',                     'completed',   N'Đã gửi hợp đồng chờ ký',                               DATEADD(day, -3,  GETDATE()), DATEADD(day, -2,  GETDATE()), NULL,                     DATEADD(day, -4,  GETDATE()), GETDATE()),
+('apt_08', 'room_101', 'usr_tenant1',  DATEADD(day, -31, CAST(GETDATE() AS DATE)), '10:00:00', '0933112233', N'Hẹn xem Phòng 101 trước khi ký hợp đồng.',                    'completed',   N'Khách đã chốt thuê',                                   DATEADD(day, -32, GETDATE()), DATEADD(day, -31, GETDATE()), NULL,                     DATEADD(day, -33, GETDATE()), GETDATE()),
+('apt_09', 'room_a2',  'usr_tenant10', DATEADD(day, -3, CAST(GETDATE() AS DATE)), '18:00:00', '0983778899', N'Em có việc đột xuất xin phép hủy lịch hẹn ạ.',                 'cancelled',   NULL,                                                    NULL,                         NULL,                       DATEADD(day, -3, GETDATE()), DATEADD(day, -4,  GETDATE()), GETDATE()),
+('apt_10', 'room_b1',  'usr_tenant2',  DATEADD(day, 1, CAST(GETDATE() AS DATE)), '15:00:00', '0944223344', N'Muốn xem căn hộ VIP 1 Cộng Hòa cho người thân.',               'pending',     NULL,                                                    NULL,                         NULL,                       NULL,                       DATEADD(hour, -2, GETDATE()), GETDATE());
 GO
 
 -- 9. Hợp đồng (2 Đang hiệu lực, 1 Chờ ký, 1 Đã thanh lý)
 INSERT INTO dbo.contracts (id, contract_code, viewing_appointment_id, room_id, owner_id, tenant_id, start_date, end_date, rent, deposit, payment_cycle, terms, status, signed_at, terminated_at, initial_electricity_reading, initial_water_reading, owner_signature, created_at, updated_at) VALUES
-('ctr_01', 'HD-2026-001', 'apt_04', 'room_101', 'usr_owner1', 'usr_tenant1', DATEADD(day, -30, CAST(GETDATE() AS DATE)), DATEADD(day, 335, CAST(GETDATE() AS DATE)), 3200000, 3200000, 'monthly', N'CCCD:079099001122|IssueDate:12/04/2021|IssuePlace:Cục CSQLHC về TTXH', 'active',     DATEADD(day, -30, GETDATE()), NULL,                       1200, 50,  NULL, DATEADD(day, -30, GETDATE()), GETDATE()),
+('ctr_01', 'HD-2026-001', 'apt_08', 'room_101', 'usr_owner1', 'usr_tenant1', DATEADD(day, -30, CAST(GETDATE() AS DATE)), DATEADD(day, 335, CAST(GETDATE() AS DATE)), 3200000, 3200000, 'monthly', N'CCCD:079099001122|IssueDate:12/04/2021|IssuePlace:Cục CSQLHC về TTXH', 'active',     DATEADD(day, -30, GETDATE()), NULL,                       1200, 50,  NULL, DATEADD(day, -30, GETDATE()), GETDATE()),
 ('ctr_02', 'HD-2026-002', NULL,     'room_a1',  'usr_owner1', 'usr_tenant2', DATEADD(day, -20, CAST(GETDATE() AS DATE)), DATEADD(day, 160, CAST(GETDATE() AS DATE)), 5200000, 5200000, 'monthly', N'CCCD:079098002233|IssueDate:20/08/2022|IssuePlace:Cục CSQLHC về TTXH', 'active',     DATEADD(day, -20, GETDATE()), NULL,                       450,  20,  NULL, DATEADD(day, -20, GETDATE()), GETDATE()),
-('ctr_03', 'HD-2026-003', 'apt_05', 'room_202', 'usr_owner1', 'usr_tenant3', CAST(GETDATE() AS DATE),                  DATEADD(day, 365, CAST(GETDATE() AS DATE)), 3100000, 3100000, 'monthly', N'CCCD:079199003344|IssueDate:10/01/2023|IssuePlace:Cục CSQLHC về TTXH', 'pending',    NULL,                         NULL,                       100,  10,  NULL, DATEADD(hour, -5,  GETDATE()), GETDATE()),
+('ctr_03', 'HD-2026-003', 'apt_07', 'room_202', 'usr_owner1', 'usr_tenant3', CAST(GETDATE() AS DATE),                  DATEADD(day, 365, CAST(GETDATE() AS DATE)), 3100000, 3100000, 'monthly', N'CCCD:079199003344|IssueDate:10/01/2023|IssuePlace:Cục CSQLHC về TTXH', 'pending',    NULL,                         NULL,                       100,  10,  NULL, DATEADD(hour, -5,  GETDATE()), GETDATE()),
 ('ctr_04', 'HD-2025-099', NULL,     'room_102', 'usr_owner1', 'usr_tenant4', DATEADD(day, -200, CAST(GETDATE() AS DATE)), DATEADD(day, -15, CAST(GETDATE() AS DATE)), 3500000, 3500000, 'monthly', N'CCCD:079097004455|IssueDate:05/05/2020|IssuePlace:Cục CSQLHC về TTXH', 'terminated', DATEADD(day, -200, GETDATE()), DATEADD(day, -15, GETDATE()), 800, 30, NULL, DATEADD(day, -200, GETDATE()), DATEADD(day, -15, GETDATE()));
 GO
 
@@ -765,25 +782,31 @@ GO
 
 -- 13. Yêu thích & Đánh giá
 INSERT INTO dbo.favorites (id, user_id, room_id, created_at, updated_at) VALUES
-('fav_01', 'usr_tenant1', 'room_101', DATEADD(day, -1,  GETDATE()), GETDATE()),
-('fav_02', 'usr_tenant2', 'room_102', DATEADD(day, -2,  GETDATE()), GETDATE()),
-('fav_03', 'usr_tenant3', 'room_a1',  DATEADD(day, -2,  GETDATE()), GETDATE()),
-('fav_04', 'usr_tenant4', 'room_a2',  DATEADD(day, -5,  GETDATE()), GETDATE()),
-('fav_05', 'usr_tenant1', 'room_201', DATEADD(day, -7,  GETDATE()), GETDATE()),
-('fav_06', 'usr_tenant4', 'room_b1',  DATEADD(day, -12, GETDATE()), GETDATE());
+('fav_01', 'usr_tenant1',  'room_101', DATEADD(day, -1,  GETDATE()), GETDATE()),
+('fav_02', 'usr_tenant2',  'room_102', DATEADD(day, -2,  GETDATE()), GETDATE()),
+('fav_03', 'usr_tenant3',  'room_a1',  DATEADD(day, -2,  GETDATE()), GETDATE()),
+('fav_04', 'usr_tenant4',  'room_a2',  DATEADD(day, -5,  GETDATE()), GETDATE()),
+('fav_05', 'usr_tenant5',  'room_a2',  DATEADD(day, -3,  GETDATE()), GETDATE()),
+('fav_06', 'usr_tenant6',  'room_201', DATEADD(day, -4,  GETDATE()), GETDATE()),
+('fav_07', 'usr_tenant7',  'room_102', DATEADD(day, -6,  GETDATE()), GETDATE()),
+('fav_08', 'usr_tenant8',  'room_a2',  DATEADD(day, -7,  GETDATE()), GETDATE()),
+('fav_09', 'usr_tenant9',  'room_201', DATEADD(day, -8,  GETDATE()), GETDATE()),
+('fav_10', 'usr_tenant10', 'room_b1',  DATEADD(day, -10, GETDATE()), GETDATE());
 GO
 
 INSERT INTO dbo.reviews (id, room_id, tenant_id, rating, comment, status, created_at, updated_at) VALUES
 ('rev_01', 'room_101', 'usr_tenant1', 5, N'Chủ nhà thân thiện, phòng sạch sẽ và rất thoáng mát!',               'visible', DATEADD(day, -10, GETDATE()), GETDATE()),
 ('rev_02', 'room_a1',  'usr_tenant2', 4, N'Nội thất xịn đầy đủ tiện nghi, thang máy êm, bảo vệ nhiệt tình.',   'visible', DATEADD(day, -5,  GETDATE()), GETDATE()),
-('rev_03', 'room_102', 'usr_tenant4', 5, N'Phòng rộng, ban công nhiều ánh sáng, giá hợp lý khu vực Tân Phú.',  'visible', DATEADD(day, -16, GETDATE()), GETDATE());
+('rev_03', 'room_102', 'usr_tenant4', 5, N'Phòng rộng, ban công nhiều ánh sáng, giá hợp lý khu vực Tân Phú.',  'visible', DATEADD(day, -16, GETDATE()), GETDATE()),
+('rev_04', 'room_201', 'usr_tenant6', 5, N'Phòng yên tĩnh, gần trường học và chợ, rất hợp cho sinh viên.',     'visible', DATEADD(day, -3,  GETDATE()), GETDATE()),
+('rev_05', 'room_a2',  'usr_tenant5', 5, N'Studio mới đẹp, hành lang có camera an ninh rất yên tâm.',          'visible', DATEADD(day, -2,  GETDATE()), GETDATE());
 GO
 
 -- 14. Thông báo hệ thống (Admin, Owner, Tenant)
 INSERT INTO dbo.notifications (id, user_id, title, message, type, reference_id, reference_type, created_at, updated_at) VALUES
 ('notif_01',     'usr_admin',   N'Tin đăng mới chờ duyệt',              N'Chủ trọ Nguyễn Văn An vừa đăng tin cho căn Studio A2 và Phòng VIP 1 đang chờ duyệt.',                                     'post_approval',         'post_05', 'rental_post',         DATEADD(minute, -10, GETDATE()), GETDATE()),
 ('notif_02',     'usr_admin',   N'Tin đăng VIP cần kiểm duyệt',         N'Chủ trọ Trần Thị Mai vừa gửi duyệt tin [Cho thuê căn hộ 1PN VIP Cộng Hòa, Tân Bình].',                                   'post_approval',         'post_07', 'rental_post',         DATEADD(hour, -1,    GETDATE()), GETDATE()),
-('notif_own_01', 'usr_owner1',  N'Khách đặt lịch xem phòng mới',        N'Khách Đỗ Hoàng Yến (0966554433) vừa đặt lịch xem Studio A2 - Căn Hộ Mini Xanh vào 09:30 ngày mai.',                      'appointment',           'apt_02',  'viewing_appointment', DATEADD(minute, -15, GETDATE()), GETDATE()),
+('notif_own_01', 'usr_owner1',  N'Khách đặt lịch xem phòng mới',        N'Khách Nguyễn Thị Thu Hà (0918223344) vừa đặt lịch xem Studio A2 - Căn Hộ Mini Xanh vào 09:30 ngày mai.',                 'appointment',           'apt_02',  'viewing_appointment', DATEADD(minute, -15, GETDATE()), GETDATE()),
 ('notif_own_02', 'usr_owner1',  N'Admin từ chối bài đăng',              N'Tin đăng [Phòng trọ 202 gần khu công nghiệp Tân Bình] bị từ chối. Lý do: Hình ảnh phòng chưa rõ nét.',                   'post_rejected',         'post_06', 'rental_post',         DATEADD(hour, -1,    GETDATE()), GETDATE()),
 ('notif_own_03', 'usr_owner1',  N'Khách báo hỏng / bảo trì phòng',      N'Khách Lê Quốc Việt (Phòng 101 - Nhà Trọ An Khang) báo sự cố: Máy lạnh không mát và chảy nước.',                          'maintenance',           'mnt_01',  'maintenance',         DATEADD(hour, -3,    GETDATE()), GETDATE()),
 ('notif_own_04', 'usr_owner1',  N'Hóa đơn tháng trước đã thanh toán',   N'Khách Lê Quốc Việt (Phòng 101) đã thanh toán hóa đơn INV-2026-001 số tiền 3.730.000đ.',                                  'invoice',               'inv_01',  'invoice',             DATEADD(day, -2,     GETDATE()), GETDATE()),
