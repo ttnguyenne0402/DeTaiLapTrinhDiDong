@@ -502,11 +502,16 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _goToRegister() {
-    Navigator.push(
+  Future<void> _goToRegister() async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RegisterScreen()),
     );
+
+    if (!mounted || result == null) return;
+    if (result is String && result.isNotEmpty) {
+      _showNotice(result);
+    }
   }
 
   @override

@@ -86,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await AuthService.register(
+      final result = await AuthService.register(
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
@@ -96,8 +96,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      _showNotice('??ng k? th?nh c?ng. Em c? th? ??ng nh?p.');
-      Navigator.pop(context);
+      final String message = result['message']?.toString() ?? 'Đăng ký thành công! Bạn có thể đăng nhập.';
+      Navigator.pop(context, message);
     } catch (error) {
       if (!mounted) return;
 
