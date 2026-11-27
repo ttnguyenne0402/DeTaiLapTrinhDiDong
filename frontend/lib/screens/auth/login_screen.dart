@@ -186,6 +186,7 @@ class _LoginScreenState extends State<LoginScreen>
       final String accessToken = responseData['accessToken']?.toString() ?? '';
       final String name = responseData['name']?.toString() ?? '';
       final String phone = responseData['phone']?.toString() ?? '';
+      final String avatar = responseData['avatar']?.toString() ?? responseData['Avatar']?.toString() ?? '';
 
       if (userId.isEmpty || role.isEmpty || accessToken.isEmpty) {
         throw Exception('Thiếu ID, quyền hoặc token đăng nhập.');
@@ -198,6 +199,7 @@ class _LoginScreenState extends State<LoginScreen>
         accessToken: accessToken,
         name: name,
         phone: phone,
+        avatar: avatar,
       );
 
       if (_rememberMe) {
@@ -296,12 +298,15 @@ class _LoginScreenState extends State<LoginScreen>
         );
       }
 
+      final String avatar = responseData['avatar']?.toString() ?? responseData['Avatar']?.toString() ?? '';
+
       // Bước 8: LƯU THÔNG TIN ĐĂNG NHẬP VÀO AUTH STORAGE
       await AuthStorage.saveLogin(
         userId: userId,
         role: role,
         accessToken: appToken,
         name: name,
+        avatar: avatar,
       );
 
       // Kiểm tra lưu thành công (không in nội dung token)
@@ -429,12 +434,15 @@ class _LoginScreenState extends State<LoginScreen>
         );
       }
 
+      final String avatar = responseData['avatar']?.toString() ?? responseData['Avatar']?.toString() ?? '';
+
       // Bước 7: LƯU THÔNG TIN ĐĂNG NHẬP VÀO AUTH STORAGE
       await AuthStorage.saveLogin(
         userId: userId,
         role: role,
         accessToken: appToken,
         name: name,
+        avatar: avatar,
       );
 
       // Kiểm tra lưu thành công, không in nội dung token

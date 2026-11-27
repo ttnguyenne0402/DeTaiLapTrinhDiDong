@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/ai_chat_service.dart';
+import '../../services/auth_storage.dart';
+import '../../services/profile_service.dart';
 
 class AiChatbotScreen extends StatefulWidget {
   final String initialRole; // 'tenant', 'owner', 'admin'
@@ -18,12 +20,34 @@ class _AiChatbotScreenState extends State<AiChatbotScreen> {
   final List<ChatMessageModel> _messages = [];
   bool _isLoading = false;
   late String _currentRole;
+  String? _userAvatar;
 
   @override
   void initState() {
     super.initState();
     _currentRole = widget.initialRole;
     _loadChatSession();
+    _loadUserAvatar();
+  }
+
+  Future<void> _loadUserAvatar() async {
+    try {
+      // 1. Đọc nhanh từ bộ nhớ đệm đã lưu lúc đăng nhập
+      final localAvatar = await AuthStorage.getUserAvatar();
+      if (localAvatar != null && localAvatar.isNotEmpty && mounted) {
+        setState(() => _userAvatar = localAvatar);
+      }
+
+      // 2. Đồng bộ dữ liệu avatar mới nhất từ Profile API
+      final profile = await ProfileService.getProfile();
+      final String? serverAvatar = profile['avatar']?.toString() ?? profile['Avatar']?.toString();
+      if (serverAvatar != null && serverAvatar.isNotEmpty) {
+        await AuthStorage.saveUserAvatar(serverAvatar);
+        if (mounted && _userAvatar != serverAvatar) {
+          setState(() => _userAvatar = serverAvatar);
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadChatSession() async {
@@ -469,17 +493,63 @@ class _AiChatbotScreenState extends State<AiChatbotScreen> {
           ),
           if (isUser) ...[
             const SizedBox(width: 8),
-            Container(
-              margin: const EdgeInsets.only(top: 2),
-              padding: const EdgeInsets.all(7),
-              decoration: const BoxDecoration(
-                color: AppColors.accentYellow,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.person, color: Colors.white, size: 20),
-            ),
+            _buildUserAvatar(),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildUserAvatar() {
+    final avatar = _userAvatar?.trim() ?? '';
+    final isNetwork = avatar.startsWith('http://') || avatar.startsWith('https://');
+
+    return Container(
+      margin: const EdgeInsets.only(top: 2),
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: AppColors.accentYellow,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: isNetwork
+            ? Image.network(
+                avatar,
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 19,
+                ),
+              )
+            : (avatar.isNotEmpty
+                ? Image.asset(
+                    avatar,
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 19,
+                    ),
+                  )
+                : const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 19,
+                  )),
       ),
     );
   }
