@@ -1,5 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
+
+import '../../utils/post_image_path.dart';
+import '../auth_storage.dart';
 
 class PostModel {
   final String id;
@@ -60,7 +65,9 @@ class PostModel {
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
     var imgList = json['images'] as List? ?? [];
-    List<String> images = imgList.map((e) => e.toString()).toList();
+    final images = imgList
+        .map((e) => postImageDisplayPath(e.toString()))
+        .toList();
 
     var amnList = json['amenities'] as List? ?? [];
     List<String> amenities = amnList.map((e) => e.toString()).toList();
@@ -73,10 +80,18 @@ class PostModel {
       propertyName: json['propertyName'] ?? '',
       propertyAddress: json['propertyAddress'] ?? '',
       room: json['room'] ?? '',
-      roomArea: (json['roomArea'] is num) ? (json['roomArea'] as num).toDouble() : 0.0,
-      roomDeposit: (json['roomDeposit'] is num) ? (json['roomDeposit'] as num).toDouble() : 0.0,
-      roomMaxPeople: (json['roomMaxPeople'] is num) ? (json['roomMaxPeople'] as num).toInt() : 0,
-      roomFloor: (json['roomFloor'] is num) ? (json['roomFloor'] as num).toInt() : null,
+      roomArea: (json['roomArea'] is num)
+          ? (json['roomArea'] as num).toDouble()
+          : 0.0,
+      roomDeposit: (json['roomDeposit'] is num)
+          ? (json['roomDeposit'] as num).toDouble()
+          : 0.0,
+      roomMaxPeople: (json['roomMaxPeople'] is num)
+          ? (json['roomMaxPeople'] as num).toInt()
+          : 0,
+      roomFloor: (json['roomFloor'] is num)
+          ? (json['roomFloor'] as num).toInt()
+          : null,
       roomStatus: json['roomStatus'] ?? 'available',
       roomDescription: json['roomDescription'] ?? '',
       title: json['title'] ?? '',
@@ -90,14 +105,16 @@ class PostModel {
       status: json['status'] ?? 'pending',
       submitNote: json['submitNote'],
       rejectReason: json['rejectReason'],
-      image: json['image'] ?? 'frontend/assets/images/anhPhongDemo.jpg',
+      image: postImageDisplayPath(
+        json['image']?.toString() ?? postImageFallback,
+      ),
       images: images,
     );
   }
 }
 
 class PostService {
-  static const String baseUrl = 'http://10.0.2.2:5093';
+  static const String baseUrl = postImageApiOrigin;
 
   // Lấy danh sách bài đăng theo bộ lọc: 'all', 'active', 'pending', 'draft_or_other'
   static Future<List<PostModel>> fetchPosts(
@@ -131,22 +148,92 @@ class PostService {
 
   // Đăng tin mới
   static Future<bool> createPost(Map<String, dynamic> data) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/owner/posts'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    return response.statusCode == 200;
+    return _savePost('POST', '/api/owner/posts/with-images', data);
   }
 
   // Cập nhật nội dung tin đăng
   static Future<bool> updatePost(String id, Map<String, dynamic> data) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl/api/owner/posts/$id'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
+    return _savePost(
+      'PUT',
+      '/api/owner/posts/${Uri.encodeComponent(id)}/with-images',
+      data,
     );
-    return response.statusCode == 200;
+  }
+
+  static Future<bool> _savePost(
+    String method,
+    String route,
+    Map<String, dynamic> data,
+  ) async {
+    final client = http.Client();
+    try {
+      final token = await AuthStorage.getAccessToken();
+      if (token == null || token.isEmpty) {
+        throw const PostSaveException('Vui lòng đăng nhập lại để lưu tin.');
+      }
+
+      final request = http.MultipartRequest(method, Uri.parse('$baseUrl$route'))
+        ..headers['Authorization'] = 'Bearer $token';
+      final references = <String>[];
+      for (final path in (data['images'] as List? ?? []).whereType<String>()) {
+        if (isSharedPostImage(path)) {
+          final localPrefix = '$baseUrl$uploadedPostImagePrefix';
+          references.add(
+            path.startsWith(localPrefix)
+                ? path.substring(baseUrl.length)
+                : path,
+          );
+          continue;
+        }
+
+        final file = File(path);
+        if (!await file.exists()) {
+          throw const PostSaveException(
+            'Có ảnh cũ không còn trên máy. Hãy bỏ ảnh đó và chọn lại.',
+          );
+        }
+        if (await file.length() > 4 * 1024 * 1024) {
+          throw const PostSaveException('Mỗi ảnh có dung lượng tối đa 4 MB.');
+        }
+        references.add('upload:${request.files.length}');
+        request.files.add(await http.MultipartFile.fromPath('Files', path));
+      }
+
+      request.fields['Post'] = jsonEncode({...data, 'images': references});
+      final response = await client
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(const Duration(seconds: 60));
+      if (response.statusCode == 200) return true;
+      if (response.statusCode == 401) {
+        throw const PostSaveException(
+          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        );
+      }
+      if (response.statusCode == 403) {
+        throw const PostSaveException(
+          'Bạn chỉ có thể đăng tin cho phòng thuộc tài khoản của mình.',
+        );
+      }
+      if (response.statusCode == 413) {
+        throw const PostSaveException('Ảnh quá lớn. Hãy chọn ảnh nhỏ hơn.');
+      }
+      final payload = response.headers['content-type']?.contains('json') == true
+          ? jsonDecode(utf8.decode(response.bodyBytes))
+          : null;
+      final message = payload is Map ? payload['message'] : null;
+      throw PostSaveException(
+        message is String ? message : 'Không thể lưu tin đăng.',
+      );
+    } on PostSaveException {
+      rethrow;
+    } catch (_) {
+      throw const PostSaveException(
+        'Không thể gửi tin và ảnh. Vui lòng kiểm tra kết nối rồi thử lại.',
+      );
+    } finally {
+      client.close();
+    }
   }
 
   // Cập nhật trạng thái tin (ẩn, hiện, gửi duyệt)
@@ -168,3 +255,7 @@ class PostService {
   }
 }
 
+class PostSaveException implements Exception {
+  const PostSaveException(this.message);
+  final String message;
+}

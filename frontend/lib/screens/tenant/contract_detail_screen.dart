@@ -7,7 +7,9 @@ import 'dart:convert';
 import 'dart:io';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
+import '../../services/auth_storage.dart';
 import '../../services/owner/contract_service.dart';
+import '../../widgets/common/contract_signing_decision.dart';
 import 'tenant_maintenance_request_screen.dart';
 
 class ContractDetailScreen extends StatefulWidget {
@@ -20,6 +22,7 @@ class ContractDetailScreen extends StatefulWidget {
 class _ContractDetailScreenState extends State<ContractDetailScreen> {
   Map<String, dynamic>? _contractDetail;
   bool _isLoading = true;
+  bool _isSubmitting = false;
   late String _contractId;
   bool _isInit = true;
   final SignatureController _tenantSignatureController = SignatureController( penStrokeWidth: 2.5, penColor: Colors.black, exportBackgroundColor: Colors.white, );
@@ -58,7 +61,11 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
 
     final client = _getCustomClient();
     try {
-      final response = await client.get(Uri.parse(url));
+      final token = await AuthStorage.getAccessToken();
+      final response = await client.get(Uri.parse(url), headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+      });
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         setState(() {
@@ -71,9 +78,53 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
       }
     } catch (e) {
       print("LỖI KẾT NỐI HOẶC CODE: $e");
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     } finally {
       client.close();
+    }
+  }
+
+  Future<void> _rejectSigning() async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final closed = await closeContractSigning(
+        context,
+        contractId: _contractId,
+        reject: true,
+      );
+      if (closed && mounted) await _fetchContractDetail();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _sign() async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final bytes = await _tenantSignatureController.toPngBytes();
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      if (bytes == null) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Vui lòng vẽ chữ ký trước khi xác nhận.'),
+        ));
+        return;
+      }
+
+      final success = await ContractService.signContract(
+        contractId: _contractId,
+        ownerSignatureBase64: '',
+        tenantSignatureBase64: base64Encode(bytes),
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(success
+          ? 'Đã lưu chữ ký của bạn.'
+          : 'Không thể ký hợp đồng. Vui lòng kiểm tra trạng thái và thử lại.')));
+      await _fetchContractDetail();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -98,11 +149,17 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
     final contractCode = _contractDetail!['contractCode'] ?? 'Chưa cập nhật';
 
     // Đổi trạng thái E sang V
-    String status = 'Chưa xác định';
-    if (_contractDetail!['status'] == 'active') status = 'Đang hiệu lực';
-    else if (_contractDetail!['status'] == 'expired') status = 'Đã hết hạn';
-    else if (_contractDetail!['status'] == 'terminated') status = 'Đã thanh lý';
-    else if (_contractDetail!['status'] == 'draft') status = 'Bản nháp';
+    final statusCode = _contractDetail!['status'];
+    final status = switch (statusCode) {
+      'active' => 'Đang hiệu lực',
+      'pending' => 'Chờ ký',
+      'expired' => 'Đã hết hạn',
+      'terminated' => 'Đã thanh lý',
+      'draft' => 'Bản nháp',
+      'rejected' => 'Đã từ chối',
+      'withdrawn' => 'Đã thu hồi',
+      _ => 'Chưa xác định',
+    };
 
     final startDate = _contractDetail!['startDate'] ?? 'N/A';
     final endDate = _contractDetail!['endDate'] ?? 'N/A';
@@ -192,6 +249,11 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                   _buildInfoRow('Chu kỳ thanh toán:', paymentCycle),
                   _buildInfoRow('Điện đầu kỳ:', '$initialElec kWh'),
                   _buildInfoRow('Nước đầu kỳ:', '$initialWater khối'),
+                  if (statusCode == 'rejected' || statusCode == 'withdrawn')
+                    ContractSigningDecisionDetails(
+                      closedAt: _contractDetail!['signingClosedAt']?.toString(),
+                      reason: _contractDetail!['signingCloseReason']?.toString(),
+                    ),
                 ],
               ),
             ),
@@ -361,23 +423,16 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                         style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
                         icon: const Icon(Icons.draw, color: Colors.white),
                         label: const Text('XÁC NHẬN KÝ HỢP ĐỒNG', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        onPressed: () async {
-                          final bytes = await _tenantSignatureController.toPngBytes();
-                          if (bytes == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng vẽ chữ ký trước khi xác nhận.')));
-                            return;
-                          }
-                          final base64Sig = base64Encode(bytes);
-                          final success = await ContractService.signContract(
-                            contractId: _contractId,
-                            ownerSignatureBase64: '',
-                            tenantSignatureBase64: base64Sig,
-                          );
-                          if (success && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ký hợp đồng thành công!')));
-                            _fetchContractDetail();
-                          }
-                        },
+                        onPressed: _isSubmitting ? null : _sign,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _isSubmitting ? null : _rejectSigning,
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
+                        child: const Text('Từ chối ký'),
                       ),
                     ),
                   ],

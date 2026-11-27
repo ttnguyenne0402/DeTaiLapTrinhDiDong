@@ -258,7 +258,7 @@ BEGIN
         deposit DECIMAL(15,2) NOT NULL,
         payment_cycle NVARCHAR(50) NOT NULL CHECK (payment_cycle IN ('monthly', 'quarterly')),
         terms NVARCHAR(MAX) NULL,
-        status NVARCHAR(50) NOT NULL CHECK (status IN ('draft', 'active', 'expired', 'terminated')),
+        status NVARCHAR(50) NOT NULL CHECK (status IN ('draft', 'pending', 'active', 'expired', 'terminated', 'rejected', 'withdrawn')),
         signed_at DATETIME2 NULL,
         terminated_at DATETIME2 NULL,
         initial_electricity_reading DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -822,8 +822,15 @@ IF NOT EXISTS (
 )
 BEGIN
     ALTER TABLE contracts ADD CONSTRAINT CK_contracts_status 
-    CHECK (status IN ('draft', 'pending', 'active', 'expired', 'terminated'));
+    CHECK (status IN ('draft', 'pending', 'active', 'expired', 'terminated', 'rejected', 'withdrawn'));
 END
+GO
+
+IF COL_LENGTH('dbo.contracts', 'signing_closed_at') IS NULL
+    ALTER TABLE dbo.contracts ADD signing_closed_at DATETIME2 NULL;
+
+IF COL_LENGTH('dbo.contracts', 'signing_close_reason') IS NULL
+    ALTER TABLE dbo.contracts ADD signing_close_reason NVARCHAR(500) NULL;
 GO
 
 -- 3. Cập nhật tọa độ mặc định cho các bất động sản chưa có vĩ độ/kinh độ

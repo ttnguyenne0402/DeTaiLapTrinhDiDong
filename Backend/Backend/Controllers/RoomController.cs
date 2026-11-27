@@ -16,6 +16,11 @@ namespace Backend.Controllers
             _context = context;
         }
 
+        private IQueryable<RentalPost> PublishedPosts => _context.RentalPosts
+            .Where(post => post.Status == "published")
+            .OrderByDescending(post => post.PublishedAt ?? post.CreatedAt)
+            .ThenByDescending(post => post.Id);
+
         // GET: api/Room
         // GET: api/Room?keyword=Quan 1
         // GET: api/Room?maxPrice=3000000&minArea=15&maxArea=30
@@ -36,7 +41,8 @@ namespace Backend.Controllers
                 .AsQueryable();
 
             // Chỉ lấy phòng đang trống
-            query = query.Where(r => r.Status == "available");
+            query = query.Where(r => r.Status == "available" &&
+                !r.Contracts.Any(c => c.Status == "pending" || c.Status == "active"));
 
             // Tìm kiếm theo tên phòng, tên khu trọ,
             // địa chỉ, quận và phường
@@ -80,6 +86,7 @@ namespace Backend.Controllers
                         ra.Amenity.Name.Contains(amenityName)));
             }
 
+            var publishedPosts = PublishedPosts;
             var rooms = await query
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => new
@@ -101,7 +108,12 @@ namespace Backend.Controllers
                     amenities = r.RoomAmenities
                         .Select(ra => ra.Amenity.Name)
                         .ToList(),
-                    image = r.Images
+                    image = r.Images,
+                    images = _context.RentalPostImages
+                        .Where(i => i.RentalPostId == publishedPosts.Where(p => p.RoomId == r.Id)
+                            .Select(p => p.Id).FirstOrDefault())
+                        .OrderByDescending(i => i.IsThumbnail).ThenBy(i => i.SortOrder).ThenBy(i => i.Id)
+                        .Select(i => i.ImagePath).ToList()
                 })
                 .ToListAsync();
 
@@ -117,12 +129,14 @@ namespace Backend.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetRoomById(string id)
         {
+            var publishedPosts = PublishedPosts;
             var room = await _context.Rooms
                 .AsNoTracking()
                 .Include(r => r.Property)
                 .Include(r => r.RoomAmenities)
                     .ThenInclude(ra => ra.Amenity)
-                .Where(r => r.Id == id && r.Status == "available")
+                .Where(r => r.Id == id && r.Status == "available" &&
+                    !r.Contracts.Any(c => c.Status == "pending" || c.Status == "active"))
                 .Select(r => new
                 {
                     id = r.Id,
@@ -164,7 +178,12 @@ namespace Backend.Controllers
                         }).ToList(),
 
                     // Hình ảnh
-                    image = r.Images
+                    image = r.Images,
+                    images = _context.RentalPostImages
+                        .Where(i => i.RentalPostId == publishedPosts.Where(p => p.RoomId == r.Id)
+                            .Select(p => p.Id).FirstOrDefault())
+                        .OrderByDescending(i => i.IsThumbnail).ThenBy(i => i.SortOrder).ThenBy(i => i.Id)
+                        .Select(i => i.ImagePath).ToList()
                 })
                 .FirstOrDefaultAsync();
 

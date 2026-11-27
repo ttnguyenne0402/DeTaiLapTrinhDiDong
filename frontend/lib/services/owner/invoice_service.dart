@@ -1,8 +1,18 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../auth_storage.dart';
 
 class OwnerInvoiceService {
   static const String baseUrl = 'http://10.0.2.2:5093/api/OwnerInvoices';
+
+  static Future<Map<String, String>> _ownerHeaders({bool json = false}) async {
+    final token = await AuthStorage.getAccessToken();
+    return {
+      'Accept': 'application/json',
+      if (json) 'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
   // 1. Lấy danh sách hóa đơn theo tháng
   static Future<dynamic> getMonthlyInvoices({
@@ -58,9 +68,13 @@ class OwnerInvoiceService {
     try {
       final response = await http.post(
         Uri.parse(baseUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _ownerHeaders(json: true),
         body: jsonEncode(data),
       );
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        return {'error': true, 'message': 'Tài khoản này không có quyền lập hóa đơn. Hãy kiểm tra phiên đăng nhập.'};
+      }
 
       final body = jsonDecode(response.body);
       if (response.statusCode == 200) {
@@ -95,7 +109,7 @@ class OwnerInvoiceService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/$invoiceId'),
-        headers: {'Accept': 'application/json'},
+        headers: await _ownerHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -201,7 +215,7 @@ class OwnerInvoiceService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/bank-accounts'),
-        headers: {'Accept': 'application/json'},
+        headers: await _ownerHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -218,9 +232,12 @@ class OwnerInvoiceService {
     try {
       final res = await http.put(
         Uri.parse('$baseUrl/$invoiceId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await _ownerHeaders(json: true),
         body: jsonEncode(body),
       );
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        return {'error': true, 'message': 'Tài khoản này không có quyền sửa hóa đơn. Hãy kiểm tra phiên đăng nhập.'};
+      }
       final resBody = jsonDecode(res.body);
       if (res.statusCode == 200) {
         return resBody;
@@ -252,7 +269,7 @@ class OwnerInvoiceService {
           'month': now.month,
           'year': now.year,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
       return response.statusCode == 200;
     } catch (e) {
       print('Lỗi saveUtilityReading: $e');

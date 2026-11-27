@@ -1,5 +1,6 @@
 ﻿using Backend.DTOs;
 using Backend.Models;
+using Backend.Helpers;
 using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -37,6 +38,7 @@ namespace Backend.Controllers
             if (!string.Equals(tenantId, request.TenantId, StringComparison.OrdinalIgnoreCase)) return Forbid();
 
             await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            await RoomSigningLock.AcquireAsync(context, request.RoomId, cancellationToken);
             // Hai yêu cầu đồng thời của cùng tài khoản phải kiểm tra và lưu theo thứ tự.
             var lockName = $"viewing-appointment:{tenantId.ToUpperInvariant()}";
             await context.Database.ExecuteSqlInterpolatedAsync($"""
@@ -63,6 +65,15 @@ namespace Backend.Controllers
             var room = await context.Rooms.Include(r => r.Property)
                 .FirstOrDefaultAsync(r => r.Id == request.RoomId, cancellationToken);
             if (room == null) return NotFound(new { message = "Không tìm thấy phòng cần đặt lịch." });
+            if (room.Status != "available" || await context.Contracts.AnyAsync(
+                c => c.RoomId == room.Id && (c.Status == "pending" || c.Status == "active"), cancellationToken))
+            {
+                return Conflict(new
+                {
+                    code = "room_unavailable",
+                    message = "Phòng đang được giữ hoặc đã cho thuê."
+                });
+            }
 
             request.TenantId = tenantId;
             request.RoomId = room.Id;

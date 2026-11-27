@@ -222,10 +222,17 @@ class _BookingScreenState extends State<booking_screen> {
             message: 'Lịch hẹn của bạn đang chờ chủ trọ xác nhận.',
           );
         } else if (response.statusCode == 409) {
-          await _showBookingResult(
-            title: 'Bạn đã có lịch xem phòng này',
-            message: 'Xem trạng thái lịch hiện tại trong mục Lịch hẹn. Nếu muốn đặt lại, hãy hủy lịch cũ trước.',
-          );
+          final error = jsonDecode(utf8.decode(response.bodyBytes));
+          if (error is Map && error['code'] == 'room_unavailable') {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Phòng đang được giữ hoặc đã cho thuê. Vui lòng chọn phòng khác.'),
+            ));
+          } else {
+            await _showBookingResult(
+              title: 'Bạn đã có lịch xem phòng này',
+              message: 'Xem trạng thái lịch hiện tại trong mục Lịch hẹn. Nếu muốn đặt lại, hãy hủy lịch cũ trước.',
+            );
+          }
         } else if (response.statusCode == 401 || response.statusCode == 403) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Vui lòng đăng nhập lại để đặt lịch.')),

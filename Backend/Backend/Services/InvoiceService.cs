@@ -1,5 +1,7 @@
 ﻿using Backend.DTOs;
 using Backend.Repositories;
+using Backend.Helpers;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -37,6 +39,10 @@ namespace Backend.Services
             var invoice = await _repository.GetByIdAsync(id);
             if (invoice == null) return null;
 
+            var bank = invoice.BankAccount;
+            var bankBelongsToOwner = bank != null && invoice.Contract != null &&
+                OwnerHelper.ResolveOwnerIds(bank.UserId).Contains(invoice.Contract.OwnerId, StringComparer.OrdinalIgnoreCase);
+
             return new InvoiceResponseDTO
             {
                 Id = invoice.Id,
@@ -48,12 +54,12 @@ namespace Backend.Services
                 Discount = invoice.Discount ?? 0,
                 Total = invoice.Total,
                 Status = invoice.Status,
-                BankAccount = invoice.BankAccount != null ? new BankAccountInfoDto
+                BankAccount = bankBelongsToOwner && bank != null ? new BankAccountInfoDto
                 {
-                    BankCode = invoice.BankAccount.BankCode,
-                    BankName = invoice.BankAccount.BankName,
-                    AccountNumber = invoice.BankAccount.AccountNumber,
-                    AccountHolder = invoice.BankAccount.AccountHolder
+                    BankCode = bank.BankCode,
+                    BankName = bank.BankName,
+                    AccountNumber = bank.AccountNumber,
+                    AccountHolder = bank.AccountHolder
                 } : null,
                 Items = invoice.InvoiceItems.Select(item => new InvoiceItemDTO
                 {

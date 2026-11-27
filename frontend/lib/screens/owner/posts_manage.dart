@@ -19,6 +19,7 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isLoading = true;
   List<Map<String, dynamic>> _posts = [];
+  final Set<String> _submittingPosts = {};
 
   @override
   void initState() {
@@ -126,6 +127,7 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
               'date': draft['created_at'] ?? 'Hôm nay',
               'status': 'draft',
               'image': draft['image'] ?? 'frontend/assets/images/anhPhongDemo.jpg',
+              'images': SqliteHelper.instance.readDraftImages(draft),
             });
           }
         });
@@ -1014,9 +1016,11 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
 
   void _submitPost(Map<String, dynamic> post, String note) async {
     final messenger = ScaffoldMessenger.of(context);
+    final id = post['id']?.toString();
+    if (id == null || !_submittingPosts.add(id)) return;
 
-    // Nếu là bản nháp từ SQLite cục bộ trên điện thoại:
-    if (post['isSqlite'] == true && post['sqliteId'] != null) {
+    try {
+      final images = (post['images'] as List? ?? []).whereType<String>().toList();
       final cleanPrice = double.tryParse(
             (post['price'] ?? '')
                 .toString()
@@ -1027,33 +1031,37 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
                 .trim(),
           ) ??
           0;
-      // 1. Gửi tin lên máy chủ Backend SQL Server
-      await PostService.createPost({
-        'roomId': post['roomId'] ?? 'room_101',
+      final data = {
+        'roomId': post['roomId'],
         'title': post['title'] ?? 'Tin đăng phòng trọ',
         'description': post['description'] ?? '',
         'price': cleanPrice,
         'amenities': post['amenities'] is List ? post['amenities'] : ['Wifi', 'Chỗ để xe'],
         'submitNote': note.isNotEmpty ? note : 'Gửi duyệt từ bản nháp',
         'status': 'pending',
-        'images': [
-          post['image']?.toString() ?? 'frontend/assets/images/anhPhongDemo.jpg',
-        ],
-      });
-      // 2. Xóa bản nháp khỏi SQLite vì đã gửi duyệt lên SQL Server
-      await SqliteHelper.instance.deleteDraftPost(post['sqliteId']);
+        'images': images,
+      };
+      if (post['isSqlite'] == true && post['sqliteId'] != null) {
+        await PostService.createPost(data);
+        await SqliteHelper.instance.deleteDraftPost(post['sqliteId']);
+      } else {
+        await PostService.updatePost(id, data);
+      }
+      if (!mounted) return;
       await _loadAllPosts();
-    } else if (post['id'] != null) {
-      await PostService.updatePostStatus(post['id'].toString(), 'pending');
-      await _loadAllPosts();
-    }
-
-    messenger.showSnackBar(
-      SnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(const SnackBar(
         backgroundColor: AppColors.primaryGreen,
-        content: const Text('Gửi duyệt tin đăng thành công'),
-      ),
-    );
+        content: Text('Gửi duyệt tin đăng thành công'),
+      ));
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text(error is PostSaveException ? error.message : 'Không thể gửi duyệt tin đăng.'),
+      ));
+    } finally {
+      _submittingPosts.remove(id);
+    }
   }
 
   void _confirmCancelApproval(Map<String, dynamic> post) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math' as logger;
 import 'package:http/http.dart' as http;
+import '../auth_storage.dart';
 
 class ContractSummaryResponse {
   final int activeCount;
@@ -50,9 +51,13 @@ class ContractService {
       url += '?${params.join('&')}';
     }
 
+    final token = await AuthStorage.getAccessToken();
     final response = await http.get(
       Uri.parse(url),
-      headers: {'Accept': 'application/json'},
+      headers: {
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
     );
 
     if (response.statusCode == 200) {
@@ -66,18 +71,21 @@ class ContractService {
   // 2. Tạo hợp đồng mới hoặc lưu bản nháp
   static Future<dynamic> createContract(Map<String, dynamic> data) async {
     try {
+      final token = await AuthStorage.getAccessToken();
       final response = await http.post(
         Uri.parse(baseUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
         body: jsonEncode(data),
       );
-      final body = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        return body;
+        return jsonDecode(response.body);
       }
       return {
         'error': true,
-        'message': body['message'] ?? 'Không thể tạo hợp đồng.'
+        'message': _errorMessage(response, 'Không thể tạo hợp đồng.'),
       };
     } catch (e) {
       return {'error': true, 'message': 'Lỗi kết nối máy chủ.'};
@@ -91,9 +99,13 @@ class ContractService {
     required String tenantSignatureBase64,
   }) async {
     try {
+      final token = await AuthStorage.getAccessToken();
       final response = await http.put(
         Uri.parse('$baseUrl/$contractId/sign'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
         body: jsonEncode({
           'ownerSignature': ownerSignatureBase64,
           'tenantSignature': tenantSignatureBase64,
@@ -105,20 +117,55 @@ class ContractService {
     }
   }
 
+  static Future<String?> closeSigning({
+    required String contractId,
+    required bool reject,
+    required String reason,
+  }) async {
+    try {
+      final token = await AuthStorage.getAccessToken();
+      if (token == null || token.isEmpty) return 'Vui lòng đăng nhập lại.';
+
+      final action = reject ? 'reject-signing' : 'withdraw-signing';
+      final id = Uri.encodeComponent(contractId);
+      final response = await http.put(
+        Uri.parse('$baseUrl/$id/$action'),
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        body: jsonEncode({'reason': reason}),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) return null;
+      return _errorMessage(response, 'Không thể cập nhật yêu cầu ký.');
+    } catch (_) {
+      return 'Không thể kết nối máy chủ. Vui lòng thử lại.';
+    }
+  }
+
+  static String _errorMessage(http.Response response, String fallback) {
+    if (response.statusCode == 401) return 'Vui lòng đăng nhập lại.';
+    if (response.statusCode == 403) return 'Bạn không có quyền thực hiện thao tác này.';
+    try {
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      if (body is Map && body['message'] is String) return body['message'] as String;
+    } on FormatException {
+      return fallback;
+    }
+    return fallback;
+  }
 
   // Lấy danh sách phòng trống theo mã Chủ trọ
   static Future<List<dynamic>> getAvailableRooms({
     String? ownerId,
+    String? selectedRoomId,
   }) async {
     try {
-      var url = '$baseUrl/available-rooms';
-
-      if (ownerId != null && ownerId.isNotEmpty) {
-        url += '?ownerId=$ownerId';
-      }
+      final url = Uri.parse('$baseUrl/available-rooms').replace(queryParameters: {
+        if (ownerId != null && ownerId.isNotEmpty) 'ownerId': ownerId,
+        if (selectedRoomId != null && selectedRoomId.isNotEmpty) 'selectedRoomId': selectedRoomId,
+      });
 
       final response = await http.get(
-        Uri.parse(url),
+        url,
         headers: {'Accept': 'application/json'},
       );
 
