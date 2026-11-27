@@ -316,6 +316,12 @@ namespace Backend.Controllers
                     UpdatedAt = DateTime.UtcNow
                 };
 
+                if ((contract.Status == "active" || contract.Status == "pending") && room != null)
+                {
+                    room.Status = "rented";
+                    room.UpdatedAt = DateTime.UtcNow;
+                }
+
                 // 🔴 KHÓA CHỐNG LẶP HỢP ĐỒNG: Mỗi phòng chỉ được có 1 Hợp đồng Nháp hoặc 1 Hợp đồng Chờ ký
                 if (contract.Status == "draft")
                 {
@@ -501,13 +507,13 @@ namespace Backend.Controllers
 
        // GET: /api/OwnerContracts/available-rooms?ownerId=... (Lấy danh sách phòng trống theo Chủ trọ)
            [HttpGet("available-rooms")]
-           public async Task<IActionResult> GetAvailableRooms([FromQuery] string? ownerId)
+           public async Task<IActionResult> GetAvailableRooms([FromQuery] string? ownerId, [FromQuery] string? includeRoomId = null)
            {
                try
                {
                    var query = _context.Rooms
                        .Include(r => r.Property)
-                       .Where(r => r.Status == "available");
+                       .Where(r => r.Status == "available" || (!string.IsNullOrEmpty(includeRoomId) && r.Id == includeRoomId));
 
 
                    if (!string.IsNullOrEmpty(ownerId) && ownerId != "all")

@@ -12,10 +12,12 @@ import '../../services/owner/contract_service.dart';
 
 class Contract_form extends StatefulWidget {
   final Map<String, dynamic>? contract;
+  final String? initialRoomId;
 
   const Contract_form({
     super.key,
     this.contract,
+    this.initialRoomId,
   });
 
   @override
@@ -490,7 +492,10 @@ class HopDongMoi extends State<Contract_form> {
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingData = true);
     final ownerId = await AuthStorage.getUserId() ?? '';
-    final rooms = await ContractService.getAvailableRooms(ownerId: ownerId);
+    final rooms = await ContractService.getAvailableRooms(
+      ownerId: ownerId,
+      includeRoomId: widget.initialRoomId,
+    );
     final apts = await ContractService.getAppointments();
 
     debugPrint('--> [LOG] Số phòng trống: ${rooms.length} | Số lịch hẹn: ${apts.length}');
@@ -549,6 +554,14 @@ class HopDongMoi extends State<Contract_form> {
             orElse: () => _availableRooms.isNotEmpty ? _availableRooms.first : null,
           );
 
+          if (matchedRoom != null) {
+            _selectedRoom = Map<String, dynamic>.from(matchedRoom);
+          }
+        } else if (widget.initialRoomId != null && widget.initialRoomId!.isNotEmpty) {
+          final matchedRoom = _availableRooms.firstWhere(
+            (r) => _getRoomId(r).toLowerCase() == widget.initialRoomId!.toLowerCase(),
+            orElse: () => _availableRooms.isNotEmpty ? _availableRooms.first : null,
+          );
           if (matchedRoom != null) {
             _selectedRoom = Map<String, dynamic>.from(matchedRoom);
           }

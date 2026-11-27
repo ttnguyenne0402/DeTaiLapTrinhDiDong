@@ -109,12 +109,20 @@ class ContractService {
   // Lấy danh sách phòng trống theo mã Chủ trọ
   static Future<List<dynamic>> getAvailableRooms({
     String? ownerId,
+    String? includeRoomId,
   }) async {
     try {
       var url = '$baseUrl/available-rooms';
+      final params = <String>[];
 
       if (ownerId != null && ownerId.isNotEmpty) {
-        url += '?ownerId=$ownerId';
+        params.add('ownerId=${Uri.encodeComponent(ownerId)}');
+      }
+      if (includeRoomId != null && includeRoomId.isNotEmpty) {
+        params.add('includeRoomId=${Uri.encodeComponent(includeRoomId)}');
+      }
+      if (params.isNotEmpty) {
+        url += '?${params.join('&')}';
       }
 
       final response = await http.get(

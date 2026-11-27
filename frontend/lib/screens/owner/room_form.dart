@@ -8,6 +8,7 @@ import '../../services/owner/amenity_service.dart';
 import '../../services/owner/service_service.dart';
 import '../../services/auth_storage.dart';
 import '../../widgets/tenant/open_street_map_widget.dart';
+import 'contract_form.dart';
 
 // Màn hình biểu mẫu thêm mới hoặc chỉnh sửa phòng trọ
 class RoomFormScreen extends StatefulWidget {
@@ -546,6 +547,12 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                     return;
                                   }
 
+                                  if (_selectedStatus == 'Đang cho thuê' &&
+                                      widget.initialData?.statusText != 'Đang cho thuê') {
+                                    _handleSelectRentedStatus();
+                                    return;
+                                  }
+
                                   final messenger = ScaffoldMessenger.of(context);
                                   final navigator = Navigator.of(context);
 
@@ -1000,6 +1007,87 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
     );
   }
 
+  Future<void> _handleSelectRentedStatus() async {
+    final isEdit = widget.initialData != null;
+    if (!isEdit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Vui lòng lưu thông tin tạo phòng trước khi lập hợp đồng cho thuê!',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.description_outlined, color: primaryColor),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Lập hợp đồng thuê phòng',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Để chuyển trạng thái phòng sang "Đang cho thuê", bạn cần tạo Hợp đồng thuê phòng cho người thuê.\n\nBạn có muốn chuyển sang màn hình Lập hợp đồng ngay bây giờ không?',
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Làm hợp đồng ngay',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final contractCreated = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Contract_form(
+            initialRoomId: widget.initialData!.id,
+          ),
+        ),
+      );
+
+      if (contractCreated == true && mounted) {
+        setState(() {
+          _selectedStatus = 'Đang cho thuê';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Tạo hợp đồng thành công! Phòng đã được chuyển sang trạng thái Đang cho thuê.',
+            ),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    }
+  }
+
   Widget _buildStatusSelector() {
     final statuses = ['Còn trống', 'Đang cho thuê', 'Bảo trì'];
 
@@ -1030,6 +1118,10 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
             showCheckmark: false,
             onSelected: (selected) {
               if (selected) {
+                if (status == 'Đang cho thuê' && _selectedStatus != 'Đang cho thuê') {
+                  _handleSelectRentedStatus();
+                  return;
+                }
                 setState(() {
                   _selectedStatus = status;
                 });
