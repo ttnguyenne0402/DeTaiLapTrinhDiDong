@@ -4,7 +4,11 @@ import 'package:http/http.dart' as http;
 class PropertyModel {
   final String id;
   final String name;
+  final String type;
   final String address;
+  final String? district;
+  final String? ward;
+  final String? description;
   final double? latitude;
   final double? longitude;
   final int totalRooms;
@@ -16,7 +20,11 @@ class PropertyModel {
   PropertyModel({
     required this.id,
     required this.name,
+    this.type = 'rooming_house',
     required this.address,
+    this.district,
+    this.ward,
+    this.description,
     this.latitude,
     this.longitude,
     required this.totalRooms,
@@ -30,7 +38,11 @@ class PropertyModel {
     return PropertyModel(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
+      type: json['type'] ?? 'rooming_house',
       address: json['address'] ?? '',
+      district: json['district'],
+      ward: json['ward'],
+      description: json['description'],
       latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
       longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
       totalRooms: json['totalRooms'] ?? 0,
@@ -67,6 +79,24 @@ class PropertyService {
       Uri.parse('$baseUrl/api/owner/properties'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(data),
+    );
+
+    return response.statusCode == 200;
+  }
+
+  static Future<bool> updateProperty(String id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/owner/properties/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+
+    return response.statusCode == 200;
+  }
+
+  static Future<bool> deleteProperty(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/owner/properties/$id'),
     );
 
     return response.statusCode == 200;

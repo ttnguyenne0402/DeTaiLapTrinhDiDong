@@ -8,7 +8,9 @@ import '../../services/owner/property_service.dart';
 import '../../services/auth_storage.dart';
 
 class PropertyFormScreen extends StatefulWidget {
-  const PropertyFormScreen({super.key});
+  final PropertyModel? property;
+
+  const PropertyFormScreen({super.key, this.property});
 
   @override
   State<PropertyFormScreen> createState() => _PropertyFormScreenState();
@@ -30,8 +32,31 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
 
   final List<String> _selectedImages = [];
   String _selectedStatus = 'Đang hoạt động';
-  final String _selectedType = 'rooming_house';
+  String _selectedType = 'rooming_house';
   bool _isLoading = false;
+
+  bool get isEditing => widget.property != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isEditing) {
+      final p = widget.property!;
+      _nameController.text = p.name;
+      _addressController.text = p.address;
+      _districtController.text = p.district ?? '';
+      _wardController.text = p.ward ?? '';
+      if (p.latitude != null) _latController.text = p.latitude.toString();
+      if (p.longitude != null) _longController.text = p.longitude.toString();
+      _roomsController.text = p.totalRooms.toString();
+      _descController.text = p.description ?? '';
+      _selectedStatus = (p.status == 'Bảo trì' || p.status == 'inactive') ? 'Bảo trì' : 'Đang hoạt động';
+      _selectedType = p.type;
+      if (p.image.isNotEmpty && !p.image.contains('anhPhongDemo.jpg')) {
+        _selectedImages.add(p.image);
+      }
+    }
+  }
 
   // Chọn ảnh từ Camera hoặc Thư viện (Gallery)
   Future<void> _showImageSourceSheet() async {
@@ -146,25 +171,29 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
         'description': _descController.text.trim(),
         'image': _selectedImages.isNotEmpty
             ? _selectedImages.first
-            : 'frontend/assets/images/anhPhongDemo.jpg',
+            : (widget.property?.image.isNotEmpty == true
+                ? widget.property!.image
+                : 'frontend/assets/images/anhPhongDemo.jpg'),
       };
 
       try {
-        bool success = await PropertyService.createProperty(data);
+        final bool success = isEditing
+            ? await PropertyService.updateProperty(widget.property!.id, data)
+            : await PropertyService.createProperty(data);
         setState(() => _isLoading = false);
 
         if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Thêm tòa nhà thành công'),
+            SnackBar(
+              content: Text(isEditing ? 'Cập nhật bất động sản thành công' : 'Thêm tòa nhà thành công'),
               backgroundColor: Colors.green,
             ),
           );
           Navigator.pop(context, true);
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Thêm tòa nhà thất bại. Vui lòng thử lại!'),
+            SnackBar(
+              content: Text(isEditing ? 'Cập nhật bất động sản thất bại. Vui lòng thử lại!' : 'Thêm tòa nhà thất bại. Vui lòng thử lại!'),
               backgroundColor: Colors.red,
             ),
           );
@@ -204,9 +233,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Thêm Bất động sản mới',
-          style: TextStyle(
+        title: Text(
+          isEditing ? 'Chỉnh sửa Bất động sản' : 'Thêm Bất động sản mới',
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -393,9 +422,9 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                         ),
                         child: _isLoading
                             ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text(
-                                'Thêm bất động sản',
-                                style: TextStyle(
+                            : Text(
+                                isEditing ? 'LƯU THAY ĐỔI' : 'Thêm bất động sản',
+                                style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -616,13 +645,37 @@ class _PropertyFormScreenState extends State<PropertyFormScreen> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.file(
-                          File(path),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const Icon(
-                            Icons.image,
-                            color: Colors.grey,
-                          ),
+                        Builder(
+                          builder: (context) {
+                            if (path.startsWith('http://') || path.startsWith('https://')) {
+                              return Image.network(
+                                path,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => const Icon(
+                                  Icons.image,
+                                  color: Colors.grey,
+                                ),
+                              );
+                            }
+                            if (path.startsWith('frontend/') || path.startsWith('assets/')) {
+                              return Image.asset(
+                                path,
+                                fit: BoxFit.cover,
+                                errorBuilder: (c, e, s) => const Icon(
+                                  Icons.image,
+                                  color: Colors.grey,
+                                ),
+                              );
+                            }
+                            return Image.file(
+                              File(path),
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, e, s) => const Icon(
+                                Icons.image,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
                         ),
                         Positioned(
                           top: 4,

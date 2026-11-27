@@ -59,9 +59,13 @@ namespace Backend.Controllers
                 {
                     Id = p.Id ?? string.Empty,
                     Name = p.Name ?? string.Empty,
+                    Type = p.Type ?? "rooming_house",
                     Address = p.Address ?? string.Empty,
+                    District = p.District ?? string.Empty,
+                    Ward = p.Ward ?? string.Empty,
                     Latitude = p.Latitude,
                     Longitude = p.Longitude,
+                    Description = p.Description ?? string.Empty,
                     TotalRooms = allRooms.Count(r => r.PropertyId == p.Id),
                     RentedRooms = allRooms.Count(r => r.PropertyId == p.Id && r.Status == "rented"),
                     EmptyRooms = allRooms.Count(r => r.PropertyId == p.Id && r.Status == "available"),
@@ -108,6 +112,7 @@ namespace Backend.Controllers
                     Latitude = dto.Latitude.Value,
                     Longitude = dto.Longitude.Value,
                     Description = dto.Description,
+                    Image = string.IsNullOrEmpty(dto.Image) ? "frontend/assets/images/anhPhongDemo.jpg" : dto.Image,
                     Status = string.IsNullOrEmpty(dto.Status) ? "active" : dto.Status
                 };
 
@@ -119,6 +124,68 @@ namespace Backend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi thêm bất động sản", error = ex.Message });
+            }
+        }
+
+        // PUT: api/owner/properties/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateProperty(string id, [FromBody] UpdatePropertyDto dto)
+        {
+            try
+            {
+                var property = await _context.Properties.FirstOrDefaultAsync(p => p.Id == id);
+                if (property == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy bất động sản cần cập nhật." });
+                }
+
+                if (string.IsNullOrEmpty(dto.Name))
+                {
+                    return BadRequest(new { message = "Tên bất động sản không được để trống." });
+                }
+
+                property.Name = dto.Name;
+                if (!string.IsNullOrEmpty(dto.Type)) property.Type = dto.Type;
+                if (!string.IsNullOrEmpty(dto.Address)) property.Address = dto.Address;
+                if (!string.IsNullOrEmpty(dto.District)) property.District = dto.District;
+                if (!string.IsNullOrEmpty(dto.Ward)) property.Ward = dto.Ward;
+                if (dto.Latitude.HasValue) property.Latitude = dto.Latitude.Value;
+                if (dto.Longitude.HasValue) property.Longitude = dto.Longitude.Value;
+                property.Description = dto.Description;
+                if (!string.IsNullOrEmpty(dto.Status)) property.Status = dto.Status;
+                if (!string.IsNullOrEmpty(dto.Image)) property.Image = dto.Image;
+                property.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Cập nhật bất động sản thành công" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi cập nhật bất động sản", error = ex.Message });
+            }
+        }
+
+        // DELETE: api/owner/properties/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteProperty(string id)
+        {
+            try
+            {
+                var property = await _context.Properties.FirstOrDefaultAsync(p => p.Id == id);
+                if (property == null)
+                {
+                    return NotFound(new { message = "Không tìm thấy bất động sản cần xóa." });
+                }
+
+                _context.Properties.Remove(property);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Xóa bất động sản thành công" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi khi xóa bất động sản", error = ex.Message });
             }
         }
     }
