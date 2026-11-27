@@ -107,7 +107,7 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
             final amnStr = (draft['amenities'] ?? '').toString();
             final amnList = amnStr.isNotEmpty
                 ? amnStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
-                : <String>['Wifi', 'Chỗ để xe'];
+                : <String>[];
 
             _posts.insert(0, {
               'id': 'sqlite_${draft['id']}',
@@ -1033,7 +1033,7 @@ class _PostsManageScreenState extends State<PostsManageScreen> {
         'title': post['title'] ?? 'Tin đăng phòng trọ',
         'description': post['description'] ?? '',
         'price': cleanPrice,
-        'amenities': post['amenities'] is List ? post['amenities'] : ['Wifi', 'Chỗ để xe'],
+        'amenities': post['amenities'] is List ? post['amenities'] : <String>[],
         'submitNote': note.isNotEmpty ? note : 'Gửi duyệt từ bản nháp',
         'status': 'pending',
         'images': [

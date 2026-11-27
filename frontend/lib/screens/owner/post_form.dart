@@ -100,7 +100,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
         }
       }
     } else {
-      selectedAmenities.addAll(['Wifi', 'Chỗ để xe']);
       _selectedImages.add('frontend/assets/images/anhPhongDemo.jpg');
     }
     _priceController = TextEditingController(text: priceStr);
