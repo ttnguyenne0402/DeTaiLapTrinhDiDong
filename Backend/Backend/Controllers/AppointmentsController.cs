@@ -75,6 +75,11 @@ namespace Backend.Controllers
                 var tomorrow = today.AddDays(1);
 
                 // Quét danh sách phòng đã cho thuê hoặc đang có hợp đồng chờ ký
+                var activeContractRoomIds = new HashSet<string>(
+                    await _context.Contracts.Where(c => c.Status == "active").Select(c => c.RoomId).ToListAsync(),
+                    StringComparer.OrdinalIgnoreCase
+                );
+
                 var rentedRoomIds = new HashSet<string>(
                     await _context.Rooms.Where(r => r.Status == "rented").Select(r => r.Id).ToListAsync(),
                     StringComparer.OrdinalIgnoreCase
@@ -106,8 +111,9 @@ namespace Backend.Controllers
                     string displayRoomName = roomName.StartsWith("Phòng", StringComparison.OrdinalIgnoreCase) ? roomName : $"Phòng {roomName}";
                     string roomInfo = string.IsNullOrEmpty(propName) ? displayRoomName : $"{displayRoomName} - {propName}";
 
-                    bool isRented = rentedRoomIds.Contains(v.RoomId) || (v.Room != null && v.Room.Status == "rented");
-                    bool hasPendingContract = pendingContractRoomIds.Contains(v.RoomId);
+                    bool hasActiveContract = activeContractRoomIds.Contains(v.RoomId);
+                    bool hasPendingContract = pendingContractRoomIds.Contains(v.RoomId) && !hasActiveContract;
+                    bool isRented = hasActiveContract || (!hasPendingContract && (rentedRoomIds.Contains(v.RoomId) || (v.Room != null && v.Room.Status == "rented")));
                     string roomStatus = isRented ? "rented" : (hasPendingContract ? "pending" : (v.Room?.Status ?? "available"));
 
                     return new OwnerAppointmentDto

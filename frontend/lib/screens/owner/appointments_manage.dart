@@ -382,7 +382,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
   }
 
   // Mở thẳng form Tạo hợp đồng (Contract_form) với thông tin khách và phòng điền sẵn
-  void _openCreateContract(Map<String, dynamic> item) {
+  Future<void> _openCreateContract(Map<String, dynamic> item) async {
     final double rentVal = (item['roomPrice'] as num?)?.toDouble() ?? 3500000;
     final double depositVal = (item['roomDeposit'] as num?)?.toDouble() ?? rentVal;
     final String formattedRent = _formatVndNumber(rentVal);
@@ -393,12 +393,16 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
     final String fullAddress = propAddr.isNotEmpty
         ? '$propName - $propAddr'
         : (propName.isNotEmpty ? propName : 'Khu trọ An Khang');
+    final String roomId = (item['roomId'] ?? '').toString();
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => Contract_form(
+          initialRoomId: roomId.isNotEmpty ? roomId : null,
           contract: {
+            'roomId': roomId,
+            'viewingAppointmentId': item['id'] ?? '',
             'tenantName': item['name'] ?? '',
             'tenantPhone': item['phone'] ?? '',
             'room': item['roomInfo'] ?? '',
@@ -411,6 +415,47 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                 '#${item['id']} - ${item['name']} (${item['time']})',
           },
         ),
+      ),
+    );
+
+    if (mounted) {
+      await _loadAppointments();
+    }
+  }
+
+  Widget _buildTenantAvatar(String avatarUrl) {
+    final trimmed = avatarUrl.trim();
+    final resolved = trimmed.startsWith('/')
+        ? 'http://10.0.2.2:5093$trimmed'
+        : trimmed;
+    const fallbackAsset = 'frontend/assets/images/avatarDemo.jpg';
+
+    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: Colors.grey.shade200,
+        child: ClipOval(
+          child: Image.network(
+            resolved,
+            width: 40,
+            height: 40,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Image.asset(
+              fallbackAsset,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: Colors.grey.shade200,
+      backgroundImage: AssetImage(
+        resolved.startsWith('frontend/assets/') ? resolved : fallbackAsset,
       ),
     );
   }
@@ -572,12 +617,7 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
             const SizedBox(height: 12),
             Row(
               children: [
-                const CircleAvatar(
-                  radius: 20,
-                  backgroundImage: AssetImage(
-                    'frontend/assets/images/avatarDemo.jpg',
-                  ),
-                ),
+                _buildTenantAvatar(item['avatar']?.toString() ?? ''),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -747,34 +787,46 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                 ],
               ),
             if (status == 'completed')
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Đã hoàn tất xem phòng',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.green[700],
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  Builder(
-                    builder: (context) {
-                      final String roomSt = (item['roomStatus'] ?? item['RoomStatus'] ?? '').toString().toLowerCase();
-                      final bool isPendingContract = roomSt == 'pending' || roomSt == 'chờ ký' || item['hasPendingContract'] == true;
-                      final bool isRented = roomSt == 'rented' || roomSt == 'đã cho thuê' || item['isRented'] == true;
-                      final bool isRoomLocked = isPendingContract || isRented || item['hasContract'] == true;
+              Builder(
+                builder: (context) {
+                  final String roomSt = (item['roomStatus'] ?? item['RoomStatus'] ?? '').toString().toLowerCase();
+                  final bool isPendingContract = roomSt == 'pending' || roomSt == 'chờ ký' || item['hasPendingContract'] == true;
+                  final bool isRented = roomSt == 'rented' || roomSt == 'đã cho thuê' || item['isRented'] == true;
+                  final bool isRoomLocked = isPendingContract || isRented || item['hasContract'] == true;
 
-                      String btnLabel = 'Lập hợp đồng';
-                      if (isRented) {
-                        btnLabel = 'Phòng đã được thuê 🛑';
-                      } else if (isPendingContract) {
-                        btnLabel = 'Đang chờ ký 🔒';
-                      } else if (isRoomLocked) {
-                        btnLabel = 'Đã có hợp đồng 🛑';
-                      }
+                  String statusCaption = 'Đã hoàn tất xem phòng';
+                  Color captionColor = Colors.green[700]!;
+                  String btnLabel = 'Lập hợp đồng';
 
-                      return ElevatedButton.icon(
+                  if (isRented) {
+                    statusCaption = 'Đã hoàn tất - Đã cho thuê';
+                    captionColor = Colors.grey[700]!;
+                    btnLabel = 'Phòng đã được thuê 🛑';
+                  } else if (isPendingContract) {
+                    statusCaption = 'Đã gửi hợp đồng chờ ký';
+                    captionColor = Colors.orange[800]!;
+                    btnLabel = 'Đang chờ ký 🔒';
+                  } else if (isRoomLocked) {
+                    statusCaption = 'Đã hoàn tất - Có hợp đồng';
+                    captionColor = Colors.grey[700]!;
+                    btnLabel = 'Đã có hợp đồng 🛑';
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          statusCaption,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: captionColor,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
                         onPressed: isRoomLocked ? null : () => _openCreateContract(item),
                         icon: Icon(
                           isRoomLocked ? Icons.lock_outline : Icons.description_outlined,
@@ -800,10 +852,10 @@ class _AppointmentsManageScreenState extends State<AppointmentsManageScreen>
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             if (status == 'cancelled' || status == 'rejected')
               Row(
