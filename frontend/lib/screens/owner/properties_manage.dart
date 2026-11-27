@@ -332,43 +332,6 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
                       right: 12,
                       child: _buildStatusBadge(item.status),
                     ),
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => _openEditProperty(item),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.65),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white38),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.edit, size: 14, color: Colors.white),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Sửa BĐS',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
