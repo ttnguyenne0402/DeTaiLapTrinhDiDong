@@ -125,7 +125,7 @@ namespace Backend.Controllers
                         Price = postPrice,
                         PriceFormatted = $"{postPrice:N0}".Replace(",", ".") + "đ/tháng",
                         Amenities = amenitiesList,
-                        Views = p.Views > 0 ? p.Views : (100 + Math.Abs(p.Id.GetHashCode() % 150)),
+                        Views = p.Views,
                         Likes = likes,
                         Date = (p.CreatedAt ?? DateTime.Now).ToString("dd/MM/yyyy"),
                         Status = normalizedStatus,
@@ -162,6 +162,24 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy bài đăng" });
                 }
 
+                // 1. Tự động tăng lượt xem thật và lưu lại vào database mỗi khi xem chi tiết bài đăng
+                p.Views += 1;
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch
+                {
+                    // Tránh chặn luồng xem bài nếu có tranh chấp ghi dữ liệu
+                }
+
+                // 2. Đếm số lượng yêu thích (thả tim) thực tế từ bảng Favorites
+                int likesCount = 0;
+                if (!string.IsNullOrEmpty(p.RoomId))
+                {
+                    likesCount = await _context.Favorites.CountAsync(f => f.RoomId == p.RoomId);
+                }
+
                 var firstImg = p.RentalPostImages?.FirstOrDefault()?.ImagePath
                                ?? p.Room?.Images
                                ?? "frontend/assets/images/anhPhongDemo.jpg";
@@ -196,8 +214,8 @@ namespace Backend.Controllers
                     Price = postPrice,
                     PriceFormatted = $"{postPrice:N0}".Replace(",", ".") + "đ/tháng",
                     Amenities = amenitiesList,
-                    Views = p.Views > 0 ? p.Views : 120,
-                    Likes = 5,
+                    Views = p.Views,
+                    Likes = likesCount,
                     Date = (p.CreatedAt ?? DateTime.Now).ToString("dd/MM/yyyy"),
                     Status = normalizedStatus,
                     SubmitNote = !string.IsNullOrEmpty(p.SubmitNote) ? p.SubmitNote : (normalizedStatus == "pending" ? "Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC" : null),
