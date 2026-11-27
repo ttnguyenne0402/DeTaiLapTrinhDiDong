@@ -31,19 +31,22 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Biểu đồ
+  # Biểu đồ & PDF
   syncfusion_flutter_charts: ^28.2.3
+  syncfusion_flutter_pdf: ^28.2.12
   fl_chart: ^1.2.0
 
   # Giao diện và tiện ích
   cupertino_icons: ^1.0.8
   cupertino_calendar_picker: ^2.2.6
   image_picker: ^1.2.0
+  file_picker: ^13.4.1
   signature: ^6.4.0
 
   # Bản đồ OpenStreetMap
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
+  maplibre_gl: ^0.27.1
 
   # Định vị GPS của người dùng
   geolocator: ^13.0.0
@@ -61,9 +64,8 @@ dependencies:
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^11.2.0
   flutter_local_notifications: ^18.0.1
-
-  syncfusion_flutter_pdf: ^28.2.3
-  file_picker: ^13.4.0
+  flutter_markdown: ^0.7.7+1
+  firebase_messaging: ^15.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
