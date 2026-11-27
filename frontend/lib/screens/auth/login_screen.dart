@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen>
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
     serverClientId:
-        '843670435307-mngs2e74rvnfc3rb7044alb5m60fs2ea.apps.googleusercontent.com',
+        '53430291551-s2rtk8huntktftrckorjk5ckb31knkn9.apps.googleusercontent.com',
   );
 
   bool _obscurePassword = true;
