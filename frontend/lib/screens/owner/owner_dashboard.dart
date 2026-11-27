@@ -173,12 +173,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     // Phần Thông tin cá nhân
                     Row(
                       children: [
-                        const CircleAvatar(
-                          radius: 24,
-                          backgroundImage: AssetImage(
-                            "frontend/assets/images/avatarDemo.jpg",
-                          ),
-                        ),
+                        _buildAvatar(data.ownerAvatar, 24),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,8 +334,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 8.0),
                                 child: _buildViewingItem(
-                                  avatarPath:
-                                      "frontend/assets/images/avatarDemo.jpg",
+                                  avatarPath: item.avatar,
                                   time: item.time,
                                   name: item.name,
                                   roomInfo: item.roomInfo,
@@ -462,6 +456,44 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     );
   }
 
+  Widget _buildAvatar(String avatarUrl, double radius) {
+    final trimmed = avatarUrl.trim();
+    final resolved = trimmed.startsWith('/')
+        ? 'http://10.0.2.2:5093$trimmed'
+        : trimmed;
+    final size = radius * 2;
+    const fallbackAsset = 'frontend/assets/images/avatarDemo.jpg';
+
+    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.grey.shade200,
+        child: ClipOval(
+          child: Image.network(
+            resolved,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Image.asset(
+              fallbackAsset,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade200,
+      backgroundImage: AssetImage(
+        resolved.startsWith('frontend/assets/') ? resolved : fallbackAsset,
+      ),
+    );
+  }
+
   // Card lịch hẹn: Nhấn vô nhảy sang trang duyệt đặt lịch xem phòng
   Widget _buildViewingItem({
     required String avatarPath,
@@ -484,7 +516,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 20, backgroundImage: AssetImage(avatarPath)),
+              _buildAvatar(avatarPath, 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 class DashboardAppointment {
   final String time;
   final String name;
+  final String avatar;
   final String roomInfo;
   final String status;
   final String phone;
@@ -11,6 +12,7 @@ class DashboardAppointment {
   DashboardAppointment({
     required this.time,
     required this.name,
+    this.avatar = '',
     required this.roomInfo,
     required this.status,
     required this.phone,
@@ -20,6 +22,7 @@ class DashboardAppointment {
     return DashboardAppointment(
       time: json['time'] ?? '',
       name: json['name'] ?? '',
+      avatar: json['avatar']?.toString() ?? '',
       roomInfo: json['roomInfo'] ?? '',
       status: json['status'] ?? '',
       phone: json['phone'] ?? '',
@@ -29,6 +32,9 @@ class DashboardAppointment {
 
 class OwnerDashboardModel {
   final String ownerName;
+  final String ownerAvatar;
+  final String ownerPhone;
+  final String ownerArea;
   final String ownerRole;
   final int totalRentedRooms;
   final int scheduledAppointments;
@@ -38,6 +44,9 @@ class OwnerDashboardModel {
 
   OwnerDashboardModel({
     required this.ownerName,
+    this.ownerAvatar = '',
+    this.ownerPhone = '',
+    this.ownerArea = '',
     required this.ownerRole,
     required this.totalRentedRooms,
     required this.scheduledAppointments,
@@ -54,6 +63,9 @@ class OwnerDashboardModel {
 
     return OwnerDashboardModel(
       ownerName: json['ownerName'] ?? '',
+      ownerAvatar: json['ownerAvatar']?.toString() ?? '',
+      ownerPhone: json['ownerPhone']?.toString() ?? '',
+      ownerArea: json['ownerArea']?.toString() ?? '',
       ownerRole: json['ownerRole'] ?? '',
       totalRentedRooms: json['totalRentedRooms'] ?? 0,
       scheduledAppointments: json['scheduledAppointments'] ?? 0,
@@ -69,9 +81,9 @@ class OwnerDashboardService {
   static const String baseUrl = 'http://10.0.2.2:5093';
 
   static Future<OwnerDashboardModel> fetchDashboardData(String ownerId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/owner/dashboard/$ownerId'),
-    );
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/owner/dashboard/$ownerId'))
+        .timeout(const Duration(seconds: 15));
 
     if (response.statusCode == 200) {
       return OwnerDashboardModel.fromJson(jsonDecode(response.body));
