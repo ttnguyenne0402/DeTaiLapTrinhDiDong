@@ -40,6 +40,7 @@ namespace Backend.Controllers
 
                 var query = _context.Rooms
                     .Include(r => r.Property)
+                    .Include(r => r.Contracts)
                     .Include(r => r.RoomAmenities)
                         .ThenInclude(ra => ra.Amenity)
                     .Include(r => r.RoomServices)
@@ -92,6 +93,8 @@ namespace Backend.Controllers
                     Status = r.Status,
                     StatusText = r.Status == "rented" ? "Đang cho thuê" : (r.Status == "available" ? "Còn trống" : "Bảo trì"),
                     IsRented = r.Status == "rented",
+                    HasActiveContract = r.Contracts.Any(c => c.Status == "active" || c.Status == "pending"),
+                    ActiveContractCode = r.Contracts.FirstOrDefault(c => c.Status == "active" || c.Status == "pending")?.ContractCode,
                     Detail = $"{r.Area} m²" + (r.Floor.HasValue ? $" - Tầng {r.Floor}" : ""),
                     PriceFormatted = $"{r.Price:N0}đ",
                     Images = string.IsNullOrEmpty(r.Images) ? "frontend/assets/images/anhPhongDemo.jpg" : r.Images,
@@ -119,6 +122,7 @@ namespace Backend.Controllers
             {
                 var r = await _context.Rooms
                     .Include(x => x.Property)
+                    .Include(x => x.Contracts)
                     .Include(x => x.RoomAmenities)
                         .ThenInclude(ra => ra.Amenity)
                     .Include(x => x.RoomServices)
@@ -145,6 +149,8 @@ namespace Backend.Controllers
                     Status = r.Status,
                     StatusText = r.Status == "rented" ? "Đang cho thuê" : (r.Status == "available" ? "Còn trống" : "Bảo trì"),
                     IsRented = r.Status == "rented",
+                    HasActiveContract = r.Contracts.Any(c => c.Status == "active" || c.Status == "pending"),
+                    ActiveContractCode = r.Contracts.FirstOrDefault(c => c.Status == "active" || c.Status == "pending")?.ContractCode,
                     Detail = $"{r.Area} m²" + (r.Floor.HasValue ? $" - Tầng {r.Floor}" : ""),
                     PriceFormatted = $"{r.Price:N0}đ",
                     Images = string.IsNullOrEmpty(r.Images) ? "frontend/assets/images/anhPhongDemo.jpg" : r.Images,
@@ -367,10 +373,28 @@ namespace Backend.Controllers
                 if (!string.IsNullOrWhiteSpace(dto.Status))
                 {
                     string s = dto.Status.ToLower();
-                    if (s.Contains("trống") || s == "available") room.Status = "available";
-                    else if (s.Contains("thuê") || s == "rented") room.Status = "rented";
-                    else if (s.Contains("trì") || s == "maintenance") room.Status = "maintenance";
-                    else room.Status = dto.Status;
+                    string targetStatus = room.Status;
+                    if (s.Contains("trống") || s == "available") targetStatus = "available";
+                    else if (s.Contains("thuê") || s == "rented") targetStatus = "rented";
+                    else if (s.Contains("trì") || s == "maintenance") targetStatus = "maintenance";
+                    else targetStatus = dto.Status;
+
+                    if (targetStatus != "rented")
+                    {
+                        var activeContract = await _context.Contracts
+                            .FirstOrDefaultAsync(c => c.RoomId == room.Id && (c.Status == "active" || c.Status == "pending"));
+
+                        if (activeContract != null)
+                        {
+                            string code = !string.IsNullOrEmpty(activeContract.ContractCode) ? $" (Mã HĐ: {activeContract.ContractCode})" : "";
+                            return BadRequest(new
+                            {
+                                message = $"Phòng này hiện đang có hợp đồng thuê còn hiệu lực{code}. Bạn phải thanh lý hoặc xóa hợp đồng trước khi chuyển trạng thái phòng!"
+                            });
+                        }
+                    }
+
+                    room.Status = targetStatus;
                 }
 
                 if (dto.AmenityIds != null)

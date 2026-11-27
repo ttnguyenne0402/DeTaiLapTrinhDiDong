@@ -23,6 +23,8 @@ class RoomModel {
   final List<String> amenities;
   final List<String> serviceIds;
   final List<String> services;
+  final bool hasActiveContract;
+  final String? activeContractCode;
 
   RoomModel({
     required this.id,
@@ -46,6 +48,8 @@ class RoomModel {
     this.amenities = const [],
     this.serviceIds = const [],
     this.services = const [],
+    this.hasActiveContract = false,
+    this.activeContractCode,
   });
 
   factory RoomModel.fromJson(Map<String, dynamic> json) {
@@ -83,6 +87,8 @@ class RoomModel {
               ?.map((e) => e.toString())
               .toList() ??
           [],
+      hasActiveContract: json['hasActiveContract'] ?? json['HasActiveContract'] ?? false,
+      activeContractCode: json['activeContractCode'] ?? json['ActiveContractCode'],
     );
   }
 }

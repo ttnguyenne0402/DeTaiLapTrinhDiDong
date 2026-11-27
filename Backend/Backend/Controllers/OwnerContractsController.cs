@@ -609,6 +609,22 @@ namespace Backend.Controllers
                 }
 
                 _context.Contracts.Remove(contract);
+
+                if (!string.IsNullOrEmpty(contract.RoomId))
+                {
+                    var hasOtherActive = await _context.Contracts
+                        .AnyAsync(c => c.Id != contract.Id && c.RoomId == contract.RoomId && (c.Status == "active" || c.Status == "pending"));
+                    if (!hasOtherActive)
+                    {
+                        var room = await _context.Rooms.FindAsync(contract.RoomId);
+                        if (room != null && room.Status == "rented")
+                        {
+                            room.Status = "available";
+                            room.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                }
+
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Đã xóa bản nháp thành công!" });

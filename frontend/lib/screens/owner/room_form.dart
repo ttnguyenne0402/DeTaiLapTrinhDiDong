@@ -9,6 +9,7 @@ import '../../services/owner/service_service.dart';
 import '../../services/auth_storage.dart';
 import '../../widgets/tenant/open_street_map_widget.dart';
 import 'contract_form.dart';
+import 'contracts_manage.dart';
 
 // Màn hình biểu mẫu thêm mới hoặc chỉnh sửa phòng trọ
 class RoomFormScreen extends StatefulWidget {
@@ -553,6 +554,11 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
                                     return;
                                   }
 
+                                  if (_selectedStatus != 'Đang cho thuê' && _hasActiveContract()) {
+                                    _handleBlockChangeFromRentedStatus(_selectedStatus);
+                                    return;
+                                  }
+
                                   final messenger = ScaffoldMessenger.of(context);
                                   final navigator = Navigator.of(context);
 
@@ -1088,6 +1094,64 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
     }
   }
 
+  bool _hasActiveContract() {
+    if (widget.initialData != null) {
+      if (widget.initialData!.hasActiveContract) return true;
+      if (widget.initialData!.statusText == 'Đang cho thuê' || widget.initialData!.isRented) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _handleBlockChangeFromRentedStatus(String targetStatus) {
+    final contractCode = widget.initialData?.activeContractCode;
+    final codeText = (contractCode != null && contractCode.isNotEmpty) ? ' (Mã HĐ: $contractCode)' : '';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 26),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'Hợp đồng còn hiệu lực',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Phòng này hiện đang có hợp đồng thuê còn hiệu lực$codeText.\n\nBạn chỉ có thể chuyển phòng sang trạng thái "$targetStatus" sau khi hợp đồng đã được Thanh lý hoặc Xóa khỏi hệ thống!',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đã hiểu', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const Contracts_manager()),
+              );
+            },
+            child: const Text('Xem hợp đồng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusSelector() {
     final statuses = ['Còn trống', 'Đang cho thuê', 'Bảo trì'];
 
@@ -1120,6 +1184,10 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
               if (selected) {
                 if (status == 'Đang cho thuê' && _selectedStatus != 'Đang cho thuê') {
                   _handleSelectRentedStatus();
+                  return;
+                }
+                if (status != 'Đang cho thuê' && _hasActiveContract()) {
+                  _handleBlockChangeFromRentedStatus(status);
                   return;
                 }
                 setState(() {
