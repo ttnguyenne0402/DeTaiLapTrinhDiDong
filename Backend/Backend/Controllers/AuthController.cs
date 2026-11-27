@@ -1074,7 +1074,7 @@ namespace Backend.Controllers
             ValidateGoogleToken(string idToken)
         {
             const string webClientId =
-                "843670435307-mngs2e74rvnfc3rb7044alb5m60fs2ea.apps.googleusercontent.com";
+                "53430291551-s2rtk8huntktftrckorjk5ckb31knkn9.apps.googleusercontent.com";
 
             return await GoogleJsonWebSignature.ValidateAsync(
                 idToken,
