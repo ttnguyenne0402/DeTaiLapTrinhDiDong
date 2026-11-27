@@ -5,6 +5,7 @@ namespace Backend.DT0s
         public string Id { get; set; } = string.Empty;
         public string PropertyId { get; set; } = string.Empty;
         public string PropertyName { get; set; } = string.Empty;
+        public string PropertyStatus { get; set; } = "active"; // active, inactive, maintenance
         public string Name { get; set; } = string.Empty;
         public decimal Area { get; set; }
         public int? Floor { get; set; }

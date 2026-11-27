@@ -177,12 +177,98 @@ namespace Backend.Controllers
                 });
             }
 
+            // 1. Tự động tăng lượt xem của bài đăng khi khách hàng xem chi tiết phòng
+            var post = await _context.RentalPosts.FirstOrDefaultAsync(p => p.RoomId == id);
+            if (post != null)
+            {
+                post.Views += 1;
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch
+                {
+                    // Tránh chặn luồng xem phòng nếu có xung đột ghi
+                }
+            }
+
             return Ok(new
             {
                 success = true,
                 message = "Lấy thông tin phòng thành công",
                 data = room
             });
+        }
+
+        // POST: api/Room/{id}/favorite?userId={userId}
+        [HttpPost("{id}/favorite")]
+        public async Task<IActionResult> ToggleFavorite(string id, [FromQuery] string? userId)
+        {
+            try
+            {
+                var room = await _context.Rooms.FindAsync(id);
+                if (room == null)
+                {
+                    return NotFound(new { success = false, message = "Không tìm thấy phòng." });
+                }
+
+                // Tìm user hợp lệ để liên kết (chỉ khách hàng / tenant mới có thể yêu thích)
+                User? user = null;
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                    if (user != null && (user.Role == "owner" || user.Role == "landlord"))
+                    {
+                        return BadRequest(new { success = false, message = "Chủ trọ không thể tự thích bài đăng của mình." });
+                    }
+                }
+
+                if (user == null)
+                {
+                    user = await _context.Users.FirstOrDefaultAsync(u => u.Role == "tenant" || u.Role == "user")
+                           ?? await _context.Users.FirstOrDefaultAsync();
+                }
+
+                if (user == null)
+                {
+                    return BadRequest(new { success = false, message = "Không xác định được người dùng." });
+                }
+
+                var existing = await _context.Favorites.FirstOrDefaultAsync(f => f.RoomId == id && f.UserId == user.Id);
+                bool isFavorite;
+                if (existing != null)
+                {
+                    _context.Favorites.Remove(existing);
+                    isFavorite = false;
+                }
+                else
+                {
+                    var newFav = new Favorite
+                    {
+                        Id = "FAV_" + Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper(),
+                        RoomId = id,
+                        UserId = user.Id,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Favorites.Add(newFav);
+                    isFavorite = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                int likesCount = await _context.Favorites.CountAsync(f => f.RoomId == id);
+                return Ok(new
+                {
+                    success = true,
+                    isFavorite,
+                    likesCount,
+                    message = isFavorite ? "Đã thêm vào yêu thích" : "Đã bỏ khỏi yêu thích"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
         }
     }
 }

@@ -65,4 +65,19 @@ class RoomService {
       throw Exception('Lỗi tải chi tiết phòng: $e');
     }
   }
+
+  Future<Map<String, dynamic>> toggleFavorite(String roomId, {String? userId}) async {
+    try {
+      final query = (userId != null && userId.isNotEmpty) ? '?userId=$userId' : '';
+      final uri = Uri.parse('$baseUrl/Room/${Uri.encodeComponent(roomId)}/favorite$query');
+      final response = await http
+          .post(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      }
+    } catch (_) {}
+    return {};
+  }
 }

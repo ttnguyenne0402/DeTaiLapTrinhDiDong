@@ -5,6 +5,7 @@ class RoomModel {
   final String id;
   final String propertyId;
   final String propertyName;
+  final String propertyStatus;
   final String name;
   final double area;
   final int? floor;
@@ -27,6 +28,7 @@ class RoomModel {
     required this.id,
     required this.propertyId,
     required this.propertyName,
+    this.propertyStatus = 'active',
     required this.name,
     required this.area,
     this.floor,
@@ -51,6 +53,7 @@ class RoomModel {
       id: json['id'] ?? '',
       propertyId: json['propertyId'] ?? '',
       propertyName: json['propertyName'] ?? '',
+      propertyStatus: json['propertyStatus'] ?? json['PropertyStatus'] ?? 'active',
       name: json['name'] ?? '',
       area: (json['area'] is num) ? (json['area'] as num).toDouble() : 0.0,
       floor: json['floor'],
