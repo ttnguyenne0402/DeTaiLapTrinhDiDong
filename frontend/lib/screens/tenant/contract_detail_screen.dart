@@ -436,21 +436,6 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                       ),
                     ),
                   const SizedBox(height: 12),
-
-                  // Nút xem PDF
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primaryGreen),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.picture_as_pdf, color: AppColors.primaryGreen),
-                      label: const Text('XEM FILE HỢP ĐỒNG (PDF)', style: TextStyle(color: AppColors.primaryGreen, fontWeight: FontWeight.bold)),
-                      onPressed: _openPdfContract,
-                    ),
-                  ),
                 ],
               ),
             ),

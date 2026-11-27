@@ -46,7 +46,11 @@ namespace Backend.Services
                 Id = appointment.Id,
                 RoomName = "Đã ghi nhận",
                 Address = "Đã ghi nhận",
-                Status = appointment.Status
+                Date = appointment.AppointmentDate.ToString("dd/MM/yyyy"),
+                Time = appointment.AppointmentTime.ToString("HH:mm"),
+                Status = appointment.Status,
+                Message = appointment.Message,
+                OwnerNote = appointment.OwnerNote
             };
         }
 
