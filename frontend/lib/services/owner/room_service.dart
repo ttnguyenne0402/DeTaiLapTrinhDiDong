@@ -5,6 +5,7 @@ class RoomModel {
   final String id;
   final String propertyId;
   final String propertyName;
+  final String propertyStatus;
   final String name;
   final double area;
   final int? floor;
@@ -22,11 +23,14 @@ class RoomModel {
   final List<String> amenities;
   final List<String> serviceIds;
   final List<String> services;
+  final bool hasActiveContract;
+  final String? activeContractCode;
 
   RoomModel({
     required this.id,
     required this.propertyId,
     required this.propertyName,
+    this.propertyStatus = 'active',
     required this.name,
     required this.area,
     this.floor,
@@ -44,6 +48,8 @@ class RoomModel {
     this.amenities = const [],
     this.serviceIds = const [],
     this.services = const [],
+    this.hasActiveContract = false,
+    this.activeContractCode,
   });
 
   factory RoomModel.fromJson(Map<String, dynamic> json) {
@@ -51,6 +57,7 @@ class RoomModel {
       id: json['id'] ?? '',
       propertyId: json['propertyId'] ?? '',
       propertyName: json['propertyName'] ?? '',
+      propertyStatus: json['propertyStatus'] ?? json['PropertyStatus'] ?? 'active',
       name: json['name'] ?? '',
       area: (json['area'] is num) ? (json['area'] as num).toDouble() : 0.0,
       floor: json['floor'],
@@ -80,6 +87,8 @@ class RoomModel {
               ?.map((e) => e.toString())
               .toList() ??
           [],
+      hasActiveContract: json['hasActiveContract'] ?? json['HasActiveContract'] ?? false,
+      activeContractCode: json['activeContractCode'] ?? json['ActiveContractCode'],
     );
   }
 }

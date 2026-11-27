@@ -194,7 +194,9 @@ protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
                 .HasColumnName("room_id");
             entity.Property(e => e.SignedAt).HasColumnName("signed_at");
             entity.Property(e => e.SigningClosedAt).HasColumnName("signing_closed_at");
-            entity.Property(e => e.SigningCloseReason).HasMaxLength(500).HasColumnName("signing_close_reason");
+            entity.Property(e => e.SigningCloseReason)
+                .HasMaxLength(500)
+                .HasColumnName("signing_close_reason");
             entity.Property(e => e.StartDate).HasColumnName("start_date");
             entity.Property(e => e.Status)
                 .HasMaxLength(50)

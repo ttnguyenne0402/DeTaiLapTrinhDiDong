@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../services/tenant/room_service.dart';
 import '../../services/tenant/review_service.dart';
 import '../../services/tenant/favorite_service.dart';
+import '../../services/auth_storage.dart';
 
 class RoomDetailScreen extends StatefulWidget {
   final Map<String, dynamic> room;
@@ -405,6 +406,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen>
       } else {
         await FavoriteService.instance.addFavorite(room);
       }
+
+      // Đồng bộ trực tiếp lên cơ sở dữ liệu Backend để tăng/giảm tim thật cho tin đăng
+      final currentUserId = await AuthStorage.getUserId();
+      _roomService.toggleFavorite(roomId, userId: currentUserId);
 
       if (!mounted) return;
       setState(() => _isFavorite = !wasFavorite);

@@ -31,6 +31,17 @@ class _PostFormScreenState extends State<PostFormScreen> {
   bool _isLoading = false;
   bool _loadingRooms = true;
 
+  bool get _isCurrentRoomPropertyMaintenance {
+    if (_selectedRoomId == null) return false;
+    for (final r in _rooms) {
+      if (r.id == _selectedRoomId) {
+        final st = r.propertyStatus.toLowerCase();
+        return st == 'inactive' || st == 'maintenance' || st.contains('trì');
+      }
+    }
+    return false;
+  }
+
   final List<String> _selectedImages = [];
 
   final List<String> amenities = [
@@ -94,8 +105,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
           }
         }
       }
-    } else {
-      selectedAmenities.addAll(['Wifi', 'Chỗ để xe']);
     }
     _priceController = TextEditingController(text: priceStr);
 
@@ -456,6 +465,18 @@ class _PostFormScreenState extends State<PostFormScreen> {
                 final messenger = ScaffoldMessenger.of(context);
                 final navigator = Navigator.of(context);
 
+                if (_isCurrentRoomPropertyMaintenance) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Bất động sản "$_selectedBuildingName" đang ở trạng thái bảo trì, không thể xuất bản tin đăng!',
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
                 setState(() => _isLoading = true);
 
                 final imagesToSave = List<String>.of(_selectedImages);
@@ -636,6 +657,18 @@ class _PostFormScreenState extends State<PostFormScreen> {
                       return;
                     }
 
+                    if (_isCurrentRoomPropertyMaintenance) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Bất động sản "$_selectedBuildingName" đang ở trạng thái bảo trì, không thể tạo tin đăng!',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+
                     final messenger = ScaffoldMessenger.of(context);
                     final navigator = Navigator.of(context);
 
@@ -737,47 +770,117 @@ class _PostFormScreenState extends State<PostFormScreen> {
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[300]!),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          value: _selectedRoomId,
-          items: _rooms.map((r) {
-            return DropdownMenuItem<String>(
-              value: r.id,
-              child: Text(
-                '${r.name} - ${r.propertyName}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14),
-              ),
-            );
-          }).toList(),
-          onChanged: (val) {
-            if (val != null) {
-              final found = _rooms.firstWhere((r) => r.id == val);
-              setState(() {
-                _selectedRoomId = val;
-                _selectedBuildingName = found.propertyName;
-                _selectedRoomName = found.name;
-                _priceController.text = found.price > 0
-                    ? _formatNumberDots('${found.price.toInt()}')
-                    : _priceController.text;
-                if (widget.initialData == null) {
-                  _titleController.text =
-                      'Cho thuê ${found.name} - ${found.propertyName}';
+    final isMaintenance = _isCurrentRoomPropertyMaintenance;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isMaintenance ? Colors.red.shade400 : Colors.grey[300]!,
+              width: isMaintenance ? 1.5 : 1,
+            ),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: _selectedRoomId,
+              items: _rooms.map((r) {
+                final rPropMaint = r.propertyStatus.toLowerCase() == 'inactive' ||
+                    r.propertyStatus.toLowerCase() == 'maintenance' ||
+                    r.propertyStatus.toLowerCase().contains('trì');
+                return DropdownMenuItem<String>(
+                  value: r.id,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${r.name} - ${r.propertyName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: rPropMaint ? Colors.red.shade800 : Colors.black87,
+                            fontWeight: rPropMaint ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      if (rPropMaint) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.red.shade300),
+                          ),
+                          child: Text(
+                            'Bảo trì',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  final found = _rooms.firstWhere((r) => r.id == val);
+                  setState(() {
+                    _selectedRoomId = val;
+                    _selectedBuildingName = found.propertyName;
+                    _selectedRoomName = found.name;
+                    _priceController.text = found.price > 0
+                        ? _formatNumberDots('${found.price.toInt()}')
+                        : _priceController.text;
+                    if (widget.initialData == null) {
+                      _titleController.text =
+                          'Cho thuê ${found.name} - ${found.propertyName}';
+                    }
+                  });
                 }
-              });
-            }
-          },
+              },
+            ),
+          ),
         ),
-      ),
+        if (isMaintenance) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF2F2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bất động sản "$_selectedBuildingName" đang ở trạng thái Bảo trì. Hệ thống không cho phép đăng tin cho phòng thuộc tòa nhà này.',
+                    style: TextStyle(
+                      color: Colors.red.shade800,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 

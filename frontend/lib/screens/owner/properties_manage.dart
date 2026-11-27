@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import '../tenant/profile_screen.dart';
 import 'owner_dashboard.dart';
-import 'owner_profile_screen.dart';
 import 'owner_notifications_screen.dart';
 import 'property_form.dart';
 import 'rooms_manage.dart';
@@ -29,6 +28,18 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
 
   void _refreshList() {
     setState(() {});
+  }
+
+  Future<void> _openEditProperty(PropertyModel item) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PropertyFormScreen(property: item),
+      ),
+    );
+    if (result == true) {
+      _refreshList();
+    }
   }
 
   Future<void> _openPropertyRooms(PropertyModel item) async {
@@ -330,13 +341,53 @@ class _PropertiesManageScreenState extends State<PropertiesManageScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () => _openEditProperty(item),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: primaryColor.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.edit_outlined, size: 14, color: primaryColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Chỉnh sửa',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Row(

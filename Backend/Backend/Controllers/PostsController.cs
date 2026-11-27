@@ -133,7 +133,7 @@ namespace Backend.Controllers
                         Price = postPrice,
                         PriceFormatted = $"{postPrice:N0}".Replace(",", ".") + "đ/tháng",
                         Amenities = amenitiesList,
-                        Views = p.Views > 0 ? p.Views : (100 + Math.Abs(p.Id.GetHashCode() % 150)),
+                        Views = p.Views,
                         Likes = likes,
                         Date = (p.CreatedAt ?? DateTime.Now).ToString("dd/MM/yyyy"),
                         Status = normalizedStatus,
@@ -156,7 +156,7 @@ namespace Backend.Controllers
 
         // 2. GET: api/owner/posts/detail/{id}
         [HttpGet("detail/{id}")]
-        public async Task<IActionResult> GetPostDetail(string id)
+        public async Task<IActionResult> GetPostDetail(string id, [FromQuery] string? viewerRole)
         {
             try
             {
@@ -169,6 +169,30 @@ namespace Backend.Controllers
                 if (p == null)
                 {
                     return NotFound(new { message = "Không tìm thấy bài đăng" });
+                }
+
+                // 1. Chỉ tăng lượt xem nếu là khách hàng (viewerRole == "customer" hoặc "tenant")
+                // Khi chủ trọ xem bài đăng của mình thì không tự tăng lượt xem
+                if (!string.IsNullOrEmpty(viewerRole) &&
+                    (viewerRole.Equals("customer", StringComparison.OrdinalIgnoreCase) ||
+                     viewerRole.Equals("tenant", StringComparison.OrdinalIgnoreCase)))
+                {
+                    p.Views += 1;
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                    catch
+                    {
+                        // Tránh chặn luồng xem bài nếu có tranh chấp ghi dữ liệu
+                    }
+                }
+
+                // 2. Đếm số lượng yêu thích (thả tim) thực tế từ bảng Favorites
+                int likesCount = 0;
+                if (!string.IsNullOrEmpty(p.RoomId))
+                {
+                    likesCount = await _context.Favorites.CountAsync(f => f.RoomId == p.RoomId);
                 }
 
                 var firstImg = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
@@ -206,8 +230,8 @@ namespace Backend.Controllers
                     Price = postPrice,
                     PriceFormatted = $"{postPrice:N0}".Replace(",", ".") + "đ/tháng",
                     Amenities = amenitiesList,
-                    Views = p.Views > 0 ? p.Views : 120,
-                    Likes = 5,
+                    Views = p.Views,
+                    Likes = likesCount,
                     Date = (p.CreatedAt ?? DateTime.Now).ToString("dd/MM/yyyy"),
                     Status = normalizedStatus,
                     SubmitNote = !string.IsNullOrEmpty(p.SubmitNote) ? p.SubmitNote : (normalizedStatus == "pending" ? "Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC" : null),
@@ -245,19 +269,25 @@ namespace Backend.Controllers
                     return BadRequest(new { message = "Mã phòng và tiêu đề không được để trống." });
                 }
 
-                var room = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == dto.RoomId);
+                var room = await _context.Rooms
+                    .Include(r => r.Property)
+                    .FirstOrDefaultAsync(r => r.Id == dto.RoomId || r.Id.ToLower() == dto.RoomId.ToLower());
                 if (room == null && ownerId == null)
                 {
-                    room = await _context.Rooms.FirstOrDefaultAsync(r => r.Id.ToLower() == dto.RoomId.ToLower() || r.Name.Contains(dto.RoomId));
-                    if (room == null)
-                    {
-                        room = await _context.Rooms.FirstOrDefaultAsync();
-                    }
+                    room = await _context.Rooms
+                        .Include(r => r.Property)
+                        .FirstOrDefaultAsync(r => r.Name.Contains(dto.RoomId));
                 }
 
                 if (room == null)
                 {
-                    return BadRequest(new { message = "Hệ thống chưa có phòng nào để tạo tin đăng." });
+                    return BadRequest(new { message = "Không tìm thấy phòng phù hợp để tạo tin đăng." });
+                }
+
+                // Kiểm tra trạng thái bất động sản: Nếu đang bảo trì thì KHÔNG cho đăng tin
+                if (room.Property != null && (room.Property.Status == "inactive" || room.Property.Status.ToLower() == "maintenance"))
+                {
+                    return BadRequest(new { message = $"Bất động sản '{room.Property.Name}' đang trong trạng thái bảo trì, không thể tạo tin đăng." });
                 }
 
                 if (ownerId != null && !OwnsRoom(room, ownerId)) return Forbid();
@@ -325,8 +355,9 @@ namespace Backend.Controllers
             try
             {
                 var post = await _context.RentalPosts
+                    .Include(p => p.Room)
+                        .ThenInclude(r => r.Property)
                     .Include(p => p.RentalPostImages)
-                    .Include(p => p.Room).ThenInclude(r => r.Property)
                     .FirstOrDefaultAsync(p => p.Id == id || p.Id.ToLower() == id.ToLower());
 
                 if (post == null)
@@ -344,6 +375,19 @@ namespace Backend.Controllers
                         if (!OwnsRoom(room, ownerId)) return Forbid();
                     }
                 }
+
+                // Kiểm tra nếu bất động sản đang bảo trì thì không cho xuất bản tin
+                var targetRoomId = !string.IsNullOrWhiteSpace(dto.RoomId) ? dto.RoomId : post.RoomId;
+                var targetRoom = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == targetRoomId);
+                if (targetRoom?.Property != null && (targetRoom.Property.Status == "inactive" || targetRoom.Property.Status.ToLower() == "maintenance"))
+                {
+                    string targetStatus = (dto.Status ?? post.Status).ToLower();
+                    if (targetStatus == "published" || targetStatus == "active")
+                    {
+                        return BadRequest(new { message = $"Bất động sản '{targetRoom.Property.Name}' đang bảo trì, không thể xuất bản tin đăng." });
+                    }
+                }
+
                 if (!ValidImageReferences(dto.Images))
                     return BadRequest(new { message = "Ảnh tin đăng chưa tải lên hoặc vượt quá 6 ảnh." });
 

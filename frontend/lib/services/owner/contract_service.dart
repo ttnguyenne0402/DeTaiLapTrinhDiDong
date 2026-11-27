@@ -157,11 +157,13 @@ class ContractService {
   static Future<List<dynamic>> getAvailableRooms({
     String? ownerId,
     String? selectedRoomId,
+    String? includeRoomId,
   }) async {
     try {
       final url = Uri.parse('$baseUrl/available-rooms').replace(queryParameters: {
         if (ownerId != null && ownerId.isNotEmpty) 'ownerId': ownerId,
         if (selectedRoomId != null && selectedRoomId.isNotEmpty) 'selectedRoomId': selectedRoomId,
+        if (includeRoomId != null && includeRoomId.isNotEmpty) 'includeRoomId': includeRoomId,
       });
 
       final response = await http.get(

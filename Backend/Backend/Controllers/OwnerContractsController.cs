@@ -344,6 +344,12 @@ namespace Backend.Controllers
                     UpdatedAt = DateTime.UtcNow
                 };
 
+                if ((contract.Status == "active" || contract.Status == "pending") && room != null)
+                {
+                    room.Status = "rented";
+                    room.UpdatedAt = DateTime.UtcNow;
+                }
+
                 // 🔴 KHÓA CHỐNG LẶP HỢP ĐỒNG: Mỗi phòng chỉ được có 1 Hợp đồng Nháp hoặc 1 Hợp đồng Chờ ký
                 if (contract.Status == "draft")
                 {
@@ -586,15 +592,20 @@ namespace Backend.Controllers
        // GET: /api/OwnerContracts/available-rooms?ownerId=... (Lấy danh sách phòng trống theo Chủ trọ)
            [HttpGet("available-rooms")]
            public async Task<IActionResult> GetAvailableRooms(
-               [FromQuery] string? ownerId, [FromQuery] string? selectedRoomId)
+               [FromQuery] string? ownerId,
+               [FromQuery] string? selectedRoomId = null,
+               [FromQuery] string? includeRoomId = null)
            {
                try
                {
+                   var targetIncludeId = !string.IsNullOrEmpty(includeRoomId) ? includeRoomId : selectedRoomId;
                    var query = _context.Rooms
                        .Include(r => r.Property)
-                       .Where(r => r.Status == "available" &&
-                           (r.Id == selectedRoomId ||
-                            !r.Contracts.Any(c => c.Status == "pending" || c.Status == "active")));
+                       .Where(r =>
+                           (!string.IsNullOrEmpty(includeRoomId) && r.Id == includeRoomId) ||
+                           (r.Status == "available" &&
+                               (r.Id == targetIncludeId ||
+                                !r.Contracts.Any(c => c.Status == "pending" || c.Status == "active"))));
 
 
                    if (!string.IsNullOrEmpty(ownerId) && ownerId != "all")
@@ -690,6 +701,22 @@ namespace Backend.Controllers
                 }
 
                 _context.Contracts.Remove(contract);
+
+                if (!string.IsNullOrEmpty(contract.RoomId))
+                {
+                    var hasOtherActive = await _context.Contracts
+                        .AnyAsync(c => c.Id != contract.Id && c.RoomId == contract.RoomId && (c.Status == "active" || c.Status == "pending"));
+                    if (!hasOtherActive)
+                    {
+                        var room = await _context.Rooms.FindAsync(contract.RoomId);
+                        if (room != null && room.Status == "rented")
+                        {
+                            room.Status = "available";
+                            room.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
+                }
+
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Đã xóa bản nháp thành công!" });

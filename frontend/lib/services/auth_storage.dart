@@ -11,6 +11,8 @@ class AuthStorage {
   static const String _tokenKey = 'accessToken';
   static const String _nameKey = 'userName';
   static const String _phoneKey = 'userPhone';
+  static const String _avatarKey = 'userAvatar';
+
   // Lưu thông tin sau khi đăng nhập thành công
   static Future<void> saveLogin({
     required String userId,
@@ -18,6 +20,7 @@ class AuthStorage {
     required String accessToken,
     String? name,
     String? phone,
+    String? avatar,
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -26,6 +29,20 @@ class AuthStorage {
     await prefs.setString(_tokenKey, accessToken);
     await prefs.setString(_nameKey, name ?? '');
     await prefs.setString(_phoneKey, phone ?? '');
+    if (avatar != null && avatar.isNotEmpty) {
+      await prefs.setString(_avatarKey, avatar);
+    }
+  }
+
+  // Lấy ảnh đại diện người dùng
+  static Future<String?> getUserAvatar() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_avatarKey);
+  }
+
+  static Future<void> saveUserAvatar(String avatar) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_avatarKey, avatar);
   }
   //HÀM LẤY SỐ ĐIỆN THOẠI
   static Future<String?> getPhone() async {
@@ -69,6 +86,7 @@ class AuthStorage {
     await prefs.remove(_tokenKey);
     await prefs.remove(_nameKey);
     await prefs.remove(_phoneKey);
+    await prefs.remove(_avatarKey);
 
     // Xóa sạch toàn bộ lịch sử trò chuyện AI khi người dùng đăng xuất
     final aiKeys = prefs.getKeys().where((k) => k.startsWith('ai_chat_history_')).toList();

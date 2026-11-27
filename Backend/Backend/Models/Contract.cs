@@ -40,8 +40,10 @@ public partial class Contract
 
     public DateTime? SignedAt { get; set; }
 
+    [Column("signing_closed_at")]
     public DateTime? SigningClosedAt { get; set; }
 
+    [Column("signing_close_reason")]
     public string? SigningCloseReason { get; set; }
 
     public DateTime? TerminatedAt { get; set; }

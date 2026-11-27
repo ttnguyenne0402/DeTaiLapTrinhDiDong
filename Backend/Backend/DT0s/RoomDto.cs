@@ -5,6 +5,7 @@ namespace Backend.DT0s
         public string Id { get; set; } = string.Empty;
         public string PropertyId { get; set; } = string.Empty;
         public string PropertyName { get; set; } = string.Empty;
+        public string PropertyStatus { get; set; } = "active"; // active, inactive, maintenance
         public string Name { get; set; } = string.Empty;
         public decimal Area { get; set; }
         public int? Floor { get; set; }
@@ -14,6 +15,8 @@ namespace Backend.DT0s
         public string Status { get; set; } = string.Empty; // available, rented, maintenance
         public string StatusText { get; set; } = string.Empty; // Còn trống, Đang cho thuê, Bảo trì
         public bool IsRented { get; set; }
+        public bool HasActiveContract { get; set; }
+        public string? ActiveContractCode { get; set; }
         public string Detail { get; set; } = string.Empty; // "25 m² - Tầng 2"
         public string PriceFormatted { get; set; } = string.Empty; // "4.000.000đ"
         public string Images { get; set; } = "frontend/assets/images/anhPhongDemo.jpg";
