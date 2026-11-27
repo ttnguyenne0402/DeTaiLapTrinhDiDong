@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../auth_storage.dart';
 
 class OwnerAppointmentModel {
   final String id;
@@ -19,6 +20,9 @@ class OwnerAppointmentModel {
   final String rawTime;
   final String date;
   final String status;
+  final String roomStatus;
+  final bool isRented;
+  final bool hasPendingContract;
   final String? note;
   final String? ownerNote;
   final String avatar;
@@ -41,6 +45,9 @@ class OwnerAppointmentModel {
     required this.rawTime,
     required this.date,
     required this.status,
+    this.roomStatus = 'available',
+    this.isRented = false,
+    this.hasPendingContract = false,
     this.note,
     this.ownerNote,
     required this.avatar,
@@ -65,6 +72,9 @@ class OwnerAppointmentModel {
       rawTime: json['rawTime'] ?? '09:00',
       date: json['date'] ?? '',
       status: json['status'] ?? 'pending',
+      roomStatus: json['roomStatus'] ?? json['RoomStatus'] ?? 'available',
+      isRented: json['isRented'] == true || json['IsRented'] == true,
+      hasPendingContract: json['hasPendingContract'] == true || json['HasPendingContract'] == true,
       note: json['note'],
       ownerNote: json['ownerNote'],
       avatar: json['avatar'] ?? 'frontend/assets/images/avatarDemo.jpg',
@@ -100,9 +110,15 @@ class AppointmentService {
     String? newDate,
     String? newTime,
   }) async {
+    final token = await AuthStorage.getAccessToken();
+    if (token == null || token.isEmpty) return false;
+
     final response = await http.put(
       Uri.parse('$baseUrl/api/owner/appointments/$id/status'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
       body: jsonEncode({
         'status': status,
         'ownerNote': ownerNote,

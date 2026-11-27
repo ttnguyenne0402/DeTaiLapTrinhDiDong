@@ -19,6 +19,9 @@ namespace Backend.DT0s
         public string RawTime { get; set; } = string.Empty; // "10:00"
         public string Date { get; set; } = string.Empty; // "09/10/2026"
         public string Status { get; set; } = string.Empty; // pending, confirmed, rescheduled, rejected, completed, cancelled
+        public string RoomStatus { get; set; } = "available"; // available, rented, pending, maintenance
+        public bool IsRented { get; set; } = false;
+        public bool HasPendingContract { get; set; } = false;
         public string? Note { get; set; } // Ghi chú của khách hoặc chủ nhà
         public string? OwnerNote { get; set; }
         public string Avatar { get; set; } = "frontend/assets/images/avatarDemo.jpg";

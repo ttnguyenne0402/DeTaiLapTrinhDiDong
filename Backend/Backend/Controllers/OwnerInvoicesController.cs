@@ -564,9 +564,9 @@ namespace Backend.Controllers
             }
         }
 
-         // GET: /api/OwnerInvoices/rooms-utility-summary?propertyId=...
+         // GET: /api/OwnerInvoices/rooms-utility-summary?ownerId=...&propertyId=...
             [HttpGet("rooms-utility-summary")]
-            public async Task<IActionResult> GetRoomsUtilitySummary([FromQuery] string? propertyId)
+            public async Task<IActionResult> GetRoomsUtilitySummary([FromQuery] string? ownerId, [FromQuery] string? propertyId)
             {
                 try
                 {
@@ -576,7 +576,14 @@ namespace Backend.Controllers
                         .Include(c => c.Tenant)
                         .Where(c => c.Status == "active");
 
-                    // 🔴 BỔ SUNG: LỌC CHÍNH XÁC CÁC PHÒNG THUỘC TÒA NHÀ (PROPERTY) ĐƯỢC CHỌN
+                    // 🔴 LỌC CHÍNH XÁC CHỦ TRỌ ĐANG ĐĂNG NHẬP
+                    if (!string.IsNullOrEmpty(ownerId) && ownerId != "all")
+                    {
+                        var targetOwnerIds = OwnerHelper.ResolveOwnerIds(ownerId);
+                        query = query.Where(c => targetOwnerIds.Contains(c.OwnerId) || (c.Room != null && c.Room.Property != null && targetOwnerIds.Contains(c.Room.Property.OwnerId)));
+                    }
+
+                    // 🔴 LỌC CHÍNH XÁC TÒA NHÀ ĐƯỢC CHỌN
                     if (!string.IsNullOrEmpty(propertyId) && propertyId != "all")
                     {
                         query = query.Where(c => c.Room != null && c.Room.PropertyId == propertyId);

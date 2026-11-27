@@ -147,35 +147,33 @@ namespace Backend.Controllers
         // 2. ĐĂNG NHẬP BẰNG EMAIL/SỐ ĐIỆN THOẠI
         // POST /api/Auth/login
         [HttpPost("login")]
-        public async Task<IActionResult> Login(
-            [FromBody] LoginRequestDTO model)
+        public async Task<IActionResult> Login([FromBody] LoginRequestDTO model)
         {
             try
             {
-                string identifier = model.EmailOrPhone.Trim();
-                string email = identifier.ToLowerInvariant();
+                if (string.IsNullOrWhiteSpace(model.EmailOrPhone) || string.IsNullOrWhiteSpace(model.Password))
+                {
+                    return BadRequest(new { message = "Vui lòng nhập đầy đủ thông tin đăng nhập." });
+                }
+
+                string identifier = model.EmailOrPhone.Trim().ToLowerInvariant();
                 string phone = NormalizePhone(identifier);
+                bool isEmail = identifier.Contains("@");
 
                 var user = await _context.Users.FirstOrDefaultAsync(u =>
-                    (u.Email.ToLower() == email ||
-                     u.Phone == phone) &&
+                    (isEmail
+                        ? u.Email.ToLower() == identifier
+                        : (u.Phone == phone || u.Email.ToLower() == identifier)) &&
                     u.Password == model.Password);
 
                 if (user == null)
                 {
-                    return Unauthorized(new
-                    {
-                        message =
-                            "Email/Số điện thoại hoặc mật khẩu không chính xác."
-                    });
+                    return Unauthorized(new { message = "Email/Số điện thoại hoặc mật khẩu không chính xác." });
                 }
 
                 if (user.Status != "active")
                 {
-                    return Unauthorized(new
-                    {
-                        message = "Tài khoản của bạn đang bị khóa."
-                    });
+                    return Unauthorized(new { message = "Tài khoản của bạn đang bị khóa." });
                 }
 
                 return Ok(new

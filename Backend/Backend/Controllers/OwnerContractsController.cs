@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Backend.DTOs;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -266,6 +266,32 @@ namespace Backend.Controllers
                     }
                 }
 
+                //  KHÓA ĐỐI SOÁT CHÍNH XÁC HỌ TÊN VÀ SỐ CCCD NHÂN THÂN (Không phân biệt hoa/thường/dấu):
+                if (!string.IsNullOrWhiteSpace(req.Cccd))
+                {
+                    var cleanCccd = req.Cccd.Trim();
+                    var inputName = req.TenantName?.Trim() ?? "";
+
+                    // 1. Đối soát với bảng ContractMembers (Thành viên / Công dân đã đăng ký CCCD)
+                    var memberByCccd = await _context.ContractMembers.FirstOrDefaultAsync(m => m.IdentityCard == cleanCccd);
+                    if (memberByCccd != null && RemoveAccents(memberByCccd.Name) != RemoveAccents(inputName))
+                    {
+                        return BadRequest(new { message = $"Lỗi sai lệch nhân thân: Số CCCD {cleanCccd} đã thuộc về công dân '{memberByCccd.Name}' trên CSDL! Tên '{inputName}' không trùng khớp." });
+                    }
+
+                    // 3. Khóa chống trùng CCCD ở các phòng đang hoạt động khác
+                    var isCccdInOtherContracts = await _context.Contracts
+                        .AnyAsync(c => c.TenantId != tenant.Id && c.Status != "terminated" && c.Terms != null && c.Terms.Contains(cleanCccd));
+
+                    var isCccdInMembers = await _context.ContractMembers
+                        .AnyAsync(m => m.IdentityCard == cleanCccd && m.Contract.TenantId != tenant.Id && m.Contract.Status != "terminated");
+
+                    if (isCccdInOtherContracts || isCccdInMembers)
+                    {
+                        return BadRequest(new { message = $"Số CCCD {cleanCccd} đã được sử dụng cho một hợp đồng đang hoạt động ở phòng khác! Vui lòng kiểm tra lại." });
+                    }
+                }
+
                 // 5. Khởi tạo Hợp đồng mới
                 var contract = new Contract
                 {
@@ -280,14 +306,38 @@ namespace Backend.Controllers
                     Rent = req.RentPrice > 0 ? req.RentPrice : room.Price,
                     Deposit = req.DepositPrice > 0 ? req.DepositPrice : room.Deposit,
                     PaymentCycle = "monthly",
-                    Status = (req.Status == "Chờ ký" || req.Status == "pending") ? "pending" : "draft",
+                    InitialElectricityReading = req.ElectricIndex,
+                    InitialWaterReading = req.WaterIndex,
+                    Status = (req.Status == "active" || req.Status == "Đang hiệu lực")
+                        ? "active"
+                        : ((req.Status == "pending" || req.Status == "Chờ ký") ? "pending" : "draft"),
                     Terms = $"CCCD:{req.Cccd}|IssueDate:{req.IssueDate}|IssuePlace:{req.IssuePlace}",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
 
-                 if (contract.Status == "pending")
-                 {
+                // 🔴 KHÓA CHỐNG LẶP HỢP ĐỒNG: Mỗi phòng chỉ được có 1 Hợp đồng Nháp hoặc 1 Hợp đồng Chờ ký
+                if (contract.Status == "draft")
+                {
+                    var existingDraft = await _context.Contracts
+                        .FirstOrDefaultAsync(c => c.RoomId == room.Id && c.Status == "draft");
+
+                    if (existingDraft != null)
+                    {
+                        return BadRequest(new { message = $"Phòng {room.Name} đã có 1 bản hợp đồng nháp rồi! Vui lòng mở bản nháp hiện tại để tiếp tục chỉnh sửa." });
+                    }
+                }
+
+                if (contract.Status == "pending")
+                {
+                    var existingPending = await _context.Contracts
+                        .FirstOrDefaultAsync(c => c.RoomId == room.Id && c.Status == "pending");
+
+                    if (existingPending != null)
+                    {
+                        return BadRequest(new { message = $"Phòng {room.Name} đang có 1 hợp đồng chờ ký với khách khác! Vui lòng hoàn tất hoặc hủy hợp đồng chờ ký hiện tại trước khi tạo mới." });
+                    }
+
                     var contractNotif = new Notification
                     {
                          Id = "notif_" + Guid.NewGuid().ToString("N")[..8],
@@ -577,7 +627,13 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy phòng trọ." });
                 }
 
-                // 1. Dịch vụ đã cài đặt cho khu trọ này (kèm giá niêm yết từ tin đăng/cơ sở)
+                // 1. Dịch vụ riêng mà phòng này đã đăng ký/có nhu cầu trước đó (nếu có)
+                var roomCustomServiceIds = await _context.RoomServices
+                    .Where(rs => rs.RoomId == roomId)
+                    .Select(rs => rs.ServiceId)
+                    .ToListAsync();
+
+                // 2. Dịch vụ đã cài đặt cho khu trọ này (kèm giá niêm yết từ tin đăng/cơ sở)
                 var propertyServices = await _context.PropertyServices
                     .Include(ps => ps.Service)
                     .Where(ps => ps.PropertyId == room.PropertyId && ps.Status == "active")
@@ -586,8 +642,9 @@ namespace Backend.Controllers
                         serviceId = ps.ServiceId,
                         name = ps.Service.Name,
                         unit = ps.Service.Unit,
-                        price = ps.Price,
-                        isDefault = true // Mặc định tự chọn
+                        price = ps.Price > 0 ? ps.Price : ps.Service.Price,
+                        isMandatory = ps.Service.IsMandatory,
+                        isDefault = ps.Service.IsMandatory || roomCustomServiceIds.Contains(ps.ServiceId) // Bắt buộc HOẶC phòng đã đăng ký nhu cầu trước đó
                     })
                     .ToListAsync();
 
@@ -659,9 +716,36 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy hợp đồng." });
                 }
 
+                if (contract.Status == "terminated" || contract.Status == "Đã thanh lý")
+                {
+                    return BadRequest(new { message = "Không thể thêm người ở ghép cho hợp đồng đã thanh lý!" });
+                }
+
                 if (string.IsNullOrWhiteSpace(req.FullName))
                 {
                     return BadRequest(new { message = "Vui lòng nhập họ tên người ở cùng." });
+                }
+
+                if (!string.IsNullOrWhiteSpace(req.Phone))
+                {
+                    string phoneVal = req.Phone.Trim();
+                    bool isPhoneExist = await _context.Users.AnyAsync(u => u.Phone == phoneVal) ||
+                                        await _context.ContractMembers.AnyAsync(m => m.Phone == phoneVal);
+                    if (isPhoneExist)
+                    {
+                        return BadRequest(new { message = $"Số điện thoại {phoneVal} đã được đăng ký/sử dụng trên hệ thống!" });
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(req.Cccd))
+                {
+                    string cccdVal = req.Cccd.Trim();
+                    bool isCccdExist = await _context.ContractMembers.AnyAsync(m => m.IdentityCard == cccdVal) ||
+                                       await _context.Contracts.AnyAsync(c => c.Terms != null && c.Terms.Contains(cccdVal));
+                    if (isCccdExist)
+                    {
+                        return BadRequest(new { message = $"Số CCCD {cccdVal} đã được đăng ký/sử dụng trên hệ thống!" });
+                    }
                 }
 
                 var member = new Backend.Models.ContractMember
@@ -943,6 +1027,20 @@ namespace Backend.Controllers
                 }
          }
 
-
+        private static string RemoveAccents(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            var normalized = text.Normalize(System.Text.NormalizationForm.FormD);
+            var sb = new System.Text.StringBuilder();
+            foreach (var c in normalized)
+            {
+                var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
+                if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString().Normalize(System.Text.NormalizationForm.FormC).ToLower().Trim();
+        }
     }
 }

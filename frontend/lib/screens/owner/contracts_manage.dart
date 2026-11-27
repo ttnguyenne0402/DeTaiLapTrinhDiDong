@@ -9,6 +9,7 @@ import 'properties_manage.dart';
 import '../../widgets/owner/owner_drawer.dart';
 import 'contract_form.dart';
 import 'tenant_list_screen.dart';
+import 'owner_notifications_screen.dart';
 import '../../services/owner/contract_service.dart';
 import '../../screens/owner/termination_screen.dart';
 
@@ -82,14 +83,13 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
         centerTitle: true,
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => OwnerNotificationsScreen()),
+              );
+            },
             icon: const Icon(Icons.notifications, color: Colors.white),
-          ),
-          const SizedBox(width: 16),
-          const CircleAvatar(
-            backgroundColor: Colors.white24,
-            radius: 16,
-            child: Icon(Icons.person, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 16),
         ],
@@ -369,6 +369,12 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       timeColor = Colors.blue;
       primaryBtnText = 'Ký hợp đồng';
       primaryBtnColor = AppColors.primaryGreen;
+    } else if (status == 'Đã thanh lý' || status == 'terminated') {
+      statusBgColor = Colors.red.shade100;
+      statusTextColor = Colors.red.shade800;
+      timeColor = Colors.grey;
+      primaryBtnText = 'Xem chi tiết';
+      primaryBtnColor = Colors.grey.shade700;
     } else {
       statusBgColor = Colors.grey.shade200;
       statusTextColor = Colors.grey.shade700;
@@ -395,7 +401,7 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       noteText: contract['noteText'] ?? '',
       primaryBtnText: primaryBtnText,
       primaryBtnColor: primaryBtnColor,
-      onTapDetail: (status == 'Đang hiệu lực' || status == 'Sắp hết hạn' || status == 'Đã thanh lý')
+      onTapDetail: (status == 'Đang hiệu lực' || status == 'Sắp hết hạn')
           ? () {
         Navigator.push(
           context,
@@ -436,6 +442,15 @@ class HienThiQuanLyHopDong extends State<Contracts_manager> {
       );
     } else if (status == 'Sắp hết hạn') {
       _showMessage('Mở chức năng gia hạn hợp đồng');
+    } else if (status == 'Đã thanh lý' || status == 'terminated') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ContractDetailScreen(
+            contract: Map<String, dynamic>.from(contract),
+          ),
+        ),
+      );
     } else {
       _openContract(contract);
     }

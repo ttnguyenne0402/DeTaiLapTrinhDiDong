@@ -4,7 +4,7 @@ import 'package:http/io_client.dart';
 import 'dart:convert';
 import 'dart:io';
 import '../../core/constants/app_colors.dart';
-
+import 'package:flutter/services.dart';
 class MaintenanceDetailScreen extends StatefulWidget {
   final String issueId; // Bắt buộc phải có ID truyền vào
 
@@ -108,13 +108,24 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
     int parsedCost = 0;
 
     if (newStatus == 'completed') {
-      final payer = _costPayerGroup == 0 ? "Chủ nhà chịu" : "Trừ cọc/Khách trả";
       final costStr = _costController.text.trim();
-      final cost = costStr.isNotEmpty ? costStr : "0";
-      ownerNoteFinal = "Chi phí: $cost đ | Phân bổ: $payer | Ghi chú: ${_noteController.text}";
+      if (costStr.isNotEmpty) {
+        final rawCost = int.tryParse(costStr);
+        if (rawCost == null || rawCost < 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Chi phí thực tế không hợp lệ (không được nhỏ hơn 0)!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isSubmitting = false);
+          return;
+        }
+        parsedCost = rawCost;
+      }
 
-
-      parsedCost = int.tryParse(cost.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      final payer = _costPayerGroup == 0 ? "Chủ nhà chịu" : "Trừ cọc/Khách trả";
+      ownerNoteFinal = "Chi phí: $parsedCost đ | Phân bổ: $payer | Ghi chú: ${_noteController.text}";
     }
 
     final url = 'http://10.0.2.2:5093/api/OwnerMaintenance/${widget.issueId}/process';
@@ -415,6 +426,9 @@ class _MaintenanceDetailScreenState extends State<MaintenanceDetailScreen> {
           TextField(
             controller: _costController,
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+            ],
             decoration: InputDecoration(
               labelText: 'Chi phí thực tế (đ)',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

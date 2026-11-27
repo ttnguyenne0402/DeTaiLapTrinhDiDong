@@ -12,6 +12,8 @@ class ServiceModel {
   final bool status;
   final String description;
   final String icon;
+  final String? propertyId;
+  final bool isAssigned;
 
   ServiceModel({
     required this.id,
@@ -24,6 +26,8 @@ class ServiceModel {
     required this.status,
     required this.description,
     required this.icon,
+    this.propertyId,
+    this.isAssigned = true,
   });
 
   factory ServiceModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +42,8 @@ class ServiceModel {
       status: json['status'] ?? true,
       description: json['description'] ?? '',
       icon: json['icon'] ?? 'bolt',
+      propertyId: json['propertyId'],
+      isAssigned: json['isAssigned'] ?? true,
     );
   }
 }
@@ -45,10 +51,11 @@ class ServiceModel {
 class ServiceManagementService {
   static const String baseUrl = 'http://10.0.2.2:5093';
 
-  // Lấy danh sách dịch vụ của chủ trọ
-  static Future<List<ServiceModel>> fetchServices(String ownerId) async {
+  // Lấy danh sách dịch vụ của chủ trọ (hỗ trợ lọc theo từng khu trọ cụ thể)
+  static Future<List<ServiceModel>> fetchServices(String ownerId, {String? propertyId}) async {
+    final query = (propertyId != null && propertyId.isNotEmpty) ? '?propertyId=$propertyId' : '';
     final response = await http
-        .get(Uri.parse('$baseUrl/api/owner/services/$ownerId'))
+        .get(Uri.parse('$baseUrl/api/owner/services/$ownerId$query'))
         .timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 200) {
@@ -79,10 +86,18 @@ class ServiceManagementService {
     return response.statusCode == 200;
   }
 
-  // Bật / tắt nhanh trạng thái hoạt động của dịch vụ
+  // Bật / tắt nhanh trạng thái hoạt động của dịch vụ toàn cục
   static Future<bool> toggleServiceStatus(String id) async {
     final response = await http.put(
       Uri.parse('$baseUrl/api/owner/services/$id/toggle-status'),
+    );
+    return response.statusCode == 200;
+  }
+
+  // Bật / tắt dịch vụ cho từng khu trọ cụ thể
+  static Future<bool> togglePropertyService(String serviceId, String propertyId) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/owner/services/$serviceId/property/$propertyId/toggle'),
     );
     return response.statusCode == 200;
   }
@@ -95,4 +110,3 @@ class ServiceManagementService {
     return response.statusCode == 200;
   }
 }
-

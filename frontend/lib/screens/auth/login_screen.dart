@@ -13,6 +13,7 @@ import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -128,7 +129,9 @@ class _LoginScreenState extends State<LoginScreen>
   void _showNotice(String message, {bool isError = false}) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Colors.redAccent : AppColors.primaryGreen,
@@ -209,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (!mounted) return;
 
-      _showNotice(result['message'] ?? 'Đăng nhập thành công!');
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
       // Điều hướng theo vai trò
       if (role == 'admin') {
@@ -217,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen>
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboard()),
         );
-      } else if (role == 'owner') {
+      } else if (role == 'owner' || role == 'landlord') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const OwnerDashboard()),
@@ -228,6 +231,11 @@ class _LoginScreenState extends State<LoginScreen>
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
+      LocalNotificationService.instance.startPushSession(
+        userId: userId,
+        role: role,
+        accessToken: accessToken,
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -311,10 +319,7 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (!mounted) return;
 
-      // Bước 9: Thông báo đăng nhập thành công
-      _showNotice(
-        result['message']?.toString() ?? 'Đăng nhập Google thành công!',
-      );
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
 
       // Bước 10: Điều hướng theo vai trò tài khoản
       if (role == 'admin') {
@@ -335,6 +340,11 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         throw Exception('Vai trò tài khoản không hợp lệ: $role');
       }
+      LocalNotificationService.instance.startPushSession(
+        userId: userId,
+        role: role,
+        accessToken: appToken,
+      );
     } catch (e, stackTrace) {
       debugPrint('[GOOGLE LOGIN] Lỗi: $e');
       debugPrintStack(stackTrace: stackTrace);
@@ -471,6 +481,11 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         throw Exception('Vai trò tài khoản không hợp lệ: $role');
       }
+      LocalNotificationService.instance.startPushSession(
+        userId: userId,
+        role: role,
+        accessToken: appToken,
+      );
     } catch (e, stackTrace) {
       debugPrint('[ZALO LOGIN] Lỗi: $e');
       debugPrintStack(stackTrace: stackTrace);

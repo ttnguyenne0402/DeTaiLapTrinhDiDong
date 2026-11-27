@@ -84,6 +84,17 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,
       ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.primaryGreen,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: const CircleBorder(),
+        tooltip: 'Hỗ trợ trực tuyến',
+        child: const Icon(Icons.chat_bubble_rounded, size: 26),
+        onPressed: () {
+          Navigator.pushNamed(context, '/ai-chat');
+        },
+      ),
     );
   }
 }

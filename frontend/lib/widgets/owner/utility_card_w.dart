@@ -293,19 +293,48 @@ class _RoomUtilityCardState extends State<RoomUtilityCard> {
         children: [
           _buildHeader(),
           const SizedBox(height: 12),
-          Text(
-            widget.tenantName,
-            style: const TextStyle(
-              fontSize: 14,
-              color: RoomCardColors.textSecondary,
-            ),
+          Row(
+            children: [
+              Text(
+                widget.tenantName,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: RoomCardColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: RoomCardColors.accentGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: RoomCardColors.accentGreen.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, size: 8, color: RoomCardColors.accentGreen),
+                    SizedBox(width: 4),
+                    Text(
+                      'Đang thuê',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: RoomCardColors.accentGreen,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          if (widget.phone != null) ...[
+          if (widget.phone != null && widget.phone!.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              widget.phone!,
+              'SĐT: ${widget.phone}',
               style: const TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 color: RoomCardColors.textSecondary,
               ),
             ),

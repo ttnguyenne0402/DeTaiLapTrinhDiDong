@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
 import '../../services/profile_service.dart';
 import '../auth/login_screen.dart';
 
@@ -345,6 +346,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    await LocalNotificationService.instance.endPushSession();
     await AuthStorage.clearLogin();
 
     if (!mounted) return;
@@ -806,22 +809,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             )
           : ListView(
               padding: const EdgeInsets.all(16),
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 24),
-                _sectionTitle('Thông tin cá nhân', Icons.person_outline),
-                const SizedBox(height: 12),
-                _buildPersonalInfo(),
-                const SizedBox(height: 24),
-                _buildMaintenanceHistoryButton(),
-                const SizedBox(height: 24),
-                _buildBankInfo(),
-                const SizedBox(height: 24),
-                _buildPrivacyNote(),
-                const SizedBox(height: 24),
-                _buildLogoutButton(),
-                const SizedBox(height: 24),
-              ],
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 24),
+          _sectionTitle('Thông tin cá nhân', Icons.person_outline),
+          const SizedBox(height: 12),
+          _buildPersonalInfo(),
+          const SizedBox(height: 24),
+          if (_userRole == 'tenant') ...[
+            _buildMaintenanceHistoryButton(),
+            const SizedBox(height: 24),
+          ],
+          _buildBankInfo(),
+          const SizedBox(height: 24),
+          _buildPrivacyNote(),
+          const SizedBox(height: 24),
+          _buildLogoutButton(),
+          const SizedBox(height: 24),
+        ],
             ),
     );
   }

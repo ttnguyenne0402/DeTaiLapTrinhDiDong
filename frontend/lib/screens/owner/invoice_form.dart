@@ -281,7 +281,7 @@ class _InvoiceFormState extends State<Invoice_form> {
   double get _totalServicesAmount {
     double sum = 0;
     for (var s in _otherServices) {
-      if (s['price'] is num) sum += (s['price'] as num).toDouble();
+      if (s['excluded'] != true && s['price'] is num) sum += (s['price'] as num).toDouble();
     }
     return sum;
   }
@@ -767,10 +767,38 @@ class _InvoiceFormState extends State<Invoice_form> {
                               subtitle: '${_waterUsage.toStringAsFixed(0)} m³',
                               icon: Icons.water_drop),
                           for (var s in _otherServices)
-                            InvoiceWidgetHelpers.buildFeeItem(
-                              s['name']?.toString() ?? 'Dịch vụ',
-                              _formatMoney((s['price'] is num) ? (s['price'] as num).toDouble() : 0),
-                              icon: Icons.miscellaneous_services,
+                            Row(
+                              children: [
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: Icon(
+                                    s['excluded'] == true
+                                        ? Icons.add_circle_outline
+                                        : Icons.remove_circle_outline,
+                                    color: s['excluded'] == true ? Colors.green : Colors.red,
+                                    size: 18,
+                                  ),
+                                  tooltip: s['excluded'] == true
+                                      ? 'Tính lại dịch vụ này'
+                                      : 'Bỏ qua dịch vụ này cho phòng',
+                                  onPressed: () {
+                                    setState(() {
+                                      s['excluded'] = s['excluded'] != true;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: InvoiceWidgetHelpers.buildFeeItem(
+                                    s['name']?.toString() ?? 'Dịch vụ',
+                                    s['excluded'] == true
+                                        ? '0 đ (Đã bỏ qua)'
+                                        : _formatMoney((s['price'] is num) ? (s['price'] as num).toDouble() : 0),
+                                    icon: Icons.miscellaneous_services,
+                                  ),
+                                ),
+                              ],
                             ),
                           const Divider(height: 16),
                           Row(

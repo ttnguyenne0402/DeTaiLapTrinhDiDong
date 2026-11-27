@@ -25,6 +25,7 @@ class Contract_form extends StatefulWidget {
 class HopDongMoi extends State<Contract_form> {
   bool _agreeTerms = false;
   bool _isLoadingData = false;
+  bool _isSubmitting = false;
 
   // Dữ liệu phòng trống & Lịch hẹn
   List<dynamic> _availableRooms = [];
@@ -41,6 +42,41 @@ class HopDongMoi extends State<Contract_form> {
   String _getRoomId(Map<dynamic, dynamic>? room) {
     if (room == null) return '';
     return (room['roomId'] ?? room['RoomId'] ?? room['id'] ?? room['Id'])?.toString().trim() ?? '';
+  }
+
+  String _normalizeText(String text, {bool removeRoomPrefix = false}) {
+    String clean = text.toLowerCase();
+    // Gom các chữ cái tiếng Việt bị Syncfusion tách dấu cách (VD: "ph ò ng" -> "phòng", "t â n" -> "tân")
+    clean = clean.replaceAllMapped(
+      RegExp(r'([a-zà-ỹ])\s+([ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ])'),
+          (m) => '${m[1]}${m[2]}',
+    );
+    clean = clean.replaceAllMapped(
+      RegExp(r'([ăâêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ])\s+([a-z]{1,2})\b'),
+          (m) => '${m[1]}${m[2]}',
+    );
+    // Xóa toàn bộ dấu cách
+    clean = clean.replaceAll(RegExp(r'\s+'), '');
+    // Xóa chữ "phòng" sau khi đã gom liền chữ
+    if (removeRoomPrefix) {
+      clean = clean.replaceAll('phòng', '');
+    }
+    return clean;
+  }
+
+  String _fixVietnameseSpacing(String text) {
+    String res = text;
+    // Bước 1: Gom ký tự có dấu vào chữ cái đứng trước nó (VD: "Nguy ễ" -> "Nguyễ", "T ấ" -> "Tấ", "K ỳ" -> "Kỳ")
+    res = res.replaceAllMapped(
+      RegExp(r'([a-zA-ZÀ-ỹ])\s+([ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵĂÂĐÊÔƠƯÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ])'),
+          (m) => '${m[1]}${m[2]}',
+    );
+    // Bước 2: Gom tiếp phụ âm cuối bị tách sau nguyên âm có dấu (VD: "Nguyễ n" -> "Nguyễn", "Tấ n" -> "Tấn")
+    res = res.replaceAllMapped(
+      RegExp(r'([ăâêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵĂÂÊÔƠƯÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ])\s+([a-zA-Z]{1,2})\b'),
+          (m) => '${m[1]}${m[2]}',
+    );
+    return res.trim();
   }
 
   // Lọc lịch hẹn của đúng phòng đang chọn (bắt mọi định dạng ID)
@@ -103,6 +139,9 @@ class HopDongMoi extends State<Contract_form> {
   late final SignatureController _tenantSignatureController;
 
   String? _selectedPdfFileName;
+  String? _pdfRoomName;
+  String? _pdfPropertyName;
+  String? _pdfFloor;
 
   Future<void> _pickPdfFile() async {
     try {
@@ -141,7 +180,7 @@ class HopDongMoi extends State<Contract_form> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(extractedText.trim().isNotEmpty
-                  ? 'Đã bóc tách dữ liệu từ "$fileName"! 🎉'
+                  ? 'Đã chọn file "$fileName"!'
                   : 'Không đọc được chữ từ "$fileName".'),
               backgroundColor: extractedText.trim().isNotEmpty ? AppColors.primaryGreen : Colors.orange,
               duration: const Duration(seconds: 3),
@@ -179,10 +218,9 @@ class HopDongMoi extends State<Contract_form> {
       final parts = beforePhone.split(':');
       if (parts.length >= 2) {
         String candidate = parts[parts.length - 2].trim();
-        // Cắt bỏ từ chữ "S" (bắt đầu nhãn "Số điện thoại") trở về cuối
         candidate = candidate.replaceAll(RegExp(r'\s+S\S*.*$'), '').trim();
         if (candidate.isNotEmpty) {
-          _tenantNameController.text = candidate;
+          _tenantNameController.text = _fixVietnameseSpacing(candidate);
         }
       }
     }
@@ -243,18 +281,98 @@ class HopDongMoi extends State<Contract_form> {
       }
     }
 
-    // 8. Tự động chọn phòng (VD: Studio A1)
-    if (_availableRooms.isNotEmpty) {
-      for (final r in _availableRooms) {
-        final rName = (r['roomName'] ?? r['name'] ?? '').toString().trim();
-        if (rName.isNotEmpty && flat.toLowerCase().contains(rName.toLowerCase())) {
-          _selectedRoom = Map<String, dynamic>.from(r as Map);
-          final rId = _getRoomId(_selectedRoom);
-          if (rId.isNotEmpty) _fetchRoomServices(rId);
-          break;
+    // 8. BÓC TÁCH TÊN PHÒNG, SỐ TẦNG & TÊN TÒA NHÀ TRONG ĐIỀU 1
+    _pdfRoomName = null;
+    _pdfPropertyName = null;
+    _pdfFloor = null;
+
+    String dieu1Block = flat;
+    final startDateStr = _startDateController.text;
+    final lastDateIdx = startDateStr.isNotEmpty ? flat.lastIndexOf(startDateStr) : -1;
+    if (lastDateIdx != -1) {
+      dieu1Block = flat.substring(0, lastDateIdx);
+      final cccdIdx = _cccdController.text.isNotEmpty ? dieu1Block.indexOf(_cccdController.text) : -1;
+      if (cccdIdx != -1) {
+        dieu1Block = dieu1Block.substring(cccdIdx);
+      }
+    }
+
+    // Bắt số tầng nếu có (VD: "Tầng 2", "Lầu 2", "Tầng trệt" -> "0")
+    final roomSectionIdx = dieu1Block.indexOf(':');
+    final roomOnlyBlock = roomSectionIdx != -1 ? dieu1Block.substring(roomSectionIdx) : dieu1Block;
+    final floorMatch = RegExp(r'(?:T\s*[ầa]\s*n\s*g|L\s*[ầa]\s*u)\s*(\d+|tr[ệe]t)', caseSensitive: false).firstMatch(roomOnlyBlock);
+    if (floorMatch != null) {
+      final rawFloor = floorMatch.group(1)!.toLowerCase().replaceAll(' ', '');
+      _pdfFloor = rawFloor.contains('tr') ? '0' : rawFloor;
+    }
+
+    final dashParts = dieu1Block.split(RegExp(r'[\-\–\—]'));
+    if (dashParts.length >= 2) {
+      final leftSide = dashParts[0];
+      if (leftSide.contains(':')) {
+        _pdfRoomName = _fixVietnameseSpacing(leftSide.split(':').last.trim());
+      }
+
+      // Lấy phần tử cuối chứa "Thuộc tòa nhà : ..." (tránh bị lệch nếu có thêm "- Tầng 2 -" ở giữa)
+      final propSegment = dashParts.lastWhere(
+            (p) => p.contains(':'),
+        orElse: () => dashParts.last,
+      );
+      final rightColons = propSegment.split(':');
+      if (rightColons.length >= 2) {
+        String propRaw = rightColons[1].trim();
+        propRaw = propRaw.replaceAll(RegExp(r'\s+T\s*h\s*[ờo]\s*i.*$', caseSensitive: false), '').trim();
+        propRaw = _fixVietnameseSpacing(propRaw);
+        if (propRaw.isNotEmpty) {
+          _pdfPropertyName = propRaw;
         }
       }
     }
+
+    // Tự động chọn đúng phòng trống trong dropdown (khớp Tên phòng + Tòa nhà + Tầng nếu có)
+    if (_pdfRoomName != null && _pdfRoomName!.isNotEmpty && _availableRooms.isNotEmpty) {
+      final targetRoom = _normalizeText(_pdfRoomName!, removeRoomPrefix: true);
+      final targetProp = _normalizeText(_pdfPropertyName ?? '');
+
+      final candidates = _availableRooms.where((r) {
+        final rName = _normalizeText((r['roomName'] ?? r['name'] ?? '').toString(), removeRoomPrefix: true);
+        final pName = _normalizeText((r['propertyName'] ?? '').toString());
+        final rFloor = (r['floor'] ?? r['floorNumber'] ?? '').toString().trim();
+
+        final roomOk = rName == targetRoom;
+        final propOk = targetProp.isEmpty || pName.isEmpty || pName == targetProp;
+        final floorOk = _pdfFloor == null || rFloor.isEmpty || rFloor == _pdfFloor;
+        return roomOk && propOk && floorOk;
+      }).toList();
+
+      if (candidates.length == 1) {
+        _selectedRoom = Map<String, dynamic>.from(candidates.first as Map);
+        final rId = _getRoomId(_selectedRoom);
+        if (rId.isNotEmpty) _fetchRoomServices(rId);
+      } else if (candidates.length > 1) {
+        // Có nhiều phòng trùng tên ở các tầng khác nhau -> Nhắc chủ trọ chọn tay trên Dropdown
+        _showMessage('Có ${candidates.length} phòng tên "$_pdfRoomName" đang trống. Vui lòng chọn đúng tầng trên danh sách!');
+      }
+    }
+
+    // 9. Tự động khớp Nguồn khách thuê: Khách đặt lịch hay Khách vãng lai
+    _selectedAppointment = null; // Mặc định là Khách vãng lai
+    if (_selectedRoom != null && tenantPhone != null && tenantPhone.isNotEmpty) {
+      final cleanPdfPhone = tenantPhone.trim();
+      final matchedApt = _appointmentsForSelectedRoom.firstWhere(
+            (a) {
+          final aptPhone = (a['tenantPhone'] ?? a['TenantPhone'] ?? a['phone'] ?? '').toString().trim();
+          return aptPhone == cleanPdfPhone;
+        },
+        orElse: () => null,
+      );
+
+      if (matchedApt != null) {
+        _selectedAppointment = Map<String, dynamic>.from(matchedApt as Map);
+      }
+    }
+
+
   }
 
   Widget _buildPdfUploadSection() {
@@ -472,17 +590,23 @@ class HopDongMoi extends State<Contract_form> {
             final m = Map<String, dynamic>.from(item as Map);
             final rawPrice = m['price'] ?? m['Price'];
             final sId = (m['serviceId'] ?? m['ServiceId'] ?? '').toString();
+            final sName = (m['name'] ?? m['Name'] ?? '').toString();
+            final isMandatory = m['isMandatory'] == true ||
+                m['IsMandatory'] == true ||
+                sName.toLowerCase().contains('điện') ||
+                sName.toLowerCase().contains('nước');
 
-            bool isSelected = true;
+            bool isSelected = isMandatory;
             if (savedServices != null) {
               isSelected = savedServiceIds.contains(sId);
             }
 
             return {
               'serviceId': sId,
-              'name': m['name'] ?? m['Name'] ?? '',
+              'name': sName,
               'unit': m['unit'] ?? m['Unit'] ?? '',
               'price': rawPrice != null ? (rawPrice as num).toDouble() : 0.0,
+              'isMandatory': isMandatory,
               'selected': isSelected,
             };
           }).toList();
@@ -671,14 +795,46 @@ class HopDongMoi extends State<Contract_form> {
       'services': _appliedServices.where((s) => s['selected'] == true).toList(),
     };
 
-    final success = await ContractService.createContract(body);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu bản nháp vào hệ thống!')),
-      );
-      Navigator.pop(context, true);
-    } else {
-      _showMessage('Lỗi khi lưu bản nháp.');
+    final res = await ContractService.createContract(body);
+    if (mounted) {
+      if (res != null && res['error'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã lưu bản nháp vào hệ thống!'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else {
+        final errorMsg = res != null ? (res['message'] ?? 'Không thể lưu bản nháp.') : 'Lỗi khi lưu bản nháp.';
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 26),
+                SizedBox(width: 8),
+                Text('Thông báo', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              errorMsg,
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -687,6 +843,69 @@ class HopDongMoi extends State<Contract_form> {
     if (_selectedRoom == null || _getRoomId(_selectedRoom).isEmpty) {
       _showMessage('Vui lòng chọn phòng trống trong hệ thống để tạo hợp đồng!');
       return;
+    }
+
+    // RÀNG BUỘC KHỚP CHÍNH XÁC PHÒNG & TÒA NHÀ TRONG PDF VỚI CSDL PHÒNG TRỐNG CỦA CHỦ TRỌ
+    final currentSelectedRoomName = (_selectedRoom?['roomName'] ?? _selectedRoom?['name'] ?? '').toString().trim();
+    final currentSelectedPropName = (_selectedRoom?['propertyName'] ?? '').toString().trim();
+
+    if (_pdfRoomName != null && _pdfRoomName!.isNotEmpty) {
+      final cleanPdfRoom = _normalizeText(_pdfRoomName!, removeRoomPrefix: true);
+      final cleanSelectedRoom = _normalizeText(currentSelectedRoomName, removeRoomPrefix: true);
+
+      final cleanPdfProp = _normalizeText(_pdfPropertyName ?? '');
+      final cleanSelectedProp = _normalizeText(currentSelectedPropName);
+
+      final bool isRoomMatched = cleanPdfRoom == cleanSelectedRoom;
+      final bool isPropMatched = cleanPdfProp.isEmpty || cleanSelectedProp.isEmpty || cleanPdfProp == cleanSelectedProp;
+
+      final currentSelectedFloor = (_selectedRoom?['floor'] ?? _selectedRoom?['floorNumber'] ?? '').toString().trim();
+      final bool isFloorMatched = _pdfFloor == null || currentSelectedFloor.isEmpty || _pdfFloor == currentSelectedFloor;
+
+      if (!isRoomMatched || !isPropMatched || !isFloorMatched) {
+        final floorText = _pdfFloor != null ? ' (Tầng $_pdfFloor)' : '';
+        final pdfFullLabel = (_pdfPropertyName != null && _pdfPropertyName!.isNotEmpty)
+            ? '$_pdfRoomName$floorText - $_pdfPropertyName'
+            : '$_pdfRoomName$floorText';
+        final selectedFloorText = currentSelectedFloor.isNotEmpty ? ' (Tầng $currentSelectedFloor)' : '';
+        final selectedFullLabel = currentSelectedPropName.isNotEmpty
+            ? '$currentSelectedRoomName$selectedFloorText - $currentSelectedPropName'
+            : '$currentSelectedRoomName$selectedFloorText';
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red, size: 26),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Lỗi không khớp phòng trọ',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              'File PDF ghi hợp đồng cho "$pdfFullLabel", nhưng phòng trống bạn đang chọn là "$selectedFullLabel" (hoặc phòng trong PDF không nằm trong danh sách phòng trống của bạn).\n\nVui lòng chọn đúng phòng hoặc tải lại file PDF hợp lệ.',
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đã hiểu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+        return; // Chặn lại không cho tạo hợp đồng
+      }
     }
 
     if (_tenantNameController.text.trim().isEmpty) {
@@ -728,12 +947,77 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
+    final double dbRentPrice = ((_selectedRoom?['price'] ?? 0) as num).toDouble();
+    final double dbDepositPrice = ((_selectedRoom?['deposit'] ?? 0) as num).toDouble();
+
+    final bool isRentMismatch = dbRentPrice > 0 && rentPrice != dbRentPrice;
+    final bool isDepositMismatch = dbDepositPrice > 0 && depositPrice != dbDepositPrice;
+
+    if (isRentMismatch || isDepositMismatch) {
+      final List<String> diffs = [];
+      if (isRentMismatch) {
+        diffs.add('• Giá thuê: Hợp đồng ghi ${_formatCurrency(rentPrice)}đ (Giá gốc SQL: ${_formatCurrency(dbRentPrice)}đ)');
+      }
+      if (isDepositMismatch) {
+        diffs.add('• Tiền đặt cọc: Hợp đồng ghi ${_formatCurrency(depositPrice)}đ (Cọc gốc SQL: ${_formatCurrency(dbDepositPrice)}đ)');
+      }
+
+      final bool? proceedWithDiffPrice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Chênh lệch giá so với hệ thống',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Thông tin tài chính trên hợp đồng đang khác với dữ liệu phòng trong hệ thống:\n\n'
+                '${diffs.join('\n')}\n\n'
+                'Bạn muốn dùng lại giá gốc trong SQL hay vẫn tiếp tục tạo hợp đồng với mức giá này?',
+            style: const TextStyle(fontSize: 13.5, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  if (dbRentPrice > 0) _rentPriceController.text = dbRentPrice.toInt().toString();
+                  if (dbDepositPrice > 0) _depositPriceController.text = dbDepositPrice.toInt().toString();
+                });
+                Navigator.pop(ctx, false);
+              },
+              child: const Text('Lấy theo giá ban đầu', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGreen,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Vẫn tạo hợp đồng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (proceedWithDiffPrice != true) {
+        return;
+      }
+    }
+
     if (!_agreeTerms) {
       _showMessage('Vui lòng xác nhận đồng thuận với các quy định trọ.');
       return;
     }
 
-    final String initialStatus = _selectedPdfFileName != null ? 'active' : 'pending';
+    final String initialStatus = 'pending';
 
     final body = {
       'viewingAppointmentId': _selectedAppointment?['id'] ?? _selectedAppointment?['Id'],
@@ -754,17 +1038,24 @@ class HopDongMoi extends State<Contract_form> {
       'services': _appliedServices.where((s) => s['selected'] == true).toList(),
     };
 
-    final success = await ContractService.createContract(body);
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(initialStatus == 'active' ? 'Đã đính kèm PDF hợp đồng và kích hoạt hợp đồng thành công!' : 'Đã tạo hợp đồng và gửi ký thành công!'),
-          backgroundColor: AppColors.primaryGreen,
-        ),
-      );
-      Navigator.pop(context, true);
-    } else {
-      _showMessage('Lỗi khi tạo hợp đồng.');
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+
+    final res = await ContractService.createContract(body);
+    if (mounted) {
+      if (res != null && res['error'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã tạo hợp đồng và gửi ký thành công!'),
+            backgroundColor: AppColors.primaryGreen,
+          ),
+        );
+        Navigator.pop(context, true);
+      } else {
+        setState(() => _isSubmitting = false);
+        final errorMsg = res != null ? (res['message'] ?? 'Lỗi khi tạo hợp đồng.') : 'Lỗi khi tạo hợp đồng.';
+        _showMessage(errorMsg);
+      }
     }
   }
 
@@ -775,8 +1066,8 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
-    if (!_ownerHasSigned || !_tenantHasSigned) {
-      _showMessage('Cả chủ trọ và người thuê đều phải ký.');
+    if (!_ownerHasSigned && !_tenantHasSigned) {
+      _showMessage('Vui lòng vẽ chữ ký trước khi xác nhận.');
       return;
     }
 
@@ -828,8 +1119,15 @@ class HopDongMoi extends State<Contract_form> {
     );
 
     if (success && mounted) {
+      setState(() {
+        if (ownerBase64.isNotEmpty) _existingOwnerSignature = ownerBase64;
+        if (tenantBase64.isNotEmpty) _existingTenantSignature = tenantBase64;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hợp đồng đã ký thành công và có hiệu lực!')),
+        const SnackBar(
+          content: Text('Hợp đồng đã ký thành công và có hiệu lực!'),
+          backgroundColor: AppColors.primaryGreen,
+        ),
       );
       Navigator.pop(context, true);
     } else {
@@ -898,6 +1196,13 @@ class HopDongMoi extends State<Contract_form> {
     );
   }
 
+  String _formatCurrency(double amount) {
+    return amount.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -949,7 +1254,7 @@ class HopDongMoi extends State<Contract_form> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('Chọn phòng còn trống', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -958,91 +1263,51 @@ class HopDongMoi extends State<Contract_form> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              width: 50,
-                              height: 50,
-                              color: Colors.grey[300],
-                              child: const Icon(
-                                Icons.home,
-                                color: AppColors.textSecondary,
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedRoom != null ? _getRoomId(_selectedRoom) : null,
+                          hint: const Text('Chọn phòng trống trong danh sách...', style: TextStyle(fontSize: 13)),
+                          isExpanded: true,
+                          items: _availableRooms.map((r) {
+                            final rId = _getRoomId(r);
+                            final rName = (r['roomName'] ?? r['name'])?.toString() ?? 'Phòng';
+                            final pName = (r['propertyName'] ?? r['address'])?.toString() ?? 'Khu trọ';
+                            final floor = (r['floor'] ?? r['floorNumber'])?.toString().trim() ?? '';
+                            final floorStr = floor.isNotEmpty ? ' (Tầng $floor)' : '';
+                            final price = ((r['price'] ?? 0) as num).toInt();
+
+                            return DropdownMenuItem(
+                              value: rId,
+                              child: Text(
+                                '$rName$floorStr - $pName (${_formatCurrency(price.toDouble())} đ/tháng)',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        widget.contract?['room'] ??
-                                            'Phòng 201 - Tầng 2',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                    Text(
-                                      widget.contract?['area'] != null
-                                          ? '${widget.contract!['area']} m²'
-                                          : '25 m²',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  widget.contract?['address'] ??
-                                      'Khu trọ Bình Thạnh (12 phòng)',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  widget.contract?['rentPrice'] != null
-                                      ? '${widget.contract!['rentPrice']} đ/tháng'
-                                      : '4.500.000 đ/tháng',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.brown,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              final chosen = _availableRooms.firstWhere(
+                                    (r) => _getRoomId(r) == val,
+                                orElse: () => _availableRooms.first,
+                              );
+                              setState(() {
+                                _selectedRoom = Map<String, dynamic>.from(chosen as Map);
+                                _rentPriceController.text = ((chosen['price'] ?? 0) as num).toInt().toString();
+                                _depositPriceController.text = ((chosen['deposit'] ?? 0) as num).toInt().toString();
+                                _selectedAppointment = null;
+                                _tenantNameController.clear();
+                                _tenantPhoneController.clear();
+                              });
+                              _fetchRoomServices(val);
+                            }
+                          },
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Khu trọ áp dụng',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    ContractFormWidgets.buildDropdownField(
-                      widget.contract?['propertyName'] ??
-                          widget.contract?['address'] ??
-                          'Khu trọ Bình Thạnh (12 phòng)',
-                    ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 14),
+                    const Text('Nguồn khách thuê', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1066,10 +1331,7 @@ class HopDongMoi extends State<Contract_form> {
                               final phone = a['tenantPhone'] ?? a['TenantPhone'] ?? '';
                               return DropdownMenuItem(
                                 value: aptId,
-                                child: Text(
-                                  'Lịch hẹn: $name ($phone)',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
+                                child: Text('Lịch hẹn: $name ($phone)', style: const TextStyle(fontSize: 13)),
                               );
                             }),
                           ],
@@ -1083,20 +1345,19 @@ class HopDongMoi extends State<Contract_form> {
                             } else {
                               final match = _appointmentsForSelectedRoom.firstWhere(
                                     (a) => (a['id'] ?? a['Id']).toString() == val,
+                                orElse: () => null,
                               );
-                              setState(() {
-                                _selectedAppointment = Map<String, dynamic>.from(match);
-                                _tenantNameController.text = match['tenantName'] ?? match['TenantName'] ?? '';
-                                _tenantPhoneController.text = match['tenantPhone'] ?? match['TenantPhone'] ?? '';
-                              });
+                              if (match != null) {
+                                setState(() {
+                                  _selectedAppointment = Map<String, dynamic>.from(match as Map);
+                                  _tenantNameController.text = match['tenantName'] ?? match['TenantName'] ?? '';
+                                  _tenantPhoneController.text = match['tenantPhone'] ?? match['TenantPhone'] ?? '';
+                                });
+                              }
                             }
                           },
                         ),
                       ),
-                    ),
-                    ContractFormWidgets.buildDropdownField(
-                      widget.contract?['appointmentInfo'] ??
-                          '#AF-8823 - Nguyễn Văn An - 10:00 24/08/...',
                     ),
                   ],
                 ),
@@ -1312,9 +1573,54 @@ class HopDongMoi extends State<Contract_form> {
                                 },
                               ),
                               Expanded(
-                                child: Text(
-                                  srv['name'] ?? '',
-                                  style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            srv['name'] ?? '',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: srv['isMandatory'] == true
+                                                ? Colors.red.shade50
+                                                : Colors.blue.shade50,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: srv['isMandatory'] == true
+                                                  ? Colors.red.shade200
+                                                  : Colors.blue.shade200,
+                                              width: 0.8,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            srv['isMandatory'] == true ? 'Bắt buộc' : 'Theo phòng',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: srv['isMandatory'] == true
+                                                  ? Colors.red.shade700
+                                                  : Colors.blue.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (srv['isMandatory'] != true)
+                                      Text(
+                                        'Chỉ tích chọn nếu phòng này đăng ký',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                      ),
+                                  ],
                                 ),
                               ),
                               Text(
@@ -1563,14 +1869,21 @@ class HopDongMoi extends State<Contract_form> {
                     hasSavedSig ? 'Đã ký số' : 'Vẽ chữ ký',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: hasSavedSig ? AppColors.primaryGreen : Colors.orange),
                   ),
-                  if (!hasSavedSig) ...[
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: () => controller.clear(),
-                      icon: const Icon(Icons.refresh, size: 12),
-                      label: const Text('Ký lại', style: TextStyle(fontSize: 10)),
-                    ),
-                  ],
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        if (title.contains('Bên A')) {
+                          _existingOwnerSignature = null;
+                        } else {
+                          _existingTenantSignature = null;
+                        }
+                      });
+                      controller.clear();
+                    },
+                    icon: const Icon(Icons.refresh, size: 12),
+                    label: Text(hasSavedSig ? 'Ký lại' : 'Xóa', style: const TextStyle(fontSize: 10)),
+                  ),
                 ],
               ),
             ],
@@ -1636,7 +1949,7 @@ class HopDongMoi extends State<Contract_form> {
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: _saveDraft,
+            onPressed: _isSubmitting ? null : _saveDraft,
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
             child: const Text('Lưu bản nháp', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryGreen)),
           ),
@@ -1644,9 +1957,15 @@ class HopDongMoi extends State<Contract_form> {
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton(
-            onPressed: _completeContract,
+            onPressed: _isSubmitting ? null : _completeContract,
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, padding: const EdgeInsets.symmetric(vertical: 12)),
-            child: const Text('Hoàn tất & Gửi ký', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text('Hoàn tất & Gửi ký', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ),
         ),
       ],

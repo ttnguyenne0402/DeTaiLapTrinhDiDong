@@ -8,6 +8,7 @@ abstract class AppRoutes {
 
   //hợp động với hóa đơn
   static const String OwnerDashboard  = '/owner/dasboard';
+  static const String ownerNotifications = '/owner/notifications';
   static const String contractsManage = '/owner/contracts';
   static const String contractForm = '/owner/contracts/form';
   static const String invoicesManage = '/owner/invoices';
@@ -21,6 +22,8 @@ abstract class AppRoutes {
   static const String contractDetailOwner = '/owner/contracts/detail';
   static const String contractMembers = '/owner/contracts/members';
   static const String invoiceDetailOwner = '/owner/invoices/detail';
+  static const String servicesManage = '/owner/services';
+  static const String amenitiesManage = '/owner/amenities';
 
   // --- TV2: NGƯỜI THUÊ (TENANT) ---
   static const String tenantBooking = '/tenant/booking';
@@ -34,6 +37,7 @@ abstract class AppRoutes {
   static const String tenantNotifications = '/tenant/notifications';
   static const String home = '/home';
   static const String roomDetail = '/room-detail';
+  static const String aiChat = '/ai-chat';
   static const String tenantMaintenanceRequest = '/tenant/maintenance/request';
   static const String tenantMaintenanceHistory = '/tenant/maintenance/history';
 }

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../route/app_routes.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
+import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/owner/owner_dashboard.dart';
 import '../../screens/owner/contracts_manage.dart';
@@ -8,12 +12,12 @@ import '../../screens/owner/maintenance_manage.dart';
 import '../../screens/owner/posts_manage.dart';
 import '../../screens/owner/properties_manage.dart';
 import '../../screens/owner/appointments_manage.dart';
-import '../../screens/owner/services_manage.dart';
 import '../../screens/owner/owner_notifications_screen.dart';
+import '../../services/auth_storage.dart';
 
 class OwnerDrawer extends StatelessWidget {
   /// Mã định danh màn hình hiện tại để làm nổi bật :
-  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'services'
+  /// 'contracts', 'invoices', 'utilities', 'maintenance', 'posts', 'appointments', 'notifications'
   final String? currentRoute;
 
   const OwnerDrawer({super.key, this.currentRoute});
@@ -35,6 +39,19 @@ class OwnerDrawer extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 _buildSectionTitle('NGHIỆP VỤ QUẢN LÝ'),
+
+                // 0. Trợ lý AI Chủ trọ
+                _buildDrawerItem(
+                  context: context,
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: 'Trợ lý Chủ trọ',
+                  subtitle: 'Tư vấn quản lý, thống kê & soạn tin',
+                  isActive: currentRoute == 'ai_chat',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, AppRoutes.aiChat, arguments: {'role': 'owner'});
+                  },
+                ),
 
                 // 1. Quản lý Hợp đồng thuê
                 _buildDrawerItem(
@@ -157,27 +174,7 @@ class OwnerDrawer extends StatelessWidget {
                   },
                 ),
 
-                // 7. Quản lý Dịch vụ & Bảng giá
-                _buildDrawerItem(
-                  context: context,
-                  icon: Icons.room_service_outlined,
-                  title: 'Dịch vụ & Bảng giá',
-                  subtitle: 'Cấu hình đơn giá điện, nước, wifi...',
-                  isActive: currentRoute == 'services',
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (currentRoute != 'services') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ServicesManageScreen(),
-                        ),
-                      );
-                    }
-                  },
-                ),
-
-                // 8. Thông báo của Chủ trọ
+                // 7. Thông báo của Chủ trọ
                 _buildDrawerItem(
                   context: context,
                   icon: Icons.notifications_active_outlined,
@@ -187,12 +184,7 @@ class OwnerDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     if (currentRoute != 'notifications') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const OwnerNotificationsScreen(),
-                        ),
-                      );
+                      Navigator.pushNamed(context, AppRoutes.ownerNotifications);
                     }
                   },
                 ),
@@ -534,11 +526,20 @@ class OwnerDrawer extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            onPressed: () {
+            onPressed: () async {
+            final navigator = Navigator.of(context);
+
               Navigator.pop(dialogCtx);
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
+
+              await LocalNotificationService.instance.endPushSession();
+              await AuthStorage.clearLogin();
+
+              if (!navigator.mounted) return;
+
+              navigator.pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => const LoginScreen(),
+                ),
                 (route) => false,
               );
             },
