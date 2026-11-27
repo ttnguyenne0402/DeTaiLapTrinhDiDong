@@ -7,6 +7,7 @@ import '../../services/owner/post_service.dart';
 import '../../services/owner/room_service.dart';
 import '../../services/owner/amenity_service.dart';
 import '../../services/auth_storage.dart';
+import '../../utils/post_image_path.dart';
 
 class PostFormScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
@@ -77,11 +78,16 @@ class _PostFormScreenState extends State<PostFormScreen> {
       }
       _selectedRoomId = item['roomId'];
 
-      if (item['image'] != null && item['image'].toString().isNotEmpty) {
-        _selectedImages.add(item['image'].toString());
-      } else {
-        _selectedImages.add('frontend/assets/images/anhPhongDemo.jpg');
+      final images = item['images'];
+      final singleImage = item['image']?.toString();
+      if (images is List && images.isNotEmpty) {
+        _selectedImages.addAll(images.whereType<String>().take(6));
+      } else if (singleImage != null && singleImage.isNotEmpty) {
+        _selectedImages.add(singleImage);
       }
+      _selectedImages.removeWhere(
+        (path) => isPostImageAsset(path) && path.endsWith('/anhPhongDemo.jpg'),
+      );
 
       final existingAmenities = item['amenities'];
       if (existingAmenities is List) {
@@ -99,8 +105,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
           }
         }
       }
-    } else {
-      _selectedImages.add('frontend/assets/images/anhPhongDemo.jpg');
     }
     _priceController = TextEditingController(text: priceStr);
 
@@ -145,8 +149,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
               _selectedBuildingName = first.propertyName;
               _selectedRoomName = first.name;
               if (_priceController.text.isEmpty && first.price > 0) {
-                _priceController.text =
-                    _formatNumberDots('${first.price.toInt()}');
+                _priceController.text = _formatNumberDots(
+                  '${first.price.toInt()}',
+                );
               }
               if (_titleController.text.isEmpty) {
                 _titleController.text =
@@ -202,6 +207,8 @@ class _PostFormScreenState extends State<PostFormScreen> {
                     final XFile? file = await _picker.pickImage(
                       source: ImageSource.camera,
                       imageQuality: 85,
+                      maxWidth: 2000,
+                      maxHeight: 2000,
                     );
                     if (file != null && mounted) {
                       setState(() {
@@ -229,8 +236,11 @@ class _PostFormScreenState extends State<PostFormScreen> {
                 onTap: () async {
                   Navigator.pop(ctx);
                   try {
-                    final List<XFile> files =
-                        await _picker.pickMultiImage(imageQuality: 85);
+                    final files = await _picker.pickMultiImage(
+                      imageQuality: 85,
+                      maxWidth: 2000,
+                      maxHeight: 2000,
+                    );
                     if (files.isNotEmpty && mounted) {
                       setState(() {
                         _selectedImages.remove(
@@ -246,7 +256,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Không thể mở Thư viện ảnh: $e')),
+                        SnackBar(
+                          content: Text('Không thể mở Thư viện ảnh: $e'),
+                        ),
                       );
                     }
                   }
@@ -358,13 +370,16 @@ class _PostFormScreenState extends State<PostFormScreen> {
                     label: Text(item),
                     selected: isSelected,
                     showCheckmark: false,
-                    selectedColor: AppColors.primaryGreen.withValues(alpha: 0.15),
+                    selectedColor: AppColors.primaryGreen.withValues(
+                      alpha: 0.15,
+                    ),
                     labelStyle: TextStyle(
                       color: isSelected
                           ? AppColors.primaryGreen
                           : Colors.grey[700],
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                     backgroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
@@ -415,9 +430,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
     final numVal = int.tryParse(digits);
     if (numVal == null || numVal <= 0) return '';
     return numVal.toString().replaceAllMapped(
-          RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (m) => '.',
-        );
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (m) => '.',
+    );
   }
 
   String _formatDraftPrice(String input) {
@@ -464,40 +479,48 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
                 setState(() => _isLoading = true);
 
-                final imagesToSave = _selectedImages.isNotEmpty
-                    ? _selectedImages
-                    : ['frontend/assets/images/anhPhongDemo.jpg'];
+                final imagesToSave = List<String>.of(_selectedImages);
 
                 bool success = false;
                 if (isSqlite && item['sqliteId'] != null) {
-                  await SqliteHelper.instance
-                      .updateDraftPost(item['sqliteId'], {
-                    'room_id': _selectedRoomId,
-                    'building_name': _selectedBuildingName,
-                    'room_name': _selectedRoomName,
-                    'title': _titleController.text.trim(),
-                    'description': _descController.text.trim(),
-                    'price': _formatDraftPrice(_priceController.text),
-                    'amenities': selectedAmenities.join(','),
-                    'image': imagesToSave.first,
-                  });
-                  success = true;
+                  success = await _savePostAction(() async {
+                    await SqliteHelper.instance
+                        .updateDraftPost(item['sqliteId'], {
+                          'room_id': _selectedRoomId,
+                          'building_name': _selectedBuildingName,
+                          'room_name': _selectedRoomName,
+                          'title': _titleController.text.trim(),
+                          'description': _descController.text.trim(),
+                          'price': _formatDraftPrice(_priceController.text),
+                          'amenities': selectedAmenities.join(','),
+                          ...await SqliteHelper.instance.saveDraftImages(
+                            imagesToSave,
+                          ),
+                        });
+                    return true;
+                  }, messenger);
                 } else {
-                  final cleanPrice = double.tryParse(_priceController.text
-                          .replaceAll('.', '')
-                          .replaceAll(',', '')
-                          .trim()) ??
+                  final cleanPrice =
+                      double.tryParse(
+                        _priceController.text
+                            .replaceAll('.', '')
+                            .replaceAll(',', '')
+                            .trim(),
+                      ) ??
                       0;
 
-                  success = await PostService.updatePost(item['id'].toString(), {
-                    'roomId': _selectedRoomId,
-                    'title': _titleController.text.trim(),
-                    'description': _descController.text.trim(),
-                    'price': cleanPrice,
-                    'amenities': selectedAmenities,
-                    'images': imagesToSave,
-                    'status': item['status'] ?? 'pending',
-                  });
+                  success = await _savePostAction(
+                    () => PostService.updatePost(item['id'].toString(), {
+                      'roomId': _selectedRoomId,
+                      'title': _titleController.text.trim(),
+                      'description': _descController.text.trim(),
+                      'price': cleanPrice,
+                      'amenities': selectedAmenities,
+                      'images': imagesToSave,
+                      'status': item['status'] ?? 'pending',
+                    }),
+                    messenger,
+                  );
                 }
 
                 if (!mounted) return;
@@ -511,13 +534,6 @@ class _PostFormScreenState extends State<PostFormScreen> {
                     ),
                   );
                   navigator.pop(true);
-                } else {
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Cập nhật tin đăng thất bại'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
                 }
               },
         style: ElevatedButton.styleFrom(
@@ -574,24 +590,29 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
                     setState(() => _isLoading = true);
 
-                    final firstImg = _selectedImages.isNotEmpty
-                        ? _selectedImages.first
-                        : 'frontend/assets/images/anhPhongDemo.jpg';
-
-                    await SqliteHelper.instance.insertDraftPost({
-                      'room_id': _selectedRoomId,
-                      'building_name': _selectedBuildingName,
-                      'room_name': _selectedRoomName,
-                      'title': _titleController.text.trim(),
-                      'description': _descController.text.trim(),
-                      'price': _formatDraftPrice(_priceController.text),
-                      'amenities': selectedAmenities.join(','),
-                      'image': firstImg,
-                      'created_at': DateTime.now().toString().substring(0, 10),
-                    });
+                    final success = await _savePostAction(() async {
+                      await SqliteHelper.instance.insertDraftPost({
+                        'room_id': _selectedRoomId,
+                        'building_name': _selectedBuildingName,
+                        'room_name': _selectedRoomName,
+                        'title': _titleController.text.trim(),
+                        'description': _descController.text.trim(),
+                        'price': _formatDraftPrice(_priceController.text),
+                        'amenities': selectedAmenities.join(','),
+                        ...await SqliteHelper.instance.saveDraftImages(
+                          List<String>.of(_selectedImages),
+                        ),
+                        'created_at': DateTime.now().toString().substring(
+                          0,
+                          10,
+                        ),
+                      });
+                      return true;
+                    }, messenger);
 
                     if (!mounted) return;
                     setState(() => _isLoading = false);
+                    if (!success) return;
 
                     messenger.showSnackBar(
                       const SnackBar(
@@ -653,29 +674,43 @@ class _PostFormScreenState extends State<PostFormScreen> {
 
                     setState(() => _isLoading = true);
 
-                    final targetRoomId = _selectedRoomId ??
-                        (_rooms.isNotEmpty ? _rooms.first.id : 'room_101');
+                    final targetRoomId = _selectedRoomId;
+                    if (targetRoomId == null) {
+                      setState(() => _isLoading = false);
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Vui lòng chọn phòng trước khi gửi duyệt.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
 
-                    final cleanPrice = double.tryParse(_priceController.text
-                            .replaceAll('.', '')
-                            .replaceAll(',', '')
-                            .trim()) ??
+                    final cleanPrice =
+                        double.tryParse(
+                          _priceController.text
+                              .replaceAll('.', '')
+                              .replaceAll(',', '')
+                              .trim(),
+                        ) ??
                         0;
 
-                    final imagesToSave = _selectedImages.isNotEmpty
-                        ? _selectedImages
-                        : ['frontend/assets/images/anhPhongDemo.jpg'];
+                    final imagesToSave = List<String>.of(_selectedImages);
 
-                    final success = await PostService.createPost({
-                      'roomId': targetRoomId,
-                      'title': _titleController.text.trim(),
-                      'description': _descController.text.trim(),
-                      'price': cleanPrice,
-                      'amenities': selectedAmenities,
-                      'status': 'pending',
-                      'submitNote': 'Gửi duyệt từ ứng dụng di động',
-                      'images': imagesToSave,
-                    });
+                    final success = await _savePostAction(
+                      () => PostService.createPost({
+                        'roomId': targetRoomId,
+                        'title': _titleController.text.trim(),
+                        'description': _descController.text.trim(),
+                        'price': cleanPrice,
+                        'amenities': selectedAmenities,
+                        'status': 'pending',
+                        'submitNote': 'Gửi duyệt từ ứng dụng di động',
+                        'images': imagesToSave,
+                      }),
+                      messenger,
+                    );
 
                     if (!mounted) return;
                     setState(() => _isLoading = false);
@@ -688,22 +723,9 @@ class _PostFormScreenState extends State<PostFormScreen> {
                         ),
                       );
                       navigator.pop(true);
-                    } else {
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Tạo tin đăng thất bại. Vui lòng thử lại!',
-                          ),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
                     }
                   },
-            icon: const Icon(
-              Icons.send_rounded,
-              color: Colors.white,
-              size: 16,
-            ),
+            icon: const Icon(Icons.send_rounded, color: Colors.white, size: 16),
             label: const Text(
               'GỬI DUYỆT',
               style: TextStyle(
@@ -923,6 +945,25 @@ class _PostFormScreenState extends State<PostFormScreen> {
     );
   }
 
+  Future<bool> _savePostAction(
+    Future<bool> Function() save,
+    ScaffoldMessengerState messenger,
+  ) async {
+    try {
+      return await save();
+    } catch (error) {
+      if (mounted) {
+        final message = error is PostSaveException
+            ? error.message
+            : 'Không thể lưu ảnh. Hãy kiểm tra hoặc chọn lại ảnh.';
+        messenger.showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+      return false;
+    }
+  }
+
   Widget _buildPreviewThumbnail(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return Image.network(
@@ -936,15 +977,13 @@ class _PostFormScreenState extends State<PostFormScreen> {
       return Image.asset(
         path,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) =>
-            const Icon(Icons.image, color: Colors.grey),
+        errorBuilder: (_, _, _) => const Icon(Icons.image, color: Colors.grey),
       );
     }
     return Image.file(
       File(path),
       fit: BoxFit.cover,
-      errorBuilder: (_, _, _) =>
-          const Icon(Icons.image, color: Colors.grey),
+      errorBuilder: (_, _, _) => const Icon(Icons.image, color: Colors.grey),
     );
   }
 

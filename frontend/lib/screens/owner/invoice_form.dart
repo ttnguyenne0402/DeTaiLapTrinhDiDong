@@ -40,12 +40,16 @@ class _InvoiceFormState extends State<Invoice_form> {
   String? _nuocImagePath;
 
   bool _isLoading = false;
+  bool _isEditingReadings = false;
   String? _selectedPropertyId;
   String? _selectedContractId;
 
   // Danh sách tài khoản ngân hàng & tài khoản được chọn
   List<dynamic> _bankAccounts = [];
   String? _selectedBankAccountId;
+  bool _bankAccountsLoadFailed = false;
+  bool _invoiceDetailLoaded = false;
+  bool _bankAccountNeedsReplacement = false;
 
   var _activeContracts = [];
   var _otherServices = [];
@@ -119,19 +123,17 @@ class _InvoiceFormState extends State<Invoice_form> {
     final contractsRes = await OwnerInvoiceService.getActiveContracts(ownerId: ownerId);
 
     // 2. Tải danh sách tài khoản ngân hàng của chủ trọ
-    try {
-      final banksRes = await OwnerInvoiceService.getBankAccounts();
-      if (banksRes != null && banksRes is List) {
-        _bankAccounts = banksRes;
-        if (_bankAccounts.isNotEmpty) {
-          final defaultBank = _bankAccounts.firstWhere(
-                (b) => b['isDefault'] == true || b['is_default'] == 1 || b['is_default'] == true,
-            orElse: () => _bankAccounts.first,
-          );
-          _selectedBankAccountId = (defaultBank['id'] ?? '').toString();
-        }
-      }
-    } catch (_) {}
+    final banksRes = await OwnerInvoiceService.getBankAccounts();
+    if (!mounted) return;
+    _bankAccountsLoadFailed = banksRes == null;
+    _bankAccounts = banksRes ?? [];
+    if (widget.invoice == null && _bankAccounts.isNotEmpty) {
+      final defaultBank = _bankAccounts.firstWhere(
+        (bank) => bank['isDefault'] == true,
+        orElse: () => _bankAccounts.first,
+      );
+      _selectedBankAccountId = defaultBank['id']?.toString();
+    }
 
     if (mounted && contractsRes != null && contractsRes.isNotEmpty) {
       _activeContracts = contractsRes;
@@ -164,9 +166,11 @@ class _InvoiceFormState extends State<Invoice_form> {
             _electricUnitPrice = (detail['electricUnitPrice'] is num) ? (detail['electricUnitPrice'] as num).toDouble() : 3800.0;
             _waterUnitPrice = (detail['waterUnitPrice'] is num) ? (detail['waterUnitPrice'] as num).toDouble() : 25000.0;
 
-            if (detail['bankAccount'] != null && detail['bankAccount'] is Map) {
-              _selectedBankAccountId = detail['bankAccount']['id']?.toString() ?? _selectedBankAccountId;
-            }
+            final savedBankId = detail['bankAccountId']?.toString();
+            _bankAccountNeedsReplacement = savedBankId != null &&
+                !_bankAccounts.any((bank) => bank['id']?.toString() == savedBankId);
+            _selectedBankAccountId = _bankAccountNeedsReplacement ? null : savedBankId;
+            _invoiceDetailLoaded = true;
 
             _isLoading = false;
           });
@@ -206,7 +210,10 @@ class _InvoiceFormState extends State<Invoice_form> {
   }
 
   Future<void> _loadPreviousReading(String contractId) async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isEditingReadings = false;
+    });
 
     final data = await OwnerInvoiceService.getPreviousReading(contractId);
     if (mounted && data != null && data is Map) {
@@ -360,6 +367,13 @@ class _InvoiceFormState extends State<Invoice_form> {
   }
 
   Future<void> _submitInvoice(String status) async {
+    final bankError = _bankAccountError;
+    if ((widget.invoice != null && !_invoiceDetailLoaded) || bankError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(bankError ?? 'Không tải được chi tiết hóa đơn. Hãy mở lại màn hình.')),
+      );
+      return;
+    }
     if (_selectedContractId == null || _selectedContractId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng chọn phòng để lập hóa đơn!')),
@@ -444,7 +458,7 @@ class _InvoiceFormState extends State<Invoice_form> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.primaryGreen,
-            content: Text(widget.invoice != null ? 'Cập nhật và phát hành lại hóa đơn thành công!' : (status == 'draft' ? 'Đã lưu hóa đơn nháp!' : 'Đã phát hành hóa đơn thành công!')),
+            content: Text(res['message']?.toString() ?? 'Đã lưu hóa đơn!'),
           ),
         );
         Navigator.pop(context, true);
@@ -479,6 +493,12 @@ class _InvoiceFormState extends State<Invoice_form> {
         );
       }
     }
+  }
+
+  String? get _bankAccountError {
+    if (_bankAccountsLoadFailed) return 'Không tải được tài khoản ngân hàng. Hãy mở lại màn hình.';
+    if (_bankAccountNeedsReplacement) return 'Hãy chọn một tài khoản ngân hàng đang hoạt động của bạn.';
+    return null;
   }
 
   @override
@@ -680,7 +700,7 @@ class _InvoiceFormState extends State<Invoice_form> {
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
                                 isExpanded: true,
-                                hint: const Text('Chọn tài khoản ngân hàng'),
+                                hint: Text(_bankAccounts.isEmpty ? 'Chưa có tài khoản ngân hàng' : 'Chọn tài khoản ngân hàng'),
                                 value: _selectedBankAccountId,
                                 items: [
                                   for (var b in _bankAccounts)
@@ -698,18 +718,41 @@ class _InvoiceFormState extends State<Invoice_form> {
                                 ],
                                 onChanged: (bankId) {
                                   if (bankId != null) {
-                                    setState(() => _selectedBankAccountId = bankId);
+                                    setState(() {
+                                      _selectedBankAccountId = bankId;
+                                      _bankAccountNeedsReplacement = false;
+                                    });
                                   }
                                 },
                               ),
                             ),
                           ),
+                          if (_bankAccountError case final message?)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(message, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                            ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 14),
 
-                    const Text('Chỉ số Điện & Nước', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Chỉ số Điện & Nước', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        ),
+                        if (_selectedContractId != null && widget.invoice?.status != InvoiceStatus.paid)
+                          TextButton.icon(
+                            onPressed: () {
+                              if (_isEditingReadings) FocusScope.of(context).unfocus();
+                              setState(() => _isEditingReadings = !_isEditingReadings);
+                            },
+                            icon: Icon(_isEditingReadings ? Icons.check : Icons.edit_outlined, size: 16),
+                            label: Text(_isEditingReadings ? 'Xong' : 'Sửa'),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 10),
 
                     InvoiceWidgetHelpers.buildUtilityCard(
@@ -719,6 +762,8 @@ class _InvoiceFormState extends State<Invoice_form> {
                       totalAmount: _formatMoney(_totalElectricAmount),
                       oldController: _dienCuController,
                       newController: _dienMoiController,
+                      canEditOldReading: _isEditingReadings && widget.invoice != null,
+                      canEditNewReading: _isEditingReadings,
                       unitLabel: 'kWh',
                       consumption: '${_electricUsage.toStringAsFixed(0)} kWh',
                       actionText: _dienImagePath != null ? 'Đổi ảnh' : 'Chụp ảnh',
@@ -734,6 +779,8 @@ class _InvoiceFormState extends State<Invoice_form> {
                       totalAmount: _formatMoney(_totalWaterAmount),
                       oldController: _nuocCuController,
                       newController: _nuocMoiController,
+                      canEditOldReading: _isEditingReadings && widget.invoice != null,
+                      canEditNewReading: _isEditingReadings,
                       unitLabel: 'm³',
                       consumption: '${_waterUsage.toStringAsFixed(0)} m³',
                       actionText: _nuocImagePath != null ? 'Đổi ảnh' : 'Chụp ảnh',

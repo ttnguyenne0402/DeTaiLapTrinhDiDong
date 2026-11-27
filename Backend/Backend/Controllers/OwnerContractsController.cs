@@ -4,6 +4,8 @@ using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend.Helpers;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace Backend.Controllers
 {
@@ -21,6 +23,7 @@ namespace Backend.Controllers
 
         [HttpGet]
         [HttpGet("{ownerId}")]
+        [Authorize(Roles = "owner,landlord,admin")]
         public async Task<IActionResult> GetContracts( [FromRoute] string? ownerId,[FromQuery] string? status, [FromQuery] string? search, [FromQuery(Name = "ownerId")] string? ownerIdQuery = null)
         {
             try
@@ -28,6 +31,14 @@ namespace Backend.Controllers
                   string? targetOwner = !string.IsNullOrEmpty(ownerId)
                              ? ownerId
                              : ownerIdQuery;
+                  if (!User.IsInRole("admin"))
+                  {
+                      var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                      if (string.IsNullOrEmpty(actorId)) return Unauthorized();
+                      if (!string.IsNullOrEmpty(targetOwner) && !IsOwner(actorId, targetOwner))
+                          return Forbid();
+                      targetOwner = actorId;
+                  }
 
                   var query = _context.Contracts
                              .Include(c => c.Room)
@@ -69,7 +80,17 @@ namespace Backend.Controllers
                         displayStatus = "Bản nháp";
                         timeText = "Bản nháp mới tạo";
                     }
-                    else if (c.SignedAt == null && c.Status != "active")
+                    else if (c.Status == "rejected" || c.Status == "withdrawn")
+                    {
+                        displayStatus = c.Status == "rejected" ? "Đã từ chối" : "Đã thu hồi";
+                        timeText = c.SigningClosedAt?.ToString("dd/MM/yyyy") ?? displayStatus;
+                    }
+                    else if (c.Status == "expired")
+                    {
+                        displayStatus = "Đã hết hạn";
+                        timeText = "Đã hết hạn hợp đồng";
+                    }
+                    else if (c.Status == "pending")
                     {
                         displayStatus = "Chờ ký";
                         timeText = "Đang chờ ký xác nhận";
@@ -119,6 +140,9 @@ namespace Backend.Controllers
                         Cccd = c.Terms?.StartsWith("CCCD:") == true ? c.Terms.Split('|')[0].Replace("CCCD:", ""): "",
                         OwnerSignature = c.OwnerSignature,
                         TenantSignature = c.TenantSignature,
+                        SigningClosedAt = c.SigningClosedAt.HasValue
+                            ? DateTime.SpecifyKind(c.SigningClosedAt.Value, DateTimeKind.Utc) : null,
+                        SigningCloseReason = c.SigningCloseReason,
                         Services = c.ContractServices.Select(cs => new ContractServiceItemDto
                         {
                             ServiceId = cs.ServiceId,
@@ -168,10 +192,32 @@ namespace Backend.Controllers
 
         // POST: /api/OwnerContracts (Tạo hợp đồng mới / Lưu bản nháp)
         [HttpPost]
-        public async Task<IActionResult> CreateContract([FromBody] CreateContractRequest req)
+        [Authorize(Roles = "owner,landlord")]
+        public async Task<IActionResult> CreateContract([FromBody] CreateContractRequest req, CancellationToken cancellationToken)
         {
             try
             {
+                var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(ownerId)) return Unauthorized();
+                if (string.IsNullOrWhiteSpace(req.RoomId))
+                    return BadRequest(new { message = "Vui lòng chọn phòng trọ để lập hợp đồng." });
+
+                var status = req.Status is "pending" or "Chờ ký" ? "pending" : "draft";
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                await RoomSigningLock.AcquireAsync(_context, req.RoomId, cancellationToken);
+                var room = await _context.Rooms.Include(r => r.Property)
+                    .FirstOrDefaultAsync(r => r.Id == req.RoomId, cancellationToken);
+                if (room == null)
+                    return NotFound(new { message = "Không tìm thấy phòng trọ phù hợp để tạo hợp đồng." });
+                if (!IsOwner(ownerId, room.Property.OwnerId)) return Forbid();
+
+                if (status == "pending" && (room.Status != "available" ||
+                    await _context.Contracts.AnyAsync(c => c.RoomId == room.Id &&
+                        (c.Status == "pending" || c.Status == "active"), cancellationToken)))
+                {
+                    return Conflict(new { message = "Phòng này không còn trống hoặc đang được giữ cho một hợp đồng khác." });
+                }
+
                 string inputVal = !string.IsNullOrWhiteSpace(req.TenantPhone) ? req.TenantPhone.Trim() : "";
                 string formName = !string.IsNullOrWhiteSpace(req.TenantName) ? req.TenantName.Trim() : "Khách thuê mới";
 
@@ -235,31 +281,12 @@ namespace Backend.Controllers
                     else DateOnly.TryParse(req.EndDate, out end);
                 }
 
-                // 3. Lấy thông tin phòng trọ và Bất động sản
-                var roomId = req.RoomId;
-                Room? room = null;
-
-                if (!string.IsNullOrEmpty(roomId))
-                {
-                    room = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == roomId);
-                }
-
-                if (room == null)
-                {
-                    room = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Status == "available")
-                           ?? await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync();
-                }
-
-                if (room == null || room.Property == null)
-                {
-                    return BadRequest(new { message = "Không tìm thấy phòng trọ phù hợp để tạo hợp đồng." });
-                }
-
                 // 4. Xử lý mã Lịch hẹn (BỎ CHUỖI "walkin" ĐỂ TRÁNH LỖI KHÓA NGOẠI SQL)
                 string? validAppointmentId = null;
                 if (!string.IsNullOrEmpty(req.ViewingAppointmentId) && req.ViewingAppointmentId != "walkin")
                 {
-                    var aptExists = await _context.ViewingAppointments.AnyAsync(a => a.Id == req.ViewingAppointmentId);
+                    var aptExists = await _context.ViewingAppointments.AnyAsync(a =>
+                        a.Id == req.ViewingAppointmentId && a.RoomId == room.Id && a.TenantId == tenant.Id);
                     if (aptExists)
                     {
                         validAppointmentId = req.ViewingAppointmentId;
@@ -281,10 +308,13 @@ namespace Backend.Controllers
 
                     // 3. Khóa chống trùng CCCD ở các phòng đang hoạt động khác
                     var isCccdInOtherContracts = await _context.Contracts
-                        .AnyAsync(c => c.TenantId != tenant.Id && c.Status != "terminated" && c.Terms != null && c.Terms.Contains(cleanCccd));
+                        .AnyAsync(c => c.TenantId != tenant.Id &&
+                            (c.Status == "draft" || c.Status == "pending" || c.Status == "active") &&
+                            c.Terms != null && c.Terms.Contains(cleanCccd));
 
                     var isCccdInMembers = await _context.ContractMembers
-                        .AnyAsync(m => m.IdentityCard == cleanCccd && m.Contract.TenantId != tenant.Id && m.Contract.Status != "terminated");
+                        .AnyAsync(m => m.IdentityCard == cleanCccd && m.Contract.TenantId != tenant.Id &&
+                            (m.Contract.Status == "draft" || m.Contract.Status == "pending" || m.Contract.Status == "active"));
 
                     if (isCccdInOtherContracts || isCccdInMembers)
                     {
@@ -308,9 +338,7 @@ namespace Backend.Controllers
                     PaymentCycle = "monthly",
                     InitialElectricityReading = req.ElectricIndex,
                     InitialWaterReading = req.WaterIndex,
-                    Status = (req.Status == "active" || req.Status == "Đang hiệu lực")
-                        ? "active"
-                        : ((req.Status == "pending" || req.Status == "Chờ ký") ? "pending" : "draft"),
+                    Status = status,
                     Terms = $"CCCD:{req.Cccd}|IssueDate:{req.IssueDate}|IssuePlace:{req.IssuePlace}",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
@@ -336,14 +364,6 @@ namespace Backend.Controllers
 
                 if (contract.Status == "pending")
                 {
-                    var existingPending = await _context.Contracts
-                        .FirstOrDefaultAsync(c => c.RoomId == room.Id && c.Status == "pending");
-
-                    if (existingPending != null)
-                    {
-                        return BadRequest(new { message = $"Phòng {room.Name} đang có 1 hợp đồng chờ ký với khách khác! Vui lòng hoàn tất hoặc hủy hợp đồng chờ ký hiện tại trước khi tạo mới." });
-                    }
-
                     var contractNotif = new Notification
                     {
                          Id = "notif_" + Guid.NewGuid().ToString("N")[..8],
@@ -422,6 +442,7 @@ namespace Backend.Controllers
                 }
 
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync(cancellationToken);
 
                 return Ok(new
                 {
@@ -439,81 +460,152 @@ namespace Backend.Controllers
         }
 
         [HttpPut("{id}/sign")]
-            public async Task<IActionResult> SignContract(string id, [FromBody] SignContractRequest req)
+        [Authorize(Roles = "owner,landlord,tenant")]
+        public async Task<IActionResult> SignContract(
+            string id, [FromBody] SignContractRequest req, CancellationToken cancellationToken)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var contract = await FindSigningContractAsync(id, cancellationToken);
+            if (contract == null) return NotFound(new { message = "Không tìm thấy hợp đồng." });
+
+            var isOwner = (User.IsInRole("owner") || User.IsInRole("landlord")) && IsOwner(userId, contract.OwnerId);
+            var isTenant = User.IsInRole("tenant") && string.Equals(userId, contract.TenantId, StringComparison.OrdinalIgnoreCase);
+            if (!isOwner && !isTenant) return Forbid();
+            if (contract.Status != "pending")
+                return Conflict(new { message = "Hợp đồng này không còn chờ ký." });
+
+            if (!string.IsNullOrWhiteSpace(req.OwnerSignature))
             {
-                try
-                {
-                    var contract = await _context.Contracts
-                        .Include(c => c.Room)
-                        .FirstOrDefaultAsync(c => c.Id == id || c.ContractCode == id);
-
-                    if (contract == null)
-                    {
-                        return NotFound(new { message = "Không tìm thấy hợp đồng." });
-                    }
-
-                    // 1. Chỉ cập nhật chữ ký nào có gửi lên (Không đè rỗng lên chữ ký cũ)
-                    if (!string.IsNullOrWhiteSpace(req.OwnerSignature))
-                    {
-                        contract.OwnerSignature = req.OwnerSignature;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(req.TenantSignature))
-                    {
-                        contract.TenantSignature = req.TenantSignature;
-                    }
-
-                    // 🔴 2. KIỂM TRA PHÁP LÝ: CHỈ KÍCH HOẠT 'active' KHI CẢ CHỦ TRỌ VÀ NGƯỜI THUÊ ĐÃ KÝ ĐỦ
-                    bool isBothSigned = !string.IsNullOrWhiteSpace(contract.OwnerSignature) &&
-                                       !string.IsNullOrWhiteSpace(contract.TenantSignature);
-
-                    if (isBothSigned)
-                    {
-                        contract.Status = "active"; // Đã ký đủ 2 bên -> Đang hiệu lực
-                        contract.SignedAt = DateTime.UtcNow;
-
-                        if (contract.Room != null)
-                        {
-                            contract.Room.Status = "rented"; // Chuyển phòng sang Đã thuê
-                            contract.Room.UpdatedAt = DateTime.UtcNow;
-                        }
-                    }
-                    else
-                    {
-                        contract.Status = "pending"; // Mới 1 bên ký -> Vẫn ở trạng thái Chờ ký!
-                    }
-
-                    contract.UpdatedAt = DateTime.UtcNow;
-                    await _context.SaveChangesAsync();
-
-                    return Ok(new
-                    {
-                        message = isBothSigned
-                            ? "Hợp đồng đã ký đủ 2 bên và chính thức có hiệu lực!"
-                            : "Đã lưu chữ ký, đang chờ bên còn lại ký xác nhận.",
-                        status = contract.Status,
-                        isBothSigned = isBothSigned
-                    });
-                }
-                catch (Exception ex)
-                {
-                    string errorMsg = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-                    return StatusCode(500, new { message = "Lỗi khi ký hợp đồng", error = errorMsg });
-                }
+                if (!isOwner) return Forbid();
+                contract.OwnerSignature = req.OwnerSignature;
             }
 
+            if (!string.IsNullOrWhiteSpace(req.TenantSignature))
+                contract.TenantSignature = req.TenantSignature;
+            else if (string.IsNullOrWhiteSpace(req.OwnerSignature))
+                return BadRequest(new { message = "Vui lòng cung cấp chữ ký." });
 
+            var isBothSigned = !string.IsNullOrWhiteSpace(contract.OwnerSignature) &&
+                !string.IsNullOrWhiteSpace(contract.TenantSignature);
+            var now = DateTime.UtcNow;
+            if (isBothSigned)
+            {
+                if (contract.Room.Status != "available" || await _context.Contracts.AnyAsync(c =>
+                    c.RoomId == contract.RoomId && c.Id != contract.Id && c.Status == "active", cancellationToken))
+                    return Conflict(new { message = "Phòng không còn trống để kích hoạt hợp đồng." });
 
+                contract.Status = "active";
+                contract.SignedAt = now;
+                contract.Room.Status = "rented";
+                contract.Room.UpdatedAt = now;
+            }
+
+            contract.UpdatedAt = now;
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return Ok(new
+            {
+                message = isBothSigned ? "Hợp đồng đã ký đủ hai bên." : "Đã lưu chữ ký, đang chờ bên còn lại.",
+                status = contract.Status,
+                isBothSigned
+            });
+        }
+
+        [HttpPut("{id}/reject-signing")]
+        [Authorize(Roles = "tenant")]
+        public Task<IActionResult> RejectSigning(
+            string id, [FromBody] CloseContractSigningRequest request, CancellationToken cancellationToken) =>
+            CloseSigningAsync(id, request.Reason, tenantRejects: true, cancellationToken);
+
+        [HttpPut("{id}/withdraw-signing")]
+        [Authorize(Roles = "owner,landlord")]
+        public Task<IActionResult> WithdrawSigning(
+            string id, [FromBody] CloseContractSigningRequest request, CancellationToken cancellationToken) =>
+            CloseSigningAsync(id, request.Reason, tenantRejects: false, cancellationToken);
+
+        private async Task<IActionResult> CloseSigningAsync(
+            string id, string? reason, bool tenantRejects, CancellationToken cancellationToken)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+            var contract = await FindSigningContractAsync(id, cancellationToken);
+            if (contract == null) return NotFound(new { message = "Không tìm thấy hợp đồng." });
+            if (tenantRejects ? !string.Equals(contract.TenantId, userId, StringComparison.OrdinalIgnoreCase)
+                              : !IsOwner(userId, contract.OwnerId))
+                return Forbid();
+
+            var status = tenantRejects ? "rejected" : "withdrawn";
+            var message = tenantRejects ? "Đã từ chối ký hợp đồng." : "Đã thu hồi yêu cầu ký.";
+            if (contract.Status == status) return Ok(new { message, status });
+            if (contract.Status != "pending")
+                return Conflict(new { message = "Chỉ có thể kết thúc yêu cầu ký khi hợp đồng đang chờ ký." });
+
+            var now = DateTime.UtcNow;
+            var closeReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+            contract.Status = status;
+            contract.SigningClosedAt = now;
+            contract.SigningCloseReason = closeReason;
+            contract.UpdatedAt = now;
+
+            var party = tenantRejects ? "Người thuê đã từ chối ký" : "Chủ trọ đã thu hồi yêu cầu ký";
+            var reasonText = closeReason == null ? "" : $" Lý do: {closeReason}";
+            _context.Notifications.Add(new Notification
+            {
+                Id = "NOTIF_" + Guid.NewGuid().ToString("N"),
+                UserId = tenantRejects ? contract.OwnerId : contract.TenantId,
+                Title = tenantRejects ? "Hợp đồng bị từ chối ký" : "Yêu cầu ký đã được thu hồi",
+                Message = $"{party} hợp đồng {contract.ContractCode}.{reasonText}",
+                Type = tenantRejects ? "contract_signing_rejected" : "contract_signing_withdrawn",
+                ReferenceId = contract.Id,
+                ReferenceType = "contract",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return Ok(new { message, status });
+        }
+
+        private async Task<Contract?> FindSigningContractAsync(string id, CancellationToken cancellationToken)
+        {
+            var roomId = await _context.Contracts
+                .Where(c => c.Id == id || c.ContractCode == id)
+                .Select(c => c.RoomId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (roomId == null) return null;
+
+            await RoomSigningLock.AcquireAsync(_context, roomId, cancellationToken);
+            return await _context.Contracts.Include(c => c.Room)
+                .FirstOrDefaultAsync(c => c.Id == id || c.ContractCode == id, cancellationToken);
+        }
+
+        private static bool IsOwner(string actorId, string ownerId) =>
+            OwnerHelper.ResolveOwnerIds(actorId).Contains(ownerId, StringComparer.OrdinalIgnoreCase);
 
        // GET: /api/OwnerContracts/available-rooms?ownerId=... (Lấy danh sách phòng trống theo Chủ trọ)
            [HttpGet("available-rooms")]
-           public async Task<IActionResult> GetAvailableRooms([FromQuery] string? ownerId, [FromQuery] string? includeRoomId = null)
+           public async Task<IActionResult> GetAvailableRooms(
+               [FromQuery] string? ownerId,
+               [FromQuery] string? selectedRoomId = null,
+               [FromQuery] string? includeRoomId = null)
            {
                try
                {
+                   var targetIncludeId = !string.IsNullOrEmpty(includeRoomId) ? includeRoomId : selectedRoomId;
                    var query = _context.Rooms
                        .Include(r => r.Property)
-                       .Where(r => r.Status == "available" || (!string.IsNullOrEmpty(includeRoomId) && r.Id == includeRoomId));
+                       .Where(r =>
+                           (!string.IsNullOrEmpty(includeRoomId) && r.Id == includeRoomId) ||
+                           (r.Status == "available" &&
+                               (r.Id == targetIncludeId ||
+                                !r.Contracts.Any(c => c.Status == "pending" || c.Status == "active"))));
 
 
                    if (!string.IsNullOrEmpty(ownerId) && ownerId != "all")
@@ -891,13 +983,17 @@ namespace Backend.Controllers
             }
         }
 
-        [HttpGet("bank-accounts")] 
+        [HttpGet("bank-accounts")]
+        [Authorize(Roles = "owner,landlord")]
         public async Task<IActionResult> GetBankAccounts()
         {
+            var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(ownerId)) return Unauthorized();
+
             try
             {
                 var banks = await _context.BankAccounts
-                    .Where(b => b.Status == "active")
+                    .Where(b => b.UserId == ownerId && b.Status == "active")
                     .Select(b => new
                     {
                         id = b.Id,
@@ -1011,6 +1107,8 @@ namespace Backend.Controllers
                     }
 
 
+                    if (contract.Status != "active")
+                        return Conflict(new { message = "Chỉ có thể thanh lý hợp đồng đang hiệu lực." });
                     contract.Status = "terminated";
                     contract.TerminatedAt = DateTime.UtcNow;
                     contract.UpdatedAt = DateTime.UtcNow;

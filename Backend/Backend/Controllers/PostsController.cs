@@ -1,8 +1,12 @@
 using Backend.DT0s;
 using Backend.Helpers;
 using Backend.Models;
+using Backend.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Text.Json;
 
 namespace Backend.Controllers
 {
@@ -11,10 +15,13 @@ namespace Backend.Controllers
     public class PostsController : ControllerBase
     {
         private readonly QuanLyPhongTroContext _context;
+        private readonly PostImageStorage _imageStorage;
+        private static readonly JsonSerializerOptions FormJsonOptions = new(JsonSerializerDefaults.Web);
 
-        public PostsController(QuanLyPhongTroContext context)
+        public PostsController(QuanLyPhongTroContext context, PostImageStorage imageStorage)
         {
             _context = context;
+            _imageStorage = imageStorage;
         }
 
         // 1. GET: api/owner/posts/{ownerId}?status=all
@@ -87,7 +94,8 @@ namespace Backend.Controllers
 
                 var result = rawPosts.Select(p =>
                 {
-                    var firstImg = p.RentalPostImages?.FirstOrDefault()?.ImagePath
+                    var firstImg = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
+                                       .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).FirstOrDefault()?.ImagePath
                                    ?? p.Room?.Images
                                    ?? "frontend/assets/images/anhPhongDemo.jpg";
 
@@ -132,7 +140,8 @@ namespace Backend.Controllers
                         SubmitNote = !string.IsNullOrEmpty(p.SubmitNote) ? p.SubmitNote : (normalizedStatus == "pending" ? "Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC" : null),
                         RejectReason = p.RejectionReason,
                         Image = firstImg,
-                        Images = p.RentalPostImages?.Select(i => i.ImagePath).ToList() ?? new List<string>()
+                        Images = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
+                            .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).Select(i => i.ImagePath).ToList() ?? new List<string>()
                     };
                 }).ToList();
 
@@ -186,7 +195,8 @@ namespace Backend.Controllers
                     likesCount = await _context.Favorites.CountAsync(f => f.RoomId == p.RoomId);
                 }
 
-                var firstImg = p.RentalPostImages?.FirstOrDefault()?.ImagePath
+                var firstImg = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
+                               .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).FirstOrDefault()?.ImagePath
                                ?? p.Room?.Images
                                ?? "frontend/assets/images/anhPhongDemo.jpg";
 
@@ -227,7 +237,8 @@ namespace Backend.Controllers
                     SubmitNote = !string.IsNullOrEmpty(p.SubmitNote) ? p.SubmitNote : (normalizedStatus == "pending" ? "Đang chờ Quản trị viên thẩm định tiêu chuẩn & PCCC" : null),
                     RejectReason = p.RejectionReason,
                     Image = firstImg,
-                    Images = p.RentalPostImages?.Select(i => i.ImagePath).ToList() ?? new List<string>()
+                    Images = p.RentalPostImages?.OrderByDescending(i => i.IsThumbnail)
+                        .ThenBy(i => i.SortOrder).ThenBy(i => i.Id).Select(i => i.ImagePath).ToList() ?? new List<string>()
                 };
 
                 return Ok(dto);
@@ -240,7 +251,16 @@ namespace Backend.Controllers
 
         // 3. POST: api/owner/posts
         [HttpPost]
-        public async Task<IActionResult> CreatePost([FromBody] CreatePostDto dto)
+        public Task<IActionResult> CreatePost([FromBody] CreatePostDto dto) => CreatePostAsync(dto, null);
+
+        [HttpPost("with-images")]
+        [Authorize(Roles = "owner,landlord")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(PostImageStorage.MaxRequestBytes)]
+        public Task<IActionResult> CreatePostWithImages([FromForm] PostUploadForm form, CancellationToken cancellationToken) =>
+            SaveFormAsync<CreatePostDto>(form, CreatePostAsync, cancellationToken);
+
+        private async Task<IActionResult> CreatePostAsync(CreatePostDto dto, string? ownerId)
         {
             try
             {
@@ -252,7 +272,7 @@ namespace Backend.Controllers
                 var room = await _context.Rooms
                     .Include(r => r.Property)
                     .FirstOrDefaultAsync(r => r.Id == dto.RoomId || r.Id.ToLower() == dto.RoomId.ToLower());
-                if (room == null)
+                if (room == null && ownerId == null)
                 {
                     room = await _context.Rooms
                         .Include(r => r.Property)
@@ -270,10 +290,15 @@ namespace Backend.Controllers
                     return BadRequest(new { message = $"Bất động sản '{room.Property.Name}' đang trong trạng thái bảo trì, không thể tạo tin đăng." });
                 }
 
+                if (ownerId != null && !OwnsRoom(room, ownerId)) return Forbid();
+                if (!ValidImageReferences(dto.Images))
+                    return BadRequest(new { message = "Ảnh tin đăng chưa tải lên hoặc vượt quá 6 ảnh." });
+
                 string validRoomId = room.Id;
 
                 string status = string.IsNullOrEmpty(dto.Status) ? "pending" : dto.Status.ToLower();
                 if (status == "active") status = "published"; // database.sql check constraint
+                if (ownerId != null) status = "pending";
 
                 decimal postPrice = (dto.Price.HasValue && dto.Price.Value > 0)
                     ? dto.Price.Value
@@ -301,26 +326,7 @@ namespace Backend.Controllers
 
                 _context.RentalPosts.Add(post);
 
-                if (dto.Images != null && dto.Images.Any())
-                {
-                    bool isFirst = true;
-                    foreach (var imgUrl in dto.Images)
-                    {
-                        if (!string.IsNullOrWhiteSpace(imgUrl))
-                        {
-                            var img = new RentalPostImage
-                            {
-                                Id = "IMG_" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
-                                RentalPostId = post.Id,
-                                ImagePath = imgUrl,
-                                IsThumbnail = isFirst,
-                                CreatedAt = DateTime.UtcNow
-                            };
-                            _context.RentalPostImages.Add(img);
-                            isFirst = false;
-                        }
-                    }
-                }
+                if (dto.Images != null) ReplaceImages(post, dto.Images);
 
                 await _context.SaveChangesAsync();
 
@@ -335,7 +341,16 @@ namespace Backend.Controllers
 
         // 4. PUT: api/owner/posts/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdatePost(string id, [FromBody] UpdatePostDto dto)
+        public Task<IActionResult> UpdatePost(string id, [FromBody] UpdatePostDto dto) => UpdatePostAsync(id, dto, null);
+
+        [HttpPut("{id}/with-images")]
+        [Authorize(Roles = "owner,landlord")]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(PostImageStorage.MaxRequestBytes)]
+        public Task<IActionResult> UpdatePostWithImages(string id, [FromForm] PostUploadForm form, CancellationToken cancellationToken) =>
+            SaveFormAsync<UpdatePostDto>(form, (dto, ownerId) => UpdatePostAsync(id, dto, ownerId), cancellationToken);
+
+        private async Task<IActionResult> UpdatePostAsync(string id, UpdatePostDto dto, string? ownerId)
         {
             try
             {
@@ -350,6 +365,17 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy bài đăng cần cập nhật." });
                 }
 
+                if (ownerId != null)
+                {
+                    if (!OwnsRoom(post.Room, ownerId)) return Forbid();
+                    if (!string.IsNullOrWhiteSpace(dto.RoomId) && dto.RoomId != post.RoomId)
+                    {
+                        var room = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == dto.RoomId);
+                        if (room == null) return NotFound(new { message = "Không tìm thấy phòng." });
+                        if (!OwnsRoom(room, ownerId)) return Forbid();
+                    }
+                }
+
                 // Kiểm tra nếu bất động sản đang bảo trì thì không cho xuất bản tin
                 var targetRoomId = !string.IsNullOrWhiteSpace(dto.RoomId) ? dto.RoomId : post.RoomId;
                 var targetRoom = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == targetRoomId);
@@ -362,6 +388,13 @@ namespace Backend.Controllers
                     }
                 }
 
+                if (!ValidImageReferences(dto.Images))
+                    return BadRequest(new { message = "Ảnh tin đăng chưa tải lên hoặc vượt quá 6 ảnh." });
+
+                var imagesChanged = dto.Images != null && !post.RentalPostImages
+                    .OrderByDescending(i => i.IsThumbnail).ThenBy(i => i.SortOrder).ThenBy(i => i.Id)
+                    .Select(i => i.ImagePath).SequenceEqual(dto.Images);
+
                 if (!string.IsNullOrWhiteSpace(dto.RoomId)) post.RoomId = dto.RoomId;
                 if (!string.IsNullOrWhiteSpace(dto.Title)) post.Title = dto.Title;
                 if (dto.Description != null) post.Description = dto.Description;
@@ -369,12 +402,18 @@ namespace Backend.Controllers
                 if (dto.Amenities != null) post.Amenities = string.Join(",", dto.Amenities);
                 if (!string.IsNullOrWhiteSpace(dto.SubmitNote)) post.SubmitNote = dto.SubmitNote;
 
-                if (!string.IsNullOrWhiteSpace(dto.Status))
+                if (ownerId != null)
+                {
+                    if (dto.Status == "pending" || (post.Status == "published" && imagesChanged))
+                        post.Status = "pending";
+                }
+                else if (!string.IsNullOrWhiteSpace(dto.Status))
                 {
                     string s = dto.Status.ToLower();
                     post.Status = s == "active" ? "published" : s;
                 }
 
+                if (imagesChanged) ReplaceImages(post, dto.Images!);
                 post.UpdatedAt = DateTime.Now;
 
                 await _context.SaveChangesAsync();
@@ -383,6 +422,80 @@ namespace Backend.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi cập nhật bài đăng", error = ex.Message });
+            }
+        }
+
+        private static bool OwnsRoom(Room room, string ownerId) =>
+            OwnerHelper.ResolveOwnerIds(ownerId).Contains(room.Property?.OwnerId, StringComparer.OrdinalIgnoreCase);
+
+        private static bool ValidImageReferences(List<string>? images) =>
+            images == null || (images.Count <= PostImageStorage.MaxImages && images.All(PostImageStorage.IsSharedReference));
+
+        private void ReplaceImages(RentalPost post, List<string> images)
+        {
+            _context.RentalPostImages.RemoveRange(post.RentalPostImages.ToArray());
+            for (var index = 0; index < images.Count; index++)
+            {
+                _context.RentalPostImages.Add(new RentalPostImage
+                {
+                    Id = "IMG_" + Guid.NewGuid().ToString("N"),
+                    RentalPostId = post.Id,
+                    ImagePath = images[index],
+                    IsThumbnail = index == 0,
+                    SortOrder = index,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+        }
+
+        private async Task<IActionResult> SaveFormAsync<T>(
+            PostUploadForm form,
+            Func<T, string, Task<IActionResult>> save,
+            CancellationToken cancellationToken) where T : class, IPostImageRequest
+        {
+            var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(ownerId)) return Unauthorized();
+
+            var stored = new List<string>();
+            var saved = false;
+            try
+            {
+                var post = JsonSerializer.Deserialize<T>(form.Post, FormJsonOptions);
+                if (post?.Images == null || post.Images.Count > PostImageStorage.MaxImages ||
+                    form.Files.Count > PostImageStorage.MaxImages)
+                    return BadRequest(new { message = "Mỗi tin đăng có thể chứa tối đa 6 ảnh." });
+
+                var filesUsed = new HashSet<int>();
+                foreach (var (reference, position) in post.Images.Select((reference, position) => (reference, position)).ToArray())
+                {
+                    if (reference?.StartsWith("upload:", StringComparison.Ordinal) != true) continue;
+                    if (!int.TryParse(reference.AsSpan(7), out var index) || index < 0 ||
+                        index >= form.Files.Count || !filesUsed.Add(index))
+                        return BadRequest(new { message = "Danh sách ảnh tải lên không hợp lệ." });
+
+                    var path = await _imageStorage.SaveAsync(form.Files[index], cancellationToken);
+                    stored.Add(path);
+                    post.Images[position] = path;
+                }
+                if (filesUsed.Count != form.Files.Count)
+                    return BadRequest(new { message = "Danh sách ảnh tải lên không đầy đủ." });
+
+                var result = await save(post, ownerId);
+                saved = result is OkObjectResult;
+                return result;
+            }
+            catch (JsonException)
+            {
+                return BadRequest(new { message = "Dữ liệu tin đăng không hợp lệ." });
+            }
+            catch (InvalidDataException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            finally
+            {
+                if (!saved)
+                    foreach (var path in stored) _imageStorage.DeleteNewImage(path);
             }
         }
 

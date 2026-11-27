@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -135,7 +134,15 @@ class _BookingScreenState extends State<booking_screen> {
   }
 
   Future<void> _submitBooking() async {
+    if (_isSubmitting) return;
     FocusScope.of(context).unfocus();
+
+    if (_currentTenantId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng đăng nhập để đặt lịch.')),
+      );
+      return;
+    }
 
     if (_selectedDate == null || _selectedTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -189,42 +196,61 @@ class _BookingScreenState extends State<booking_screen> {
 
       final client = _getCustomClient();
       try {
+        final token = await AuthStorage.getAccessToken();
+        if (!mounted) return;
+        if (token == null || token.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Vui lòng đăng nhập lại để đặt lịch.')),
+          );
+          return;
+        }
+
         final response = await client.post(
           Uri.parse('http://10.0.2.2:5093/api/viewing-appointments'),
-          headers: {"Content-Type": "application/json"},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: json.encode(requestData),
-        );
+        ).timeout(const Duration(seconds: 15));
+
+        if (!mounted) return;
 
         if (response.statusCode == 201) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Gửi lịch hẹn thành công!"),
-                backgroundColor: AppColors.primaryGreen,
-              ),
+          await _showBookingResult(
+            title: 'Đã gửi lịch hẹn',
+            message: 'Lịch hẹn của bạn đang chờ chủ trọ xác nhận.',
+          );
+        } else if (response.statusCode == 409) {
+          final error = jsonDecode(utf8.decode(response.bodyBytes));
+          if (error is Map && error['code'] == 'room_unavailable') {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Phòng đang được giữ hoặc đã cho thuê. Vui lòng chọn phòng khác.'),
+            ));
+          } else {
+            await _showBookingResult(
+              title: 'Bạn đã có lịch xem phòng này',
+              message: 'Xem trạng thái lịch hiện tại trong mục Lịch hẹn. Nếu muốn đặt lại, hãy hủy lịch cũ trước.',
             );
-
-            _navigateToTab(2);
           }
+        } else if (response.statusCode == 401 || response.statusCode == 403) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Vui lòng đăng nhập lại để đặt lịch.')),
+          );
         } else {
-          print("Lỗi server: ${response.body}");
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Gửi lịch thất bại. Vui lòng thử lại."),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
-          }
-        }
-      } catch (e) {
-        print("Lỗi kết nối: $e");
-        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Không thể kết nối đến máy chủ."),
+              content: Text('Gửi lịch thất bại. Vui lòng thử lại.'),
               backgroundColor: Colors.redAccent,
             ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Không nhận được phản hồi đặt lịch: $e');
+        if (mounted) {
+          await _showBookingResult(
+            title: 'Chưa xác nhận được kết quả',
+            message: 'Mở mục Lịch hẹn để kiểm tra trước khi gửi lại.',
           );
         }
       } finally {
@@ -232,6 +258,27 @@ class _BookingScreenState extends State<booking_screen> {
         if (mounted) setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _showBookingResult({
+    required String title,
+    required String message,
+  }) async {
+    final openHistory = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Xem lịch hẹn'),
+          ),
+        ],
+      ),
+    );
+    if (mounted && openHistory == true) _navigateToTab(2);
   }
 
   @override

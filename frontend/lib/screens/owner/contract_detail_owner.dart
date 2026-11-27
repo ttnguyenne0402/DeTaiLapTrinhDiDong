@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../screens/owner/contract_members.dart';
 import '../../services/owner/contract_service.dart';
 import '../../services/auth_storage.dart';
+import '../../widgets/common/contract_signing_decision.dart';
 
 class ContractDetailScreen extends StatefulWidget {
   final Map<String, dynamic>? contract;
@@ -101,6 +102,14 @@ class _ContractDetailScreenState extends State<ContractDetailScreen> {
                   padding: const EdgeInsets.all(16.0),
                   children: [
                     _buildContractSummaryCard(),
+                    if (_c['status'] == 'Đã từ chối' || _c['status'] == 'Đã thu hồi')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: ContractSigningDecisionDetails(
+                          closedAt: _c['signingClosedAt']?.toString(),
+                          reason: _c['signingCloseReason']?.toString(),
+                        ),
+                      ),
                     const SizedBox(height: 16),
                     _buildTenantSection(),
                     const SizedBox(height: 16),

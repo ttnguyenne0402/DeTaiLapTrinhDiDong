@@ -58,6 +58,9 @@ builder.Services.AddScoped<Backend.Services.IMaintenanceService,
 
 // 8. Đăng ký HttpClient
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<Backend.Services.PostImageStorage>();
+builder.Services.AddScoped<Backend.Services.FirebasePushService>();
+builder.Services.AddHostedService<Backend.Services.FirebasePushWorker>();
 
 // 9. Cấu hình JWT
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -142,6 +145,12 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+var postImages = app.Services.GetRequiredService<Backend.Services.PostImageStorage>();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(postImages.DirectoryPath),
+    RequestPath = Backend.Services.PostImageStorage.RequestPath
+});
 
 // 13. Cấu hình Swagger
 if (app.Environment.IsDevelopment())

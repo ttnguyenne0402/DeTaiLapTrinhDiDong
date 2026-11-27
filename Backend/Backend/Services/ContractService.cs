@@ -47,11 +47,12 @@ namespace Backend.Services
                                c.PaymentCycle == "quarterly" ? "Hàng quý" : c.PaymentCycle
             });
         }
-        public async Task<object> GetContractDetailAsync(string contractId)
+        public async Task<object?> GetContractDetailAsync(string contractId, string tenantId)
         {
             var contract = await _repository.GetByIdAsync(contractId);
 
-            if (contract == null) return null;
+            if (contract == null || !string.Equals(contract.TenantId, tenantId, StringComparison.OrdinalIgnoreCase))
+                return null;
 
             List<string> amenities = new List<string>();
             if (contract.Room != null && !string.IsNullOrEmpty(contract.Room.PropertyId))
@@ -75,6 +76,9 @@ namespace Backend.Services
                 roomId = contract.RoomId,
                 roomName = contract.Room != null ? contract.Room.Name : "Phòng trọ",
                 status = contract.Status,
+                signingClosedAt = contract.SigningClosedAt.HasValue
+                    ? DateTime.SpecifyKind(contract.SigningClosedAt.Value, DateTimeKind.Utc) : (DateTime?)null,
+                signingCloseReason = contract.SigningCloseReason,
                 startDate = contract.StartDate.ToString("dd/MM/yyyy"),
                 endDate = contract.EndDate.ToString("dd/MM/yyyy"),
                 rent = contract.Rent,

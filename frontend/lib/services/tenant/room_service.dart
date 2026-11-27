@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../../utils/post_image_path.dart';
+
 class RoomService {
-  static const String baseUrl = 'http://10.0.2.2:5093/api';
+  static const String baseUrl = '$postImageApiOrigin/api';
 
   Future<List<Map<String, dynamic>>> getRooms() async {
     try {
@@ -27,7 +29,7 @@ class RoomService {
       return data.map((item) {
         final room = Map<String, dynamic>.from(item);
 
-        room['image'] ??= '';
+        _applyImages(room);
         room['amenities'] = List<String>.from(room['amenities'] ?? []);
 
         return room;
@@ -57,7 +59,7 @@ class RoomService {
 
       final room = Map<String, dynamic>.from(jsonData['data']);
 
-      room['image'] ??= '';
+      _applyImages(room);
       room['amenities'] = List<String>.from(room['amenities'] ?? []);
 
       return room;
@@ -79,5 +81,21 @@ class RoomService {
       }
     } catch (_) {}
     return {};
+  }
+
+  void _applyImages(Map<String, dynamic> room) {
+    final images = (room['images'] as List? ?? [])
+        .whereType<String>()
+        .where(isSharedPostImage)
+        .toList();
+    if (images.isEmpty) {
+      final fallback = room['image']?.toString() ?? '';
+      images.addAll(
+        fallback.split(',').map((s) => s.trim()).where(isSharedPostImage),
+      );
+    }
+    final paths = images.map(postImageDisplayPath).toList();
+    room['images'] = paths;
+    room['image'] = paths.isEmpty ? '' : paths.first;
   }
 }

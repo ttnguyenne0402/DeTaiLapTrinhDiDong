@@ -20,7 +20,7 @@ namespace Backend.Repositories
             // Join qua bảng Contract vì Invoice không có TenantId
             return await _context.Invoices
                 .Include(i => i.Contract)
-                .Where(i => i.Contract.TenantId == tenantId)
+                .Where(i => i.Contract.TenantId == tenantId && i.Status != "draft")
                 .OrderByDescending(i => i.IssueDate)
                 .ToListAsync();
         }
@@ -31,7 +31,8 @@ namespace Backend.Repositories
             return await _context.Invoices
                 .Include(i => i.InvoiceItems)
                 .Include(i => i.BankAccount)
-                .FirstOrDefaultAsync(i => i.Id == id);
+                .Include(i => i.Contract)
+                .FirstOrDefaultAsync(i => i.Id == id && i.Status != "draft");
         }
 
         public async Task UpdateAsync(Invoice invoice)

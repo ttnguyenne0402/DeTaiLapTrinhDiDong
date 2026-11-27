@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Backend.DTOs;
 using Backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Backend.Helpers;
@@ -270,8 +272,12 @@ namespace Backend.Controllers
 
         // 3. POST: /api/OwnerInvoices (Tính toán cước & Lập hóa đơn mới)
         [HttpPost]
+        [Authorize(Roles = "owner,landlord")]
         public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest req)
         {
+            var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(ownerId)) return Unauthorized();
+
             try
             {
                 var contract = await _context.Contracts
@@ -284,42 +290,13 @@ namespace Backend.Controllers
                 {
                     return NotFound(new { message = "Không tìm thấy hợp đồng." });
                 }
+                if (!OwnerHelper.ResolveOwnerIds(ownerId).Contains(contract.OwnerId, StringComparer.OrdinalIgnoreCase)) return Forbid();
 
-               var lastReading = await _context.UtilityReadings
-                              .Where(u => u.RoomId == contract.RoomId)
-                              .OrderByDescending(u => u.Month)
-                              .ThenByDescending(u => u.CreatedAt)
-                              .FirstOrDefaultAsync();
-
-               decimal oldElectric = lastReading != null
-                              ? lastReading.ElectricityNew
-                              : contract.InitialElectricityReading;
-
-               decimal oldWater = lastReading != null
-                              ? lastReading.WaterNew
-                              : contract.InitialWaterReading;
-
-               decimal electricUnitPrice = 3800;
-               decimal waterUnitPrice = 25000;
-               decimal totalServiceAmount = 0;
-
-               foreach (var cs in contract.ContractServices)
-               {
-                    var name = cs.Service?.Name?.ToLower() ?? "";
-                    if (name.Contains("điện")) electricUnitPrice = cs.UnitPrice;
-                    else if (name.Contains("nước")) waterUnitPrice = cs.UnitPrice;
-                    else totalServiceAmount += cs.UnitPrice;
-               }
-
-               decimal electricUsage = Math.Max(0, req.NewElectric - oldElectric);
-               decimal waterUsage = Math.Max(0, req.NewWater - oldWater);
-
-               decimal electricAmount = electricUsage * electricUnitPrice;
-               decimal waterAmount = waterUsage * waterUnitPrice;
-               decimal rentAmount = contract.Rent;
-
-               decimal subtotal = rentAmount + electricAmount + waterAmount + totalServiceAmount;
-               decimal total = Math.Max(0, subtotal - req.DiscountAmount);
+                var bankId = string.IsNullOrWhiteSpace(req.BankAccountId) ? null : req.BankAccountId.Trim();
+                if (bankId != null && !await ActiveBankAccounts(ownerId).AnyAsync(b => b.Id == bankId))
+                {
+                    return BadRequest(new { message = "Tài khoản ngân hàng đã chọn không thuộc tài khoản của bạn hoặc đã ngừng hoạt động." });
+                }
 
                var today = DateOnly.FromDateTime(DateTime.UtcNow);
                var billingMonth = new DateOnly(req.Year, req.Month, 1);
@@ -333,24 +310,27 @@ namespace Backend.Controllers
                    return BadRequest(new { message = $"Phòng {contract.Room?.Name} đã được phát hành hóa đơn cho Tháng {req.Month}/{req.Year} rồi!" });
                }
 
-               string? validBankId = string.IsNullOrWhiteSpace(req.BankAccountId) ? null : req.BankAccountId;
-
-
-               if (validBankId != null)
-               {
-                 var bankExists = await _context.BankAccounts.AnyAsync(b => b.Id == validBankId);
-                 if (!bankExists) validBankId = null; // Tránh lỗi Khóa ngoại SQL
-               }
-
+               var lastReading = await _context.UtilityReadings
+                   .Where(u => u.RoomId == contract.RoomId && u.Month <= billingMonth)
+                   .OrderByDescending(u => u.Month)
+                   .ThenByDescending(u => u.CreatedAt)
+                   .FirstOrDefaultAsync();
+               var existingReading = lastReading?.Month == billingMonth ? lastReading : null;
+               var oldElectric = existingReading?.ElectricityOld ?? lastReading?.ElectricityNew ?? contract.InitialElectricityReading;
+               var oldWater = existingReading?.WaterOld ?? lastReading?.WaterNew ?? contract.InitialWaterReading;
+               var invoiceId = "inv_" + Guid.NewGuid().ToString("N")[..8];
+               var (items, electricUnitPrice, waterUnitPrice) = BuildInvoiceItems(invoiceId, contract, oldElectric, req.NewElectric, oldWater, req.NewWater);
+               var subtotal = items.Sum(item => item.Amount);
+               var total = Math.Max(0, subtotal - req.DiscountAmount);
 
                string uniqueCode = $"#HD-T{req.Month:D2}-{contract.Room?.Name?.Replace(" ", "")}-{new Random().Next(100, 999)}";
 
                 var invoice = new Invoice
                 {
-                    Id = "inv_" + Guid.NewGuid().ToString("N")[..8],
+                    Id = invoiceId,
                     InvoiceCode = uniqueCode,
                     ContractId = contract.Id,
-                    BankAccountId = validBankId, // Đã được xử lý gán NULL an toàn nếu trống
+                    BankAccountId = bankId,
                     BillingMonth = billingMonth,
                     IssueDate = today,
                     DueDate = dueDate,
@@ -362,35 +342,33 @@ namespace Backend.Controllers
                     UpdatedAt = DateTime.UtcNow
                 };
 
-                var existingReading = await _context.UtilityReadings
-                    .FirstOrDefaultAsync(u => u.RoomId == contract.RoomId && u.Month == billingMonth);
-
-                if (existingReading != null)
+                var reading = existingReading;
+                if (reading == null)
                 {
-                    existingReading.ElectricityNew = req.NewElectric;
-                    existingReading.WaterNew = req.NewWater;
-                    existingReading.UpdatedAt = DateTime.UtcNow;
-                }
-                else
-                {
-                    var utilityReading = new UtilityReading
+                    reading = new UtilityReading
                     {
                         Id = "ur_" + Guid.NewGuid().ToString("N")[..8],
                         RoomId = contract.RoomId,
                         Month = billingMonth,
                         ElectricityOld = oldElectric,
-                        ElectricityNew = req.NewElectric,
-                        ElectricityPrice = electricUnitPrice,
                         WaterOld = oldWater,
-                        WaterNew = req.NewWater,
-                        WaterPrice = waterUnitPrice,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
+                        CreatedAt = DateTime.UtcNow
                     };
-                    _context.UtilityReadings.Add(utilityReading);
+                    _context.UtilityReadings.Add(reading);
                 }
+                reading.ElectricityNew = req.NewElectric;
+                reading.ElectricityPrice = electricUnitPrice;
+                reading.WaterNew = req.NewWater;
+                reading.WaterPrice = waterUnitPrice;
+                reading.UpdatedAt = DateTime.UtcNow;
+                invoice.UtilityReadingId = reading.Id;
 
                 _context.Invoices.Add(invoice);
+                _context.InvoiceItems.AddRange(items);
+                if (invoice.Status == "unpaid")
+                {
+                    NotifyTenantAboutInvoice(invoice, contract.TenantId, newlyIssued: true);
+                }
 
                 contract.InitialElectricityReading = req.NewElectric;
                 contract.InitialWaterReading = req.NewWater;
@@ -400,7 +378,7 @@ namespace Backend.Controllers
 
                 return Ok(new
                 {
-                    message = "Lập hóa đơn thành công!",
+                    message = invoice.Status == "draft" ? "Đã lưu hóa đơn nháp!" : "Đã phát hành hóa đơn thành công!",
                     invoiceId = invoice.Id,
                     code = invoice.InvoiceCode,
                     subtotal = subtotal,
@@ -463,8 +441,12 @@ namespace Backend.Controllers
 
         // 5. GET: /api/OwnerInvoices/{id} (Chi tiết hóa đơn đầy đủ kèm tài khoản ngân hàng)
         [HttpGet("{id}")]
+        [Authorize(Roles = "owner,landlord")]
         public async Task<IActionResult> GetInvoiceDetail(string id)
         {
+            var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(ownerId)) return Unauthorized();
+
             try
             {
                 var invoice = await _context.Invoices
@@ -484,6 +466,7 @@ namespace Backend.Controllers
                 }
 
                 var contract = invoice.Contract;
+                if (contract == null || !OwnerHelper.ResolveOwnerIds(ownerId).Contains(contract.OwnerId, StringComparer.OrdinalIgnoreCase)) return Forbid();
                 var reading = invoice.UtilityReading;
 
                 decimal electricAmount = 0;
@@ -548,13 +531,14 @@ namespace Backend.Controllers
                     total = invoice.Total,
                     otherServices = otherServices,
 
-                    // Thông tin ngân hàng trả về cho app Người thuê xem & quét VietQR
-                    bankAccount = invoice.BankAccount != null ? new
+                    bankAccountId = invoice.BankAccountId,
+                    bankAccount = invoice.BankAccount is { } bank && bank.UserId == ownerId ? new
                     {
-                        bankCode = invoice.BankAccount.BankCode,
-                        bankName = invoice.BankAccount.BankName,
-                        accountNumber = invoice.BankAccount.AccountNumber,
-                        accountHolder = invoice.BankAccount.AccountHolder
+                        id = bank.Id,
+                        bankCode = bank.BankCode,
+                        bankName = bank.BankName,
+                        accountNumber = bank.AccountNumber,
+                        accountHolder = bank.AccountHolder
                     } : null
                 });
             }
@@ -696,12 +680,15 @@ namespace Backend.Controllers
         }
 
         [HttpGet("bank-accounts")]
+        [Authorize(Roles = "owner,landlord")]
         public async Task<IActionResult> GetBankAccounts()
         {
+            var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(ownerId)) return Unauthorized();
+
             try
             {
-                var banks = await _context.BankAccounts
-                    .Where(b => b.Status == "active")
+                var banks = await ActiveBankAccounts(ownerId)
                     .Select(b => new
                     {
                         id = b.Id,
@@ -720,6 +707,9 @@ namespace Backend.Controllers
                 return StatusCode(500, new { message = "Lỗi nạp danh sách ngân hàng", error = ex.Message });
             }
         }
+
+        private IQueryable<BankAccount> ActiveBankAccounts(string ownerId) =>
+            _context.BankAccounts.Where(b => b.UserId == ownerId && b.Status == "active");
 
         // POST: /api/OwnerInvoices/save-utility-reading
         [HttpPost("save-utility-reading")]
@@ -757,8 +747,16 @@ namespace Backend.Controllers
                     .ThenByDescending(u => u.CreatedAt)
                     .FirstOrDefaultAsync();
 
-                decimal oldElectric = lastReading != null ? lastReading.ElectricityNew : contract.InitialElectricityReading;
-                decimal oldWater = lastReading != null ? lastReading.WaterNew : contract.InitialWaterReading;
+                decimal oldElectric = existingReading?.ElectricityOld ?? lastReading?.ElectricityNew ?? contract.InitialElectricityReading;
+                decimal oldWater = existingReading?.WaterOld ?? lastReading?.WaterNew ?? contract.InitialWaterReading;
+                if (req.NewElectric < oldElectric || req.NewWater < oldWater ||
+                    req.NewElectric < 0 || req.NewWater < 0 ||
+                    req.NewElectric >= 100_000_000m || req.NewWater >= 100_000_000m ||
+                    decimal.Round(req.NewElectric, 2) != req.NewElectric ||
+                    decimal.Round(req.NewWater, 2) != req.NewWater)
+                {
+                    return BadRequest(new { message = "Chỉ số mới phải hợp lệ, có tối đa hai chữ số lẻ và không nhỏ hơn chỉ số cũ." });
+                }
 
                 if (existingReading != null)
                 {
@@ -801,13 +799,21 @@ namespace Backend.Controllers
 
         // PUT: /api/OwnerInvoices/{id} (Chỉnh sửa & Phát hành lại hóa đơn chưa thanh toán)
         [HttpPut("{id}")]
+        [Authorize(Roles = "owner,landlord")]
         public async Task<IActionResult> UpdateInvoice(string id, [FromBody] CreateInvoiceRequest req)
         {
+            var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(ownerId)) return Unauthorized();
+
             try
             {
                 var invoice = await _context.Invoices
                     .Include(i => i.InvoiceItems)
                     .Include(i => i.Contract)
+                        .ThenInclude(c => c.Room)
+                    .Include(i => i.Contract)
+                        .ThenInclude(c => c.ContractServices)
+                            .ThenInclude(cs => cs.Service)
                     .FirstOrDefaultAsync(i => i.Id == id);
 
                 if (invoice == null)
@@ -815,50 +821,48 @@ namespace Backend.Controllers
                     return NotFound(new { message = "Không tìm thấy hóa đơn." });
                 }
 
+                var contract = invoice.Contract;
+                if (contract == null || !OwnerHelper.ResolveOwnerIds(ownerId).Contains(contract.OwnerId, StringComparer.OrdinalIgnoreCase)) return Forbid();
+
                 if (invoice.Status == "paid")
                 {
                     return BadRequest(new { message = "Hóa đơn đã được thanh toán, không thể chỉnh sửa!" });
                 }
 
-                var contract = invoice.Contract;
-                if (contract == null) return NotFound(new { message = "Không tìm thấy hợp đồng." });
-
-                decimal electricUnitPrice = 3800;
-                decimal waterUnitPrice = 25000;
-                decimal totalServiceAmount = 0;
-
-                foreach (var cs in contract.ContractServices)
+                var bankId = string.IsNullOrWhiteSpace(req.BankAccountId) ? null : req.BankAccountId.Trim();
+                if (bankId != null && !await ActiveBankAccounts(ownerId).AnyAsync(b => b.Id == bankId))
                 {
-                    var name = cs.Service?.Name?.ToLower() ?? "";
-                    if (name.Contains("điện")) electricUnitPrice = cs.UnitPrice;
-                    else if (name.Contains("nước")) waterUnitPrice = cs.UnitPrice;
-                    else totalServiceAmount += cs.UnitPrice;
+                    return BadRequest(new { message = "Tài khoản ngân hàng đã chọn không thuộc tài khoản của bạn hoặc đã ngừng hoạt động." });
                 }
 
-                decimal electricUsage = Math.Max(0, req.NewElectric - req.OldElectric);
-                decimal waterUsage = Math.Max(0, req.NewWater - req.OldWater);
-
-                decimal electricAmount = electricUsage * electricUnitPrice;
-                decimal waterAmount = waterUsage * waterUnitPrice;
-                decimal rentAmount = contract.Rent;
-
-                decimal subtotal = rentAmount + electricAmount + waterAmount + totalServiceAmount;
+                var (items, electricUnitPrice, waterUnitPrice) = BuildInvoiceItems(invoice.Id, contract, req.OldElectric, req.NewElectric, req.OldWater, req.NewWater);
+                var subtotal = items.Sum(item => item.Amount);
                 decimal total = Math.Max(0, subtotal - req.DiscountAmount);
 
                 invoice.Subtotal = subtotal;
                 invoice.Discount = req.DiscountAmount > 0 ? req.DiscountAmount : null;
                 invoice.Total = total;
-                invoice.BankAccountId = string.IsNullOrWhiteSpace(req.BankAccountId) ? null : req.BankAccountId;
+                invoice.BankAccountId = bankId;
                 invoice.UpdatedAt = DateTime.UtcNow;
+                var newlyIssued = invoice.Status == "draft" && req.Status == "unpaid";
+                if (newlyIssued)
+                {
+                    invoice.Status = "unpaid";
+                    invoice.IssueDate = DateOnly.FromDateTime(DateTime.UtcNow);
+                    invoice.DueDate = invoice.IssueDate.AddDays(5);
+                }
 
                 var reading = await _context.UtilityReadings.FirstOrDefaultAsync(u => u.RoomId == contract.RoomId && u.Month == invoice.BillingMonth);
                 if (reading != null)
                 {
                     reading.ElectricityOld = req.OldElectric;
                     reading.ElectricityNew = req.NewElectric;
+                    reading.ElectricityPrice = electricUnitPrice;
                     reading.WaterOld = req.OldWater;
                     reading.WaterNew = req.NewWater;
+                    reading.WaterPrice = waterUnitPrice;
                     reading.UpdatedAt = DateTime.UtcNow;
+                    invoice.UtilityReadingId = reading.Id;
                 }
 
                 contract.InitialElectricityReading = req.NewElectric;
@@ -867,37 +871,79 @@ namespace Backend.Controllers
 
                 _context.InvoiceItems.RemoveRange(invoice.InvoiceItems);
 
-                var items = new List<InvoiceItem>
-                {
-                    new InvoiceItem { Id = "item_" + Guid.NewGuid().ToString("N")[..8], InvoiceId = invoice.Id, Type = "rent", Description = $"Tiền thuê phòng ({contract.Room?.Name})", Quantity = 1, UnitPrice = rentAmount, Amount = rentAmount, CreatedAt = DateTime.UtcNow },
-                    new InvoiceItem { Id = "item_" + Guid.NewGuid().ToString("N")[..8], InvoiceId = invoice.Id, Type = "electricity", Description = $"Tiền điện ({req.OldElectric} ➔ {req.NewElectric} kWh)", Quantity = electricUsage, UnitPrice = electricUnitPrice, Amount = electricAmount, CreatedAt = DateTime.UtcNow },
-                    new InvoiceItem { Id = "item_" + Guid.NewGuid().ToString("N")[..8], InvoiceId = invoice.Id, Type = "water", Description = $"Tiền nước ({req.OldWater} ➔ {req.NewWater} m³)", Quantity = waterUsage, UnitPrice = waterUnitPrice, Amount = waterAmount, CreatedAt = DateTime.UtcNow }
-                };
-
                 _context.InvoiceItems.AddRange(items);
 
-                if (!string.IsNullOrEmpty(contract.TenantId))
+                if (invoice.Status != "draft")
                 {
-                    _context.Notifications.Add(new Notification
-                    {
-                        Id = "notif_" + Guid.NewGuid().ToString("N")[..8],
-                        UserId = contract.TenantId,
-                        Title = "Hóa đơn đã được cập nhật 📝",
-                        Message = $"Chủ trọ vừa điều chỉnh lại Hóa đơn {invoice.InvoiceCode}. Tổng tiền mới: {total:N0}đ.",
-                        Type = "invoice_updated",
-                        ReferenceId = invoice.Id,
-                        CreatedAt = DateTime.UtcNow
-                    });
+                    NotifyTenantAboutInvoice(invoice, contract.TenantId, newlyIssued);
                 }
 
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "Cập nhật và phát hành lại hóa đơn thành công!", invoiceId = invoice.Id });
+                var message = invoice.Status == "draft" ? "Đã lưu hóa đơn nháp!" :
+                    newlyIssued ? "Đã phát hành hóa đơn thành công!" : "Đã cập nhật hóa đơn!";
+                return Ok(new { message, invoiceId = invoice.Id });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi khi cập nhật hóa đơn", error = ex.Message });
             }
+        }
+
+        private static (List<InvoiceItem> Items, decimal ElectricRate, decimal WaterRate) BuildInvoiceItems(
+            string invoiceId, Contract contract, decimal oldElectric, decimal newElectric, decimal oldWater, decimal newWater)
+        {
+            decimal electricRate = 3800;
+            decimal waterRate = 25000;
+            var createdAt = DateTime.UtcNow;
+
+            InvoiceItem MakeItem(string type, string description, decimal quantity, decimal unitPrice, string? serviceId = null) => new()
+            {
+                Id = "item_" + Guid.NewGuid().ToString("N"),
+                InvoiceId = invoiceId,
+                Type = type,
+                Description = description,
+                Quantity = quantity,
+                UnitPrice = unitPrice,
+                Amount = decimal.Round(quantity * unitPrice, 2, MidpointRounding.AwayFromZero),
+                ServiceId = serviceId,
+                CreatedAt = createdAt
+            };
+
+            var services = new List<InvoiceItem>();
+            foreach (var service in contract.ContractServices)
+            {
+                var name = service.Service?.Name ?? "Dịch vụ";
+                if (name.Contains("điện", StringComparison.OrdinalIgnoreCase)) electricRate = service.UnitPrice;
+                else if (name.Contains("nước", StringComparison.OrdinalIgnoreCase)) waterRate = service.UnitPrice;
+                else services.Add(MakeItem("service", name, 1, service.UnitPrice, service.ServiceId));
+            }
+
+            var items = new List<InvoiceItem>
+            {
+                MakeItem("rent", $"Tiền thuê phòng ({contract.Room?.Name})", 1, contract.Rent),
+                MakeItem("electricity", $"Tiền điện ({oldElectric:0.##} → {newElectric:0.##} kWh)", Math.Max(0, newElectric - oldElectric), electricRate),
+                MakeItem("water", $"Tiền nước ({oldWater:0.##} → {newWater:0.##} m³)", Math.Max(0, newWater - oldWater), waterRate)
+            };
+            items.AddRange(services);
+            return (items, electricRate, waterRate);
+        }
+
+        private void NotifyTenantAboutInvoice(Invoice invoice, string tenantId, bool newlyIssued)
+        {
+            if (string.IsNullOrWhiteSpace(tenantId)) return;
+
+            _context.Notifications.Add(new Notification
+            {
+                Id = "notif_" + Guid.NewGuid().ToString("N"),
+                UserId = tenantId,
+                Title = newlyIssued ? "Hóa đơn mới" : "Hóa đơn đã được cập nhật",
+                Message = $"Hóa đơn {invoice.InvoiceCode} kỳ {invoice.BillingMonth:MM/yyyy}. Tổng tiền: {invoice.Total:N0}đ.",
+                Type = newlyIssued ? "invoice" : "invoice_updated",
+                ReferenceId = invoice.Id,
+                ReferenceType = "invoice",
+                CreatedAt = DateTime.UtcNow
+            });
         }
     }
 

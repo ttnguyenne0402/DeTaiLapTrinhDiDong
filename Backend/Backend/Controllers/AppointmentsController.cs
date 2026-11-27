@@ -1,8 +1,10 @@
 using Backend.DT0s;
 using Backend.Helpers;
 using Backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Backend.Controllers
 {
@@ -147,6 +149,7 @@ namespace Backend.Controllers
 
         // 2. PUT: api/owner/appointments/{id}/status (Xác nhận, từ chối, đổi giờ, hoàn thành hoặc hủy lịch)
         [HttpPut("{id}/status")]
+        [Authorize(Roles = "owner,landlord")]
         public async Task<IActionResult> UpdateStatus(string id, [FromBody] UpdateAppointmentStatusDto dto)
         {
             try
@@ -159,6 +162,13 @@ namespace Backend.Controllers
                 if (appointment == null)
                 {
                     return NotFound(new { message = "Không tìm thấy lịch hẹn." });
+                }
+
+                var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+                var propertyOwnerId = appointment.Room?.Property?.OwnerId;
+                if (!OwnerHelper.ResolveOwnerIds(ownerId).Contains(propertyOwnerId, StringComparer.OrdinalIgnoreCase))
+                {
+                    return Forbid();
                 }
 
                 string input = (dto.Status ?? "").Trim().ToLower();

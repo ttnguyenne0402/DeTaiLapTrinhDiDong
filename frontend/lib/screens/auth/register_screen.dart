@@ -86,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await AuthService.register(
+      final result = await AuthService.register(
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
@@ -96,8 +96,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      _showNotice('??ng k? th?nh c?ng. Em c? th? ??ng nh?p.');
-      Navigator.pop(context);
+      final String message = result['message']?.toString() ?? 'Đăng ký thành công! Bạn có thể đăng nhập.';
+      Navigator.pop(context, message);
     } catch (error) {
       if (!mounted) return;
 
@@ -261,49 +261,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      debugPrint('[ZALO] 8. Đang gửi yêu cầu đăng ký đến backend');
+      debugPrint('[ZALO] 8. Đang hiển thị form nhập thông tin SĐT & mật khẩu');
 
-      // Gửi access token và vai trò đã chọn đến ASP.NET Core.
-      final credentials = await showDialog<Map<String, String>>(
+      // Hiển thị dialog hoàn tất đăng ký và thực hiện gọi API ngay trong dialog.
+      // Nếu SĐT bị trùng hoặc lỗi, dialog vẫn giữ nguyên để người dùng chỉnh sửa lại SĐT mà không bị đóng form.
+      final bool? isRegistered = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const _ZaloRegistrationDetailsDialog(),
-      );
-      if (!mounted || credentials == null) return;
-
-      final resultApi = await AuthService.zaloRegister(
-        accessToken: accessToken,
-        role: _selectedRole == 'landlord' ? 'owner' : 'tenant',
-        phone: credentials['phone']!,
-        password: credentials['password']!,
+        builder: (_) => _ZaloRegistrationDetailsDialog(
+          accessToken: accessToken,
+          role: _selectedRole == 'landlord' ? 'owner' : 'tenant',
+        ),
       );
 
-      debugPrint('[ZALO] 9. Backend trả kết quả: $resultApi');
+      if (!mounted || isRegistered != true) return;
 
-      if (!mounted) return;
+      _showNotice('Đăng ký Zalo thành công! Vui lòng đăng nhập.');
 
-      final bool isNewUser = resultApi['isNewUser'] == true;
-      final String message = resultApi['message']?.toString() ?? '';
+      await Future.delayed(const Duration(milliseconds: 900));
 
-      if (isNewUser) {
-        _showNotice(
-          message.isNotEmpty
-              ? message
-              : 'Đăng ký Zalo thành công! Vui lòng đăng nhập.',
-        );
-
-        await Future.delayed(const Duration(milliseconds: 900));
-
-        if (mounted) {
-          Navigator.pop(context);
-        }
-      } else {
-        _showNotice(
-          message.isNotEmpty
-              ? message
-              : 'Tài khoản Zalo đã tồn tại. Vui lòng đăng nhập.',
-          isError: true,
-        );
+      if (mounted) {
+        Navigator.pop(context);
       }
     } catch (error, stackTrace) {
       debugPrint('[ZALO] LỖI: $error');
@@ -643,7 +621,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 }
 
 class _ZaloRegistrationDetailsDialog extends StatefulWidget {
-  const _ZaloRegistrationDetailsDialog();
+  final String accessToken;
+  final String role;
+
+  const _ZaloRegistrationDetailsDialog({
+    required this.accessToken,
+    required this.role,
+  });
 
   @override
   State<_ZaloRegistrationDetailsDialog> createState() =>
@@ -658,6 +642,8 @@ class _ZaloRegistrationDetailsDialogState
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isSubmitting = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -679,12 +665,47 @@ class _ZaloRegistrationDetailsDialogState
     ).join();
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    Navigator.pop(context, {
-      'phone': _phoneController.text.trim(),
-      'password': _passwordController.text,
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate() || _isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
     });
+
+    try {
+      final resultApi = await AuthService.zaloRegister(
+        accessToken: widget.accessToken,
+        role: widget.role,
+        phone: _phoneController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      final bool isNewUser = resultApi['isNewUser'] == true;
+      final String message = resultApi['message']?.toString() ?? '';
+
+      if (isNewUser) {
+        if (mounted) {
+          Navigator.pop(context, true); // Thành công -> Đóng dialog
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+            _errorMessage = message.isNotEmpty
+                ? message
+                : 'Tài khoản Zalo đã tồn tại. Vui lòng đăng nhập.';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    }
   }
 
   @override
@@ -696,15 +717,41 @@ class _ZaloRegistrationDetailsDialogState
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text('Nhập số điện thoại liên hệ và tạo mật khẩu cho Trọ Ơi.'),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.red.shade900, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
+                enabled: !_isSubmitting,
                 decoration: const InputDecoration(
                   labelText: 'Số điện thoại',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
                 ),
                 validator: (value) {
                   final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
@@ -718,10 +765,12 @@ class _ZaloRegistrationDetailsDialogState
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                enabled: !_isSubmitting,
                 decoration: InputDecoration(
                   labelText: 'Mật khẩu Trọ Ơi',
                   helperText: 'Tối thiểu 8 ký tự',
                   border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
@@ -734,13 +783,15 @@ class _ZaloRegistrationDetailsDialogState
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () {
-                    final suggestion = _suggestPassword();
-                    setState(() {
-                      _passwordController.text = suggestion;
-                      _confirmPasswordController.text = suggestion;
-                    });
-                  },
+                  onPressed: _isSubmitting
+                      ? null
+                      : () {
+                          final suggestion = _suggestPassword();
+                          setState(() {
+                            _passwordController.text = suggestion;
+                            _confirmPasswordController.text = suggestion;
+                          });
+                        },
                   icon: const Icon(Icons.auto_awesome),
                   label: const Text('Gợi ý mật khẩu mạnh'),
                 ),
@@ -748,9 +799,11 @@ class _ZaloRegistrationDetailsDialogState
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
+                enabled: !_isSubmitting,
                 decoration: InputDecoration(
                   labelText: 'Xác nhận mật khẩu',
                   border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_reset),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                     icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
@@ -766,10 +819,19 @@ class _ZaloRegistrationDetailsDialogState
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context, false),
           child: const Text('Hủy'),
         ),
-        FilledButton(onPressed: _save, child: const Text('Tạo tài khoản')),
+        FilledButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Tạo tài khoản'),
+        ),
       ],
     );
   }

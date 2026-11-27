@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:signature/signature.dart';
+import '../../widgets/common/contract_signing_decision.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/auth_storage.dart';
@@ -146,6 +147,8 @@ class HopDongMoi extends State<Contract_form> {
   String? _pdfFloor;
 
   Future<void> _pickPdfFile() async {
+    if (!_canImportPdf) return;
+
     try {
       final result = await FilePickerPlatform.instance.pickFiles(
         type: FileType.custom,
@@ -170,6 +173,8 @@ class HopDongMoi extends State<Contract_form> {
         } catch (e) {
           debugPrint('Lỗi đọc nội dung PDF bằng Syncfusion: $e');
         }
+
+        if (!mounted || !_canImportPdf) return;
 
         setState(() {
           _selectedPdfFileName = fileName;
@@ -425,6 +430,7 @@ class HopDongMoi extends State<Contract_form> {
   }
 
   bool get _isDraft => widget.contract?['status'] == 'Bản nháp' || widget.contract?['status'] == 'draft';
+  bool get _canImportPdf => widget.contract == null || _isDraft;
   bool get _isPendingSignature => widget.contract?['status'] == 'Chờ ký' || widget.contract?['status'] == 'pending';
   bool get _isActive => widget.contract?['status'] == 'Đang hiệu lực' || widget.contract?['status'] == 'active';
 
@@ -492,8 +498,10 @@ class HopDongMoi extends State<Contract_form> {
   Future<void> _loadInitialData() async {
     setState(() => _isLoadingData = true);
     final ownerId = await AuthStorage.getUserId() ?? '';
+    final currentRoomId = widget.contract?['roomId']?.toString();
     final rooms = await ContractService.getAvailableRooms(
       ownerId: ownerId,
+      selectedRoomId: _isPendingSignature ? currentRoomId : null,
       includeRoomId: widget.initialRoomId,
     );
     final apts = await ContractService.getAppointments();
@@ -1074,6 +1082,7 @@ class HopDongMoi extends State<Contract_form> {
 
   // 3. Ký hợp đồng
   Future<void> _signContract() async {
+    if (_isSubmitting) return;
     if (!_agreeTerms) {
       _showMessage('Vui lòng đồng ý với điều khoản hợp đồng.');
       return;
@@ -1089,8 +1098,7 @@ class HopDongMoi extends State<Contract_form> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Xác nhận ký hợp đồng'),
         content: const Text(
-          'Hai bên đã ký và đồng ý các điều khoản nội quy. '
-              'Bạn có chắc chắn muốn xác nhận hợp đồng không?',
+          'Bạn có muốn lưu chữ ký cho hợp đồng này?',
         ),
         actions: [
           TextButton(
@@ -1110,6 +1118,7 @@ class HopDongMoi extends State<Contract_form> {
 
     final ownerBytes = await _ownerSignatureController.toPngBytes();
     final tenantBytes = await _tenantSignatureController.toPngBytes();
+    if (!mounted || _isSubmitting) return;
 
     String ownerBase64 = ownerBytes != null ? base64Encode(ownerBytes) : (_existingOwnerSignature ?? '');
     String tenantBase64 = tenantBytes != null ? base64Encode(tenantBytes) : (_existingTenantSignature ?? '');
@@ -1125,26 +1134,45 @@ class HopDongMoi extends State<Contract_form> {
       return;
     }
 
+    setState(() => _isSubmitting = true);
     final success = await ContractService.signContract(
       contractId: contractId.toString(),
       ownerSignatureBase64: ownerBase64,
       tenantSignatureBase64: tenantBase64,
     );
 
-    if (success && mounted) {
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+    if (success) {
       setState(() {
         if (ownerBase64.isNotEmpty) _existingOwnerSignature = ownerBase64;
         if (tenantBase64.isNotEmpty) _existingTenantSignature = tenantBase64;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hợp đồng đã ký thành công và có hiệu lực!'),
+          content: Text('Đã lưu chữ ký hợp đồng.'),
           backgroundColor: AppColors.primaryGreen,
         ),
       );
       Navigator.pop(context, true);
     } else {
       _showMessage('Lỗi khi lưu chữ ký hợp đồng.');
+    }
+  }
+
+  Future<void> _withdrawSigning() async {
+    final id = widget.contract?['id'] ?? widget.contract?['code'];
+    if (id == null || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final closed = await closeContractSigning(
+        context,
+        contractId: id.toString(),
+        reject: false,
+      );
+      if (closed && mounted) Navigator.pop(context, true);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -1730,8 +1758,10 @@ class HopDongMoi extends State<Contract_form> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildPdfUploadSection(),
+                    if (_canImportPdf) ...[
+                      const SizedBox(height: 12),
+                      _buildPdfUploadSection(),
+                    ],
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -1947,14 +1977,22 @@ class HopDongMoi extends State<Contract_form> {
 
   Widget _buildBottomButtons() {
     if (_isPendingSignature) {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: (_agreeTerms && _bothSigned) ? _signContract : null,
-          icon: const Icon(Icons.draw, color: Colors.white),
-          label: const Text('Xác nhận ký hợp đồng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, padding: const EdgeInsets.symmetric(vertical: 12)),
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ElevatedButton.icon(
+            onPressed: !_isSubmitting && _agreeTerms && _bothSigned ? _signContract : null,
+            icon: const Icon(Icons.draw, color: Colors.white),
+            label: const Text('Xác nhận ký hợp đồng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen, padding: const EdgeInsets.symmetric(vertical: 12)),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: _isSubmitting ? null : _withdrawSigning,
+            style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('Thu hồi yêu cầu ký'),
+          ),
+        ],
       );
     }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../route/app_routes.dart';
 import '../../core/constants/app_colors.dart';
+import '../../route/app_routes.dart';
+import '../../services/auth_storage.dart';
+import '../../services/local_notification_service.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/owner/owner_dashboard.dart';
 import '../../screens/owner/contracts_manage.dart';
@@ -181,12 +184,7 @@ class OwnerDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     if (currentRoute != 'notifications') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const OwnerNotificationsScreen(),
-                        ),
-                      );
+                      Navigator.pushNamed(context, AppRoutes.ownerNotifications);
                     }
                   },
                 ),
@@ -529,12 +527,19 @@ class OwnerDrawer extends StatelessWidget {
               ),
             ),
             onPressed: () async {
+            final navigator = Navigator.of(context);
+
               Navigator.pop(dialogCtx);
+
+              await LocalNotificationService.instance.endPushSession();
               await AuthStorage.clearLogin();
-              if (!context.mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
+
+              if (!navigator.mounted) return;
+
+              navigator.pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => const LoginScreen(),
+                ),
                 (route) => false,
               );
             },

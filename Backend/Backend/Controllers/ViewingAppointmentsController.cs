@@ -1,8 +1,11 @@
 ﻿using Backend.DTOs;
 using Backend.Models;
+using Backend.Helpers;
 using Backend.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Backend.Controllers
 {
@@ -24,71 +27,95 @@ namespace Backend.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateAppointment([FromBody] ViewingAppointmentRequestDTO request, [FromServices] QuanLyPhongTroContext _context)
+        [Authorize]
+        public async Task<IActionResult> CreateAppointment(
+            [FromBody] ViewingAppointmentRequestDTO request,
+            [FromServices] QuanLyPhongTroContext context,
+            CancellationToken cancellationToken)
         {
-            if (!ModelState.IsValid)
+            var tenantId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(tenantId)) return Unauthorized();
+            if (!string.Equals(tenantId, request.TenantId, StringComparison.OrdinalIgnoreCase)) return Forbid();
+
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+            await RoomSigningLock.AcquireAsync(context, request.RoomId, cancellationToken);
+            // Hai yêu cầu đồng thời của cùng tài khoản phải kiểm tra và lưu theo thứ tự.
+            var lockName = $"viewing-appointment:{tenantId.ToUpperInvariant()}";
+            await context.Database.ExecuteSqlInterpolatedAsync($"""
+                DECLARE @result INT;
+                EXEC @result = sys.sp_getapplock @Resource = {lockName},
+                    @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 5000;
+                IF @result < 0 THROW 50001, 'Unable to lock viewing appointment creation.', 1;
+                """, cancellationToken);
+
+            var hasActiveAppointment = await context.ViewingAppointments.AnyAsync(
+                appointment => appointment.TenantId == tenantId &&
+                    appointment.RoomId == request.RoomId &&
+                    (appointment.Status == "pending" || appointment.Status == "confirmed" ||
+                     appointment.Status == "rescheduled"),
+                cancellationToken);
+            if (hasActiveAppointment)
             {
-                return BadRequest(ModelState);
+                return Conflict(new
+                {
+                    message = "Bạn đã có lịch xem phòng này. Mở Lịch hẹn để xem trạng thái hoặc hủy lịch trước khi đặt lại."
+                });
             }
 
+            var room = await context.Rooms.Include(r => r.Property)
+                .FirstOrDefaultAsync(r => r.Id == request.RoomId, cancellationToken);
+            if (room == null) return NotFound(new { message = "Không tìm thấy phòng cần đặt lịch." });
+            if (room.Status != "available" || await context.Contracts.AnyAsync(
+                c => c.RoomId == room.Id && (c.Status == "pending" || c.Status == "active"), cancellationToken))
+            {
+                return Conflict(new
+                {
+                    code = "room_unavailable",
+                    message = "Phòng đang được giữ hoặc đã cho thuê."
+                });
+            }
+
+            request.TenantId = tenantId;
+            request.RoomId = room.Id;
             var result = await _service.CreateAppointmentAsync(request);
+            var roomName = room.Property == null ? room.Name : $"{room.Name} ({room.Property.Name})";
+            var time = TimeOnly.FromTimeSpan(request.AppointmentTime).ToString("HH:mm");
+            var date = request.AppointmentDate.ToString("dd/MM/yyyy");
+            var now = DateTime.UtcNow;
 
-            // BẮT ĐẦU CHÈN CODE: Tự động tạo thông báo cho NGƯỜI THUÊ
-            try
+            context.Notifications.Add(new Notification
             {
-                var room = await _context.Rooms.Include(r => r.Property).FirstOrDefaultAsync(r => r.Id == request.RoomId);
-                string roomName = room != null ? $"{room.Name} ({room.Property?.Name})" : "phòng";
+                Id = "NOTIF_" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+                UserId = tenantId,
+                Title = "Đặt lịch thành công",
+                Message = $"Bạn đã gửi yêu cầu xem {roomName} vào lúc {time} ngày {date}. Vui lòng chờ chủ trọ xác nhận.",
+                Type = "viewing_appointment",
+                ReferenceId = result.Id,
+                ReferenceType = "viewing_appointment",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
 
-                var tenantNotif = new Notification
+            var ownerId = room.Property?.OwnerId;
+            if (!string.IsNullOrEmpty(ownerId))
+            {
+                context.Notifications.Add(new Notification
                 {
-                    Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
-                    UserId = request.TenantId, // Gửi cho chính người đặt
-                    Title = "Đặt lịch thành công",
-                    Message = $"Bạn đã gửi yêu cầu xem {roomName} vào lúc {request.AppointmentTime} ngày {request.AppointmentDate}. Vui lòng chờ chủ trọ xác nhận.",
-                    Type = "viewing_appointment",
-                    ReferenceId = "",
+                    Id = "NOTIF_" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+                    UserId = ownerId,
+                    Title = "Lịch hẹn xem phòng mới 📅",
+                    Message = $"Khách hàng vừa đặt lịch hẹn xem {roomName} vào lúc {time} ngày {date}. SĐT: {request.Phone}.",
+                    Type = "appointment_new",
+                    ReferenceId = result.Id,
                     ReferenceType = "viewing_appointment",
-                    CreatedAt = DateTime.Now,
-                    UpdatedAt = DateTime.Now
-                };
-
-                // Lấy Id của lịch hẹn vừa tạo gán vào ReferenceId
-                var idProp = result?.GetType().GetProperty("Id");
-                if (idProp != null)
-                {
-                    tenantNotif.ReferenceId = idProp.GetValue(result)?.ToString() ?? "";
-                }
-
-                _context.Notifications.Add(tenantNotif);
-
-                // 🔴 TỰ ĐỘNG TẠO THÔNG BÁO CHO CHỦ TRỌ KHI CÓ KHÁCH ĐẶT LỊCH
-                string? ownerId = room?.Property?.OwnerId;
-                if (!string.IsNullOrEmpty(ownerId))
-                {
-                    var ownerNotif = new Notification
-                    {
-                        Id = "NOTIF_" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper(),
-                        UserId = ownerId, // Gửi cho CHỦ TRỌ sở hữu phòng này
-                        Title = "Lịch hẹn xem phòng mới 📅",
-                        Message = $"Khách hàng vừa đặt lịch hẹn xem {roomName} vào lúc {request.AppointmentTime} ngày {request.AppointmentDate}. SĐT: {request.Phone}.",
-                        Type = "appointment_new",
-                        ReferenceId = tenantNotif.ReferenceId,
-                        ReferenceType = "viewing_appointment",
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-                    _context.Notifications.Add(ownerNotif);
-                }
-
-                await _context.SaveChangesAsync();
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Lỗi tạo thông báo đặt lịch cho người thuê.");
-            }
-            
 
-            return CreatedAtAction(nameof(GetTenantAppointments), new { tenantId = request.TenantId }, result);
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return CreatedAtAction(nameof(GetTenantAppointments), new { tenantId }, result);
         }
 
         // GET: api/viewing-appointments/tenant/{tenantId}

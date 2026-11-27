@@ -1,4 +1,4 @@
-import 'dart:io';
+import '../../widgets/common/shared_post_image.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../route/app_routes.dart';
@@ -271,80 +271,11 @@ class duyettin extends State<review> {
     );
   }
 
-  Widget _buildPostImage(String imgPath, {double width = double.infinity, double height = 160, BoxFit fit = BoxFit.cover}) {
-    if (imgPath.isEmpty) {
-      return Image.asset(
-        'assets/images/anhPhongDemo.jpg',
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (_, __, ___) => Container(
-          width: width,
-          height: height,
-          color: AppColors.lightGreen,
-          child: const Center(child: Icon(Icons.home, color: AppColors.primaryGreen, size: 32)),
-        ),
-      );
-    }
-
-    if (imgPath.startsWith('http://') || imgPath.startsWith('https://')) {
-      return Image.network(
-        imgPath,
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (_, __, ___) => Image.asset(
-          'assets/images/anhPhongDemo.jpg',
-          width: width,
-          height: height,
-          fit: fit,
-          errorBuilder: (_, __, ___) => Container(
-            width: width,
-            height: height,
-            color: AppColors.lightGreen,
-            child: const Icon(Icons.home, color: AppColors.primaryGreen, size: 32),
-          ),
-        ),
-      );
-    }
-
-    if (imgPath.contains('assets/')) {
-      final cleanPath = 'assets/' + imgPath.split('assets/').last;
-      return Image.asset(
-        cleanPath,
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (_, __, ___) => Container(
-          width: width,
-          height: height,
-          color: AppColors.lightGreen,
-          child: const Icon(Icons.home, color: AppColors.primaryGreen, size: 32),
-        ),
-      );
-    }
-
-    if (File(imgPath).existsSync()) {
-      return Image.file(
-        File(imgPath),
-        width: width,
-        height: height,
-        fit: fit,
-      );
-    }
-
-    final fullUrl = imgPath.startsWith('/') ? 'http://10.0.2.2:5093$imgPath' : 'http://10.0.2.2:5093/$imgPath';
-    return Image.network(
-      fullUrl,
-      width: width,
-      height: height,
-      fit: fit,
-      errorBuilder: (_, __, ___) => Image.asset(
-        'assets/images/anhPhongDemo.jpg',
-        width: width,
-        height: height,
-        fit: fit,
-      ),
-    );
+  Widget _buildPostImage(
+    String imgPath, {
+    double width = double.infinity,
+    double height = 160,
+  }) {
+    return SharedPostImage(path: imgPath, width: width, height: height);
   }
 }
